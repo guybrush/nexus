@@ -9,6 +9,7 @@ var fs      = require('fs')
   , spawn   = require('child_process').spawn
   , dnode   = require('dnode')
   , AA      = require('async-array')
+  , pf      = require('portfinder')
   , npm     = require('npm')
   , uuid    = require('node-uuid')
   , _config = config()
@@ -193,12 +194,18 @@ function start(opts, cb) {
   var script = /^\//.test(opts.script)
     ? opts.script
     : _config.apps+'/'+opts.script+'/server.js'
+    
   console.log('starting '+script,opts)
-  var spawn = require('child_process').spawn
+
+  var exec = 'node'
+  var options = [script].concat(opts.options)
   var child = spawn('node',[script].concat(opts.options))
-  child.stdout.on('data',function(data){util.print(data)})
-  child.stderr.on('data',function(data){util.debug(data)})
-  child.once('exit',function(){start(opts)})
+  console.log('child ready: '+child.pid)
+  
+  monitor(child,function(err,data){
+    cb(err, data)
+    //process.exit(0)
+  })
 }
 
 //------------------------------------------------------------------------------
@@ -287,6 +294,35 @@ function remote(opts, cb) {
   }).on('error',function(err){cb(err)})
 }
 
+//------------------------------------------------------------------------------
+//                                               monitor
+//------------------------------------------------------------------------------
+
+function monitor(child, cb) {
+  var Buffer = require('buffer').Buffer
+  console.log('starting monitor')
+  var server = net.createServer(function(socket){
+    console.log('monitor started')
+    socket.write(JSON.stringify({msg:'started app'}))
+    child.stdout.on('data',function(data){
+      console.log('stdout data')
+      console.log('stdout data',(data instanceof Buffer))
+      socket.write('foo')
+    })
+    child.stderr.on('data',function(data){util.debug(data)})
+    // child.once('exit',function(code){start(opts)})
+  })
+  var socketPath = _config.socket+'/nexus.sock'
+  server.listen(socketPath, function(){
+      cb(null, server)
+  })
+  // pf.getSocket({path:socketPath},function(err,socket){
+  //   if (err) return cb(err)
+  //   server.listen(socket, function(){
+  //     cb(null, server)
+  //   })
+  // })
+}
 
 
 /*************************************** /

@@ -124,6 +124,15 @@ function parseArgs() {
         , function(err,proc){console.log(err ? err : proc)}
         )
       break
+    case 'test':
+      var util = require('util')
+      var net = require('net')
+      var sockPath = nexus.config().socket+'/nexus.sock'
+      socket = new net.Socket({ type: 'unix' })
+      socket.on('data',function(data){util.print(data)})
+      console.log('connecting to socket '+sockPath)
+      socket.connect(nexus.config().socket+'/nexus.sock')
+      break
     default: console.log(usage)
   }
 }
