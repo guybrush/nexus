@@ -4,6 +4,7 @@
 
 var fs      = require('fs')
   , fstream = require('fstream')
+  , util    = require('util')
   , net     = require('net')
   , spawn   = require('child_process').spawn
   , dnode   = require('dnode')
@@ -21,24 +22,24 @@ module.exports = exports =
   { version   : _pkg.version
   , config    : config
 
-  , install   : install    // #TODO
-  , uninstall : uninstall  // #TODO
-  , link      : link       // #TODO
+  , install   : install
+  , uninstall : uninstall
+  , link      : link
 
-  , ls        : ls         // #TODO
-  , ps        : ps         // #TODO
+  , ls        : ls
+  , ps        : ps
 
-  , start     : start      // #TODO
-  , restart   : restart    // #TODO
-  , stop      : stop       // #TODO
-  , stopall   : stopall    // #TODO
+  , start     : start
+  , restart   : restart
+  , stop      : stop
+  , stopall   : stopall
 
-  , stderr    : stderr     // #TODO
-  , stdout    : stdout     // #TODO
-  , stdin     : stdin      // #TODO
+  , stderr    : stderr
+  , stdout    : stdout
+  , stdin     : stdin
 
-  , server    : server     // #TODO
-  , remote    : remote     // #TODO
+  , server    : server
+  , remote    : remote
   }
 
 //------------------------------------------------------------------------------
@@ -90,13 +91,15 @@ function config(key, value, cb) {
       ] )
 
   aa.map(function(x, i, next){
-    fs.lstat(x, function(err, stats){
-      var w = fstream.Writer({path:x,type:'Directory'}).end()
+    fs.lstat(x, function(err){
+      if (!err) return next()
+      var w = fstream.Writer({path:x,type:'Directory'})
       w.on('error',function(err){next(err)})
       w.once('end',function(){next()})
+      w.end()
     })
   }).done(function(err, data){
-    if (err) return cb(err)
+    if (err) return cb && cb(err)
     cb && cb(null, currConfig)
   }).exec()
 
@@ -107,7 +110,7 @@ function config(key, value, cb) {
 //                                               install
 //------------------------------------------------------------------------------
 //
-//  install('same-as-npm',function(err,data){})
+// install('same-as-npm',function(err,data){})
 //
 function install(opts, cb) {
   npm.load({prefix:_config.tmp, global:true, loglevel:'silent'}, function(err){
@@ -181,31 +184,31 @@ function ps(opts, cb) {
 //        , path : '/path/to/script'
 //        , args : []
 //        , max  : 10                  // restart maximal 10 times
+//        , env  : {}                  // process.env
 //        }
 //      , function(err, data) {}
 //      )
 //
 function start(opts, cb) {
-  console.log('starting',opts)
-
   var script = /^\//.test(opts.script)
     ? opts.script
     : _config.apps+'/'+opts.script+'/server.js'
-
+  console.log('starting '+script,opts)
   var spawn = require('child_process').spawn
   var child = spawn('node',[script].concat(opts.options))
-  child.stdout.on('data',function(){})
-  child.stderr.on('data',function(){})
+  child.stdout.on('data',function(data){util.print(data)})
+  child.stderr.on('data',function(data){util.debug(data)})
   child.once('exit',function(){start(opts)})
 }
 
 //------------------------------------------------------------------------------
 //                                               restart
 //------------------------------------------------------------------------------
-
+//
+// restart({},function(err,data){})
+//
 function restart(opts, cb) {
   if (opt.script === null) return cb('vo nix kommt nix')
-  //var runner = forever.restart(opt.script)
   stop({script:opt.script}, function(err, stoppedProc) {
     start( {script:stoppedProc.file,uid:stoppedProc.uid}
          , function(err, startedProc) {
@@ -251,14 +254,15 @@ function stderr(opts, cb) {cb && cb(null, '#TODO')}
 // server({host:'localhost',port:5001},function(err,data){})
 //
 function server(opts, cb) {
-  var opt  = opt || {}
-    , port = opt.port || _config.netPort
-    , host = opt.host || _config.netHost
-  start( { script  : __dirname+'/bin/server.js'
-         , options : ['-p',port,'-h',host] }
-       , function(err, proc){
-    cb && cb(err,proc)
-  })
+  cb && cb(null, '#TODO')
+  // var opt  = opt || {}
+  //   , port = opt.port || _config.netPort
+  //   , host = opt.host || _config.netHost
+  // start( { script  : __dirname+'/bin/server.js'
+  //        , options : ['-p',port,'-h',host] }
+  //      , function(err, proc){
+  //   cb && cb(err,proc)
+  // })
 }
 
 //------------------------------------------------------------------------------
