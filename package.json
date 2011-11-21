@@ -6,7 +6,7 @@
   , "url" : "git://github.com/guybrush/nexus.git"
   }
 , "bin" : { "nexus" : "./bin/cli.js" }
-, "scripts" : { "test" : "tap test/*.js" }
+, "scripts" : { "test" : "node node_modules/tap/bin/tap.js test/*.js" }
 , "dependencies" :
   { "async-array" : "0.1.7"
   , "dnode"       : "0.9.2"

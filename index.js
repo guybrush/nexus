@@ -11,7 +11,7 @@ var fs      = require('fs')
   , npm     = require('npm')
   , uuid    = require('node-uuid')
   , _config = config()
-  , _pkg    = require('./package.json')    
+  , _pkg    = require('./package.json')
 
 //------------------------------------------------------------------------------
 //                                               exports
@@ -20,26 +20,24 @@ var fs      = require('fs')
 module.exports = exports =
   { version   : _pkg.version
   , config    : config
-              
+
   , install   : install    // #TODO
   , uninstall : uninstall  // #TODO
   , link      : link       // #TODO
-  , git       : git        // #TODO
-              
+
   , ls        : ls         // #TODO
   , ps        : ps         // #TODO
-              
+
   , start     : start      // #TODO
   , restart   : restart    // #TODO
   , stop      : stop       // #TODO
   , stopall   : stopall    // #TODO
-              
+
   , stderr    : stderr     // #TODO
   , stdout    : stdout     // #TODO
   , stdin     : stdin      // #TODO
-              
+
   , server    : server     // #TODO
-  , web       : web        // #TODO
   , remote    : remote     // #TODO
   }
 
@@ -52,7 +50,11 @@ function version(cb) {cb(null, _version); return _version}
 //------------------------------------------------------------------------------
 //                                               config
 //------------------------------------------------------------------------------
-
+//
+// config(function(err,data){})                          // get all config
+// config('some key',function(err,data){})               // get 1 config
+// config('some key','some value',function(err,data){})  // set config
+//
 function config(key, value, cb) {
   if (key && value && !cb) cb = value
   if (key && !value && !cb) cb = key
@@ -67,54 +69,51 @@ function config(key, value, cb) {
   currConfig.key     = fileConfig.key        || currConfig.prefix+'/nexus.key'
   currConfig.cert    = fileConfig.cert       || currConfig.prefix+'/nexus.cert'
   currConfig.tmp     = fileConfig.tmp        || currConfig.prefix+'/tmp'
-  currConfig.socket  = fileConfig.sockets    || currConfig.prefix+'/sockets'
+  currConfig.socket  = fileConfig.socket     || currConfig.prefix+'/socket'
   currConfig.apps    = fileConfig.packages   || currConfig.prefix+'/apps'
   currConfig.pids    = fileConfig.pids       || currConfig.prefix+'/pids'
   currConfig.keys    = fileConfig.keys       || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs       || currConfig.prefix+'/logs'
   currConfig.host    = fileConfig.serverHost || '127.0.0.1'
   currConfig.port    = fileConfig.serverPort || 5001
-  currConfig.remotes = fileConfig.remotes    || 
+  currConfig.remotes = fileConfig.remotes    ||
                        { localhost : { host : currConfig.serverHost
                                      , port : currConfig.serverPort } }
 
   var aa = new AA
-    ( [ currConfig.sockets
+    ( [ currConfig.socket
       , currConfig.pids
       , currConfig.keys
       , currConfig.logs
       , currConfig.apps
       , currConfig.tmp
       ] )
+
   aa.map(function(x, i, next){
-    // var w = fstream.Writer({path:x,type:'Directory'})
-    // w.once('end',function(){next()})
     fs.lstat(x, function(err, stats){
-      if (!err) return next()
-      var child = spawn('mkdir', ['-p', x]), stdout = [], stderr = []
-      child.stdout.on('data', function(d){ stdout.push(d.toString()) })
-      child.stderr.on('data', function(d){ stderr.push(d.toString()) })
-      child.once('exit', function(code){
-        if (code > 0) next(code)
-        else next()
-      })
+      var w = fstream.Writer({path:x,type:'Directory'}).end()
+      w.on('error',function(err){next(err)})
+      w.once('end',function(){next()})
     })
   }).done(function(err, data){
     if (err) return cb(err)
     cb && cb(null, currConfig)
   }).exec()
-  
+
   return currConfig
 }
 
 //------------------------------------------------------------------------------
 //                                               install
 //------------------------------------------------------------------------------
-
+//
+//  install('same-as-npm',function(err,data){})
+//
 function install(opts, cb) {
   npm.load({prefix:_config.tmp, global:true, loglevel:'silent'}, function(err){
     if (err) return cb(err)
     npm.commands.install(opts, function(err, res){
+      if (err) return cb(err)
       var r = fstream.Reader(res[0][1])
         , w = fstream.Writer( { path:_config.apps+'/'+res[0][0]
                               , type:'Directory' } )
@@ -127,7 +126,9 @@ function install(opts, cb) {
 //------------------------------------------------------------------------------
 //                                               uninstall
 //------------------------------------------------------------------------------
-
+//
+// uninstall('app-name',function(err,data){})
+//
 function uninstall(opts, cb) {
   cb('#TODO')
   // npm.load({prefix:_config.prefix, global:true}, function(err){
@@ -150,12 +151,6 @@ function link(opts, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               git
-//------------------------------------------------------------------------------
-
-function git(opts, cb) {cb && cb(null, '#TODO')}
-
-//------------------------------------------------------------------------------
 //                                               ls
 //------------------------------------------------------------------------------
 
@@ -169,7 +164,9 @@ function ls(opts, cb) {
 //------------------------------------------------------------------------------
 //                                               ps
 //------------------------------------------------------------------------------
-
+//
+// ps({},function(err,data){})
+//
 function ps(opts, cb) {
   // * connect to socket
   // * query: who is alive?
@@ -184,20 +181,22 @@ function ps(opts, cb) {
 //        , path : '/path/to/script'
 //        , args : []
 //        , max  : 10                  // restart maximal 10 times
-//        } )
+//        }
+//      , function(err, data) {}
+//      )
 //
 function start(opts, cb) {
-  
-    
-  var script = /^\//.test(opts.script) 
-    ? opts.script 
+  console.log('starting',opts)
+
+  var script = /^\//.test(opts.script)
+    ? opts.script
     : _config.apps+'/'+opts.script+'/server.js'
-    
-  
-  console.log('starting '+script,opts.options)
+
   var spawn = require('child_process').spawn
   var child = spawn('node',[script].concat(opts.options))
-  
+  child.stdout.on('data',function(){})
+  child.stderr.on('data',function(){})
+  child.once('exit',function(){start(opts)})
 }
 
 //------------------------------------------------------------------------------
@@ -248,7 +247,9 @@ function stderr(opts, cb) {cb && cb(null, '#TODO')}
 //------------------------------------------------------------------------------
 //                                               server
 //------------------------------------------------------------------------------
-
+//
+// server({host:'localhost',port:5001},function(err,data){})
+//
 function server(opts, cb) {
   var opt  = opt || {}
     , port = opt.port || _config.netPort
@@ -309,3 +310,4 @@ dnode({server:function(cb){cb('hello i am the server')}}).listen
   })
 
 /***************************************/
+
