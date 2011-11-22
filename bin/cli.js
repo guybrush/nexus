@@ -14,19 +14,19 @@ var nexus = require('../index.js')
     , ''
     , '    version    .. print version-number'
     , '    config     .. get/set config'
-    , '    install    .. install packages into program'
+    , '    install    .. install packages'
     , '    uninstall  .. uninstall packages'
-    , '    ls         .. list installed programs'
-    , '    ps         .. report snapshot of current running programs'
+    , '    ls         .. list installed packages'
+    , '    ps         .. list of current running programs'
     , '    start      .. start program'
-    , '    restart    .. restart running processes'
-    , '    stop       .. stop running processes'
+    , '    restart    .. restart running program'
+    , '    stop       .. stop running program'
     , '    stopall    .. stop all running programs'
-    , '    stdin      .. access stdin'
-    , '    stdout     .. access stdout'
-    , '    stderr     .. access stderr'
-    , '    server     .. start net/tls-interface'
-    , '    remote     .. connect to tls-interface of another remote nexus'
+    // , '    stdin      .. access stdin'
+    // , '    stdout     .. access stdout'
+    // , '    stderr     .. access stderr'
+    , '    server     .. start dnode-server'
+    , '    remote     .. connect to remote nexus'
     , ''
     ].join('\n')
     
@@ -84,18 +84,21 @@ function parseArgs() {
       var options = process.argv.splice(process.argv.indexOf(argv._[0])).splice(1)
       nexus.start
         ( { script  : argv._[0]
-          , options : options } 
+          , options : options 
+          , format  : true } 
         , function(err,data){console.log(err ? err : data)} )
       break
     case 'restart':
-      nexus.restart({script:argv._[0]},function(err, proc){
-        console.log(err ? err : {'restarted process':proc})
-      })
+      nexus.restart
+        ( { script : argv._[0] 
+          , format : true }
+        , function(err, proc){console.log(err ? err : {'restarted process':proc})})
       break
     case 'stop':
-      nexus.stop({script:argv._[0]},function(err,proc){
-        console.log(err ? err : {'stopped process':proc})
-      })
+      nexus.stop
+        ( { script:argv._[0]
+          , format:true }
+        , function(err,proc){console.log(err ? err : proc)} )
       break
     case 'stopall':
       nexus.stopall(null, function(err, procs){

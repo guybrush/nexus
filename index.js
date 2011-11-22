@@ -7,7 +7,10 @@ var fs      = require('fs')
   , fstream = require('fstream')
   , util    = require('util')
   , net     = require('net')
+  , fork    = require('child_process').fork
   , spawn   = require('child_process').spawn
+  , exec    = require('child_process').exec
+  , execFile = require('child_process').execFile
   , dnode   = require('dnode')
   , AA      = require('async-array')
   , pf      = require('portfinder')
@@ -18,9 +21,9 @@ var fs      = require('fs')
   , _config = config()
   , _pkg    = require('./package.json')
 
-forever.load( { root     : _config.logPath
-              , pidPath  : _config.pidPath
-              , sockPath : _config.sockPath } )  
+forever.load( { root     : _config.logs
+              , pidPath  : _config.pids
+              , sockPath : _config.socks } )  
   
 //------------------------------------------------------------------------------
 //                                               exports
@@ -180,7 +183,10 @@ function ls(opts, cb) {
 //
 function ps(opts, cb) {
   opts = opts || {}
-  forever.list(opts.format,cb)
+  forever.list(opts.format,function(err,procs){
+    if (procs) return cb(null, procs)
+    forever.list(opts.format,cb)
+  })
 }
 
 //------------------------------------------------------------------------------
@@ -197,6 +203,10 @@ function ps(opts, cb) {
 //      )
 //
 function start(opts, cb) {
+  
+  opts = opts || {}
+  if (!opts.script) return cb('no script')
+  
   var scriptConfig =
     { sourceDir : '/'
     , command   : opts.command || 'node'
@@ -291,7 +301,6 @@ function start(opts, cb) {
   // console.log('------- SCRIPT : '+script)
   
   if (!process.send) {
-    var fork = require('child_process').fork
     fork( __dirname+'/bin/cli.js'
         , ['start',script].concat(scriptConfig.options)
         , {env:scriptConfig.env} )
@@ -299,9 +308,10 @@ function start(opts, cb) {
   }
   var monitor = new forever.Monitor(script, scriptConfig).start()
   monitor.on('start',function(){
+    var data = opts.format ? forever.format(monitor) : monitor
     cb(null,script)
     forever.startServer(monitor)
-  })
+  }) 
 }
 
 //------------------------------------------------------------------------------
@@ -310,12 +320,19 @@ function start(opts, cb) {
 //
 // restart({},function(err,data){})
 //
+var i = 0
 function restart(opts, cb) {
-  if (opt.script === null) return cb('vo nix kommt nix')
-  stop({script:opt.script}, function(err, stoppedProc) {
-    start( {script:stoppedProc.file,uid:stoppedProc.uid}
-         , function(err, startedProc) {
-      cb(null, startedProc)
+  i++
+  opts = opts || {}
+  if (opts.script === undefined) return cb('no script')
+
+  forever.list(false,function(err,allProcs){
+    var procs = forever.findByIndex(opts.script, allProcs)
+      || forever.findByScript(opts.script, allProcs)
+    if (!procs && i<3) restart(opts,cb)
+    var child = spawn(__dirname+'/bin/cli.js',['stop',opts.script])
+    child.on('exit',function(){
+      start({script:procs[0].file,options:procs[0].options},cb)
     })
   })
 }
@@ -331,7 +348,7 @@ function stop(opts, cb) {
   runner.on('stop',function(procs){
     // fs.unlinkSync(procs[0].pidFile)
     // fs.unlinkSync(config.pidPath+'/'+procs[0].uid+'.fvr')
-    cb && cb(null, opts.script)
+    cb && cb(null, procs[0])
   })
   runner.on('error',function(err){
     return cb && cb('cant stop process: '+opts.script)
