@@ -10,11 +10,17 @@ var fs      = require('fs')
   , dnode   = require('dnode')
   , AA      = require('async-array')
   , pf      = require('portfinder')
+  , forever = require('forever')
+  , rimraf  = require('rimraf') 
   , npm     = require('npm')
   , uuid    = require('node-uuid')
   , _config = config()
   , _pkg    = require('./package.json')
 
+forever.load( { root     : _config.logPath
+              , pidPath  : _config.pidPath
+              , sockPath : _config.sockPath } )  
+  
 //------------------------------------------------------------------------------
 //                                               exports
 //------------------------------------------------------------------------------
@@ -67,23 +73,23 @@ function config(key, value, cb) {
   try { fileConfig = require(fileConfigPath) }
   catch (e) { /* no config.json, so we use hardcoded defaults */ }
 
-  currConfig.prefix  = fileConfig.prefix     || process.env.HOME+'/.nexus'
-  currConfig.key     = fileConfig.key        || currConfig.prefix+'/nexus.key'
-  currConfig.cert    = fileConfig.cert       || currConfig.prefix+'/nexus.cert'
-  currConfig.tmp     = fileConfig.tmp        || currConfig.prefix+'/tmp'
-  currConfig.socket  = fileConfig.socket     || currConfig.prefix+'/socket'
-  currConfig.apps    = fileConfig.packages   || currConfig.prefix+'/apps'
-  currConfig.pids    = fileConfig.pids       || currConfig.prefix+'/pids'
-  currConfig.keys    = fileConfig.keys       || currConfig.prefix+'/keys'
-  currConfig.logs    = fileConfig.logs       || currConfig.prefix+'/logs'
-  currConfig.host    = fileConfig.serverHost || '127.0.0.1'
-  currConfig.port    = fileConfig.serverPort || 5001
-  currConfig.remotes = fileConfig.remotes    ||
-                       { localhost : { host : currConfig.serverHost
-                                     , port : currConfig.serverPort } }
+  currConfig.prefix  = fileConfig.prefix  || process.env.HOME+'/.nexus'
+  currConfig.key     = fileConfig.key     || currConfig.prefix+'/nexus.key'
+  currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
+  currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
+  currConfig.socks   = fileConfig.socks   || currConfig.prefix+'/socks'
+  currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
+  currConfig.pids    = fileConfig.pids    || currConfig.prefix+'/pids'
+  currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
+  currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
+  currConfig.host    = fileConfig.host    || '127.0.0.1'
+  currConfig.port    = fileConfig.port    || 5001
+  currConfig.remotes = fileConfig.remotes || { localhost : 
+                                               { host : currConfig.host
+                                               , port : currConfig.port } }
 
   var aa = new AA
-    ( [ currConfig.socket
+    ( [ currConfig.socks
       , currConfig.pids
       , currConfig.keys
       , currConfig.logs
@@ -95,7 +101,7 @@ function config(key, value, cb) {
     fs.lstat(x, function(err){
       if (!err) return next()
       var w = fstream.Writer({path:x,type:'Directory'})
-      w.on('error',function(err){next(err)})
+      // w.on('error',function(err){next(err)})
       w.once('end',function(){next()})
       w.end()
     })
@@ -169,11 +175,10 @@ function ls(opts, cb) {
 //                                               ps
 //------------------------------------------------------------------------------
 //
-// ps({},function(err,data){})
+// ps(function(err,data){})
 //
 function ps(opts, cb) {
-  // * connect to socket
-  // * query: who is alive?
+  forever.list(true,cb)
 }
 
 //------------------------------------------------------------------------------
@@ -191,20 +196,30 @@ function ps(opts, cb) {
 //      )
 //
 function start(opts, cb) {
+  var scriptConfig =
+    { sourceDir : '/'
+    , command   : opts.command || 'node'
+    , options   : opts.options || []
+    , forever   : opts.forever || true
+    , max       : opts.max     || 10
+    , env       : opts.env     || process.env
+    , silent    : true
+    }         
+   
   var script = /^\//.test(opts.script)
     ? opts.script
     : _config.apps+'/'+opts.script+'/server.js'
     
-  console.log('starting '+script,opts)
-
-  var exec = 'node'
-  var options = [script].concat(opts.options)
-  var child = spawn('node',[script].concat(opts.options))
-  console.log('child ready: '+child.pid)
-  
-  monitor(child,function(err,data){
-    cb(err, data)
-    //process.exit(0)
+  if (!process.send) {
+    var fork = require('child_process').fork
+    fork( __dirname+'/bin/cli.js'
+        , ['start',script].concat(scriptConfig.options)
+        , {env:scriptConfig.env} )
+    process.exit(0)  
+  }
+  var monitor = new forever.Monitor(script, scriptConfig).start()
+  monitor.on('start',function(){
+    forever.startServer(monitor)
   })
 }
 
@@ -234,7 +249,12 @@ function stop(opts, cb) {cb && cb(null, '#TODO')}
 //                                               stopall
 //------------------------------------------------------------------------------
 
-function stopall(opts, cb) {cb && cb(null, '#TODO')}
+function stopall(opts, cb) {
+  var runner = forever.stopAll()
+  runner.on('stopAll', function (procs) {
+    cb && cb(null, procs)
+  })
+}
 
 //------------------------------------------------------------------------------
 //                                               stdin
@@ -294,35 +314,6 @@ function remote(opts, cb) {
   }).on('error',function(err){cb(err)})
 }
 
-//------------------------------------------------------------------------------
-//                                               monitor
-//------------------------------------------------------------------------------
-
-function monitor(child, cb) {
-  var Buffer = require('buffer').Buffer
-  console.log('starting monitor')
-  var server = net.createServer(function(socket){
-    console.log('monitor started')
-    socket.write(JSON.stringify({msg:'started app'}))
-    child.stdout.on('data',function(data){
-      console.log('stdout data')
-      console.log('stdout data',(data instanceof Buffer))
-      socket.write('foo')
-    })
-    child.stderr.on('data',function(data){util.debug(data)})
-    // child.once('exit',function(code){start(opts)})
-  })
-  var socketPath = _config.socket+'/nexus.sock'
-  server.listen(socketPath, function(){
-      cb(null, server)
-  })
-  // pf.getSocket({path:socketPath},function(err,socket){
-  //   if (err) return cb(err)
-  //   server.listen(socket, function(){
-  //     cb(null, server)
-  //   })
-  // })
-}
 
 
 /*************************************** /

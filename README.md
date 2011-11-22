@@ -10,16 +10,10 @@
                                               \_`---´___`---´-´
                                                /../..\ /..\..\
 
-* nexus is basically a mashup of [npm], [dnode], redis and couchdb.
-* nexus provides a cli and a dnode/redis/couchdb-interface to install, 
-  uninstall, start, stop and observe local and remote programs (npm packages).
-* the nexus-server is a node-tcp-server, which can be accessed via these
-  interfaces.
-* programs are controlled by monitor-servers (node-tcp-servers)
-* monitor-servers are connected to unix-sockets or a dnode-server or redis or 
-  couchdb. these tools can be used to control the programs.
+* nexus is basically a mashup of [npm], [dnode] and [forever].
+* nexus provides a cli and a dnode-interface to install, uninstall, start, stop 
+  and observe local and remote programs (npm packages).
 * all the config, logs and programs live in `~/.nexus` by default.
-* nexus is inspired by [forever].
 
 ## install
 
