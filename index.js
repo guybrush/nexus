@@ -63,6 +63,9 @@ function version(cb) {cb(null, _version); return _version}
 // config('some key','some value',function(err,data){})  // set config
 //
 function config(key, value, cb) {
+  
+  // #TODO get/set config
+  
   if (key && value && !cb) cb = value
   if (key && !value && !cb) cb = key
   var currConfig = {}
@@ -157,10 +160,8 @@ function link(opts, cb) {
 //------------------------------------------------------------------------------
 
 function ls(opts, cb) {
-  npm.load({prefix:_config.prefix, global:true}, function(err){
-    if (err) return cb(err)
-    npm.commands.ls(cb)
-  })
+  cb('#TODO')
+  // fstream.Reader().end()
 }
 
 //------------------------------------------------------------------------------
@@ -199,7 +200,7 @@ function start(opts, cb) {
     , silent    : true
     }         
    
-  // #TODO scripts
+  // #TODO generate script-path to start
   var script = /^\//.test(opts.script)
     ? opts.script
     : _config.apps+'/'+opts.script+'/server.js'
@@ -237,7 +238,7 @@ function restart(opts, cb) {
 //                                               stop
 //------------------------------------------------------------------------------
 
-function stop(opts, cb) {cb && cb(null, '#TODO')}
+function stop(opts, cb) {cb && cb('#TODO')}
 
 //------------------------------------------------------------------------------
 //                                               stopall
@@ -254,25 +255,27 @@ function stopall(opts, cb) {
 //                                               stdin
 //------------------------------------------------------------------------------
 
-function stdin(opts, cb) {cb && cb(null, '#TODO')}
+function stdin(opts, cb) {cb && cb('#TODO')}
 
 //------------------------------------------------------------------------------
 //                                               stdout
 //------------------------------------------------------------------------------
 
-function stdout(opts, cb) {cb && cb(null, '#TODO')}
+function stdout(opts, cb) {cb && cb('#TODO')}
 
 //------------------------------------------------------------------------------
 //                                               stderr
 //------------------------------------------------------------------------------
 
-function stderr(opts, cb) {cb && cb(null, '#TODO')}
+function stderr(opts, cb) {cb && cb('#TODO')}
 
 //------------------------------------------------------------------------------
 //                                               remote
 //------------------------------------------------------------------------------
 
 function remote(opts, cb) {
+  return cb('#TODO')
+  /*************************** /
   var opts = opts || {}
     , remote = (opt.remote && config.remotes[opts.remote])
                ? config.remotes[opts.remote] : false
@@ -288,6 +291,7 @@ function remote(opts, cb) {
   dnode.connect(host, port, options, function(remote,con) {
     cb(null,remote)
   }).on('error',function(err){cb(err)})
+  //***************************/
 }
 
 

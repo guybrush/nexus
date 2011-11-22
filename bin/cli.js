@@ -16,10 +16,8 @@ var nexus = require('../index.js')
     , '    config     .. get/set config'
     , '    install    .. install packages into program'
     , '    uninstall  .. uninstall packages'
-    , '    git        .. hook git-repository'
     , '    ls         .. list installed programs'
     , '    ps         .. report snapshot of current running programs'
-    // , '    dir        .. list source files of programs'
     , '    start      .. start program'
     , '    restart    .. restart running processes'
     , '    stop       .. stop running processes'
@@ -28,7 +26,6 @@ var nexus = require('../index.js')
     , '    stdout     .. access stdout'
     , '    stderr     .. access stderr'
     , '    server     .. start net/tls-interface'
-    , '    web        .. start web-interface'
     , '    remote     .. connect to tls-interface of another remote nexus'
     , ''
     ].join('\n')
