@@ -45,7 +45,6 @@ module.exports = exports =
   , stdout    : stdout
   , stdin     : stdin
 
-  , server    : server
   , remote    : remote
   }
 
@@ -140,11 +139,7 @@ function install(opts, cb) {
 // uninstall('app-name',function(err,data){})
 //
 function uninstall(opts, cb) {
-  cb('#TODO')
-  // npm.load({prefix:_config.prefix, global:true}, function(err){
-  //   if (err) return cb(err)
-  //   npm.commands.uninstall(opts, cb)
-  // })
+  rimraf(_config.apps+'/'+opts,cb)
 }
 
 //------------------------------------------------------------------------------
@@ -153,11 +148,8 @@ function uninstall(opts, cb) {
 
 function link(opts, cb) {
   cb('#TODO')
-  // npm.load({prefix:_config.prefix}, function(err){
-  //   if (err) return cb(err)
-  //   console.log('linking',opts,process.cwd())
-  //   npm.commands.link(opts, cb)
-  // })
+  // like `npm link`
+  // fstream.Writer({type:'Symlink'}).end()
 }
 
 //------------------------------------------------------------------------------
@@ -175,17 +167,18 @@ function ls(opts, cb) {
 //                                               ps
 //------------------------------------------------------------------------------
 //
-// ps(function(err,data){})
+// ps({format:true},function(err,data){})
 //
 function ps(opts, cb) {
-  forever.list(true,cb)
+  opts = opts || {}
+  forever.list(opts.format,cb)
 }
 
 //------------------------------------------------------------------------------
 //                                               start
 //------------------------------------------------------------------------------
 //
-// start( { exec : 'node'              // executable
+// start( { command : 'node'           // executable
 //        , app  : ''                  // optional
 //        , path : '/path/to/script'
 //        , args : []
@@ -206,6 +199,7 @@ function start(opts, cb) {
     , silent    : true
     }         
    
+  // #TODO scripts
   var script = /^\//.test(opts.script)
     ? opts.script
     : _config.apps+'/'+opts.script+'/server.js'
@@ -273,24 +267,6 @@ function stdout(opts, cb) {cb && cb(null, '#TODO')}
 //------------------------------------------------------------------------------
 
 function stderr(opts, cb) {cb && cb(null, '#TODO')}
-
-//------------------------------------------------------------------------------
-//                                               server
-//------------------------------------------------------------------------------
-//
-// server({host:'localhost',port:5001},function(err,data){})
-//
-function server(opts, cb) {
-  cb && cb(null, '#TODO')
-  // var opt  = opt || {}
-  //   , port = opt.port || _config.netPort
-  //   , host = opt.host || _config.netHost
-  // start( { script  : __dirname+'/bin/server.js'
-  //        , options : ['-p',port,'-h',host] }
-  //      , function(err, proc){
-  //   cb && cb(err,proc)
-  // })
-}
 
 //------------------------------------------------------------------------------
 //                                               remote

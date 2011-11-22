@@ -78,9 +78,10 @@ function parseArgs() {
       nexus.link(argv._[0],function(err,data){console.log(err ? err : data)})
       break
     case 'ps':
-      nexus.ps(null, function(err,data){console.log(err ? err : data)})
+      nexus.ps({format:true}, function(err,data){console.log(err ? err : data)})
       break
     case 'start':
+      // #TODO check for nexus-start-options besides scripts-options
       var options = process.argv.splice(process.argv.indexOf(argv._[0])).splice(1)
       nexus.start
         ( { script  : argv._[0]
@@ -112,26 +113,6 @@ function parseArgs() {
           }
         , function(err,proc){console.log(err ? err : proc)}
         )
-      break
-    case 'web':
-      console.log('OPTIONS',process.argv,argv)
-      var options = process.argv.splice(process.argv.indexOf('web')).splice(1)
-      console.log('OPTIONS',options)
-      nexus.start
-        ( { script  : __dirname+'/web.js'
-          , options : options
-          }
-        , function(err,proc){console.log(err ? err : proc)}
-        )
-      break
-    case 'test':
-      var util = require('util')
-      var net = require('net')
-      var sockPath = nexus.config().socket+'/nexus.sock'
-      socket = new net.Socket({ type: 'unix' })
-      socket.on('data',function(data){util.print(data)})
-      console.log('connecting to socket '+sockPath)
-      socket.connect(nexus.config().socket+'/nexus.sock')
       break
     default: console.log(usage)
   }
