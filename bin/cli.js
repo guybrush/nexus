@@ -57,17 +57,19 @@ function parseArgs() {
       console.log('v'+nexus.version)
       break
     case 'config':
-      nexus.config(function(err,data){console.log(err ? err : data)})
+      nexus.config(function(err, data){console.log(err ? err : data)})
       break
     case 'ls':
-      nexus.ls(null, function(err, files){err && console.log(err)})
+      nexus.ls(null, function(err, data){console.log(err ? err : data)})
       break
     case 'install':
       nexus.install(argv._[0],function(err,data){console.log(err ? err : data)})
       break
     case 'rm':
     case 'uninstall':
-      nexus.uninstall(argv._,function(err,data){console.log(err ? err : data)})
+      nexus.uninstall(argv._[0],function(err,data){
+        console.log(err ? err : 'uninstalled '+argv._[0])
+      })
       break
     case 'git':
       nexus.git(argv._[0],function(err,data){console.log(err ? err : data)})
@@ -119,3 +121,4 @@ function exit(msg) {
   console.log(msg)
   process.exit()
 }
+

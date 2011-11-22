@@ -14,6 +14,7 @@
 * nexus provides a cli and a dnode-interface to install, uninstall, start, stop 
   and observe local and remote programs (npm packages).
 * all the config, logs and programs live in `~/.nexus` by default.
+* this is still *super-alpha*. 
 
 ## install
 

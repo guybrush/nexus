@@ -3,6 +3,7 @@
 //
 
 var fs      = require('fs')
+  , path    = require('path')
   , fstream = require('fstream')
   , util    = require('util')
   , net     = require('net')
@@ -130,7 +131,11 @@ function install(opts, cb) {
         , w = fstream.Writer( { path:_config.apps+'/'+res[0][0]
                               , type:'Directory' } )
       r.pipe(w)
-      w.once('end',function(){cb(null, res[0][0])})
+      w.once('end',function(){
+        // #TODO maybe delete _config.tmp+'/lib'
+        // what if 2 guys install at the same time?
+        rimraf(res[0][1],function(err){cb(err, res[0][0])})
+      })
     })
   })
 }
@@ -142,7 +147,11 @@ function install(opts, cb) {
 // uninstall('app-name',function(err,data){})
 //
 function uninstall(opts, cb) {
-  rimraf(_config.apps+'/'+opts,cb)
+  var path = _config.apps+'/'+opts
+  fs.stat(path,function(err,stat){
+    if (err) return cb(opts+' not installed')
+    rimraf(_config.apps+'/'+opts,cb)  
+  })
 }
 
 //------------------------------------------------------------------------------
@@ -160,8 +169,7 @@ function link(opts, cb) {
 //------------------------------------------------------------------------------
 
 function ls(opts, cb) {
-  cb('#TODO')
-  // fstream.Reader().end()
+  fs.readdir(_config.apps,cb)
 }
 
 //------------------------------------------------------------------------------
@@ -179,12 +187,11 @@ function ps(opts, cb) {
 //                                               start
 //------------------------------------------------------------------------------
 //
-// start( { command : 'node'           // executable
-//        , app  : ''                  // optional
-//        , path : '/path/to/script'
-//        , args : []
-//        , max  : 10                  // restart maximal 10 times
-//        , env  : {}                  // process.env
+// start( { command : 'node'             // executable
+//        , script  : '/path/to/script'
+//        , options : []
+//        , max     : 10                 // restart maximal 10 times
+//        , env     : {}                 // process.env
 //        }
 //      , function(err, data) {}
 //      )
@@ -200,11 +207,89 @@ function start(opts, cb) {
     , silent    : true
     }         
    
-  // #TODO generate script-path to start
-  var script = /^\//.test(opts.script)
-    ? opts.script
-    : _config.apps+'/'+opts.script+'/server.js'
-    
+  // #TODO generate script-path - this may need some refactor :D
+  
+  // nexus start /some/file
+  //   script = /some/file 
+  // nexus start ./some/file 
+  //   script = CWD+'/some/file'
+  // nexus start appName/path/to/script
+  //   appName is an app
+  //     ? script = _config.apps+'/appName/path/to/script'
+  //     : script = CWD+'/appName/path/to/script'
+  // nexus start appName
+  //   appName is an app
+  //     ? look for package.json-startScript
+  //       ? starScript.split(' ')
+  //         ? fs.stat([0])
+  //           ? script = [0], options = [>0]
+  //           : command = [0], script = [1], options = [>1]
+  //         : script = _config.apps+'/appName/'+startScript 
+  //       : fs.stat(appName+'/server.js') || fs.stat(appName+'/app.js')
+  //         ? script = appName+'/server.js' || appName+'/server.js'
+  //         : script = appName // this is most likely an error..
+  //     : script CWD+'/'+appName
+  
+  // handle `nexus start /some/file` and `nexus start ./some/file`
+  var script = 
+    /^\//.test(opts.script) 
+      ? opts.script 
+      : /^\.\//.test(opts.script)
+        ? process.cwd()+'/'+opts.script.substring(1)
+        : null
+  
+  // handle `nexus start appName/path/to/script`
+  if (!script && /\//.test(opts.script)) {
+    var maybeApp = opts.script.split('/')[0]
+      , isApp = path.existsSync(_config.apps+'/'+maybeApp)
+    if (isApp) script = _config.apps+'/'+opts.script
+    else script = process.cwd()+'/'+opts.script
+  }
+
+  // handle `nexus start appName`
+  if (!script) {
+    var maybeApp = opts.script.split('/')[0]
+    if (path.existsSync(_config.apps+'/'+maybeApp)) {
+      // console.log('---- A')
+      var appPath = _config.apps+'/'+maybeApp
+      var pkg = require(appPath+'/package.json')
+      if (pkg.scripts && pkg.scripts.start) {
+        // console.log('---- AA')
+        var startScript = pkg.scripts.start
+        if (/\w/.test(startScript)) {
+          // console.log('---- AAA')
+          var split = startScript.split(' ')
+          var isScript = path.existsSync(appPath+'/'+split[0])
+          if (isScript) {
+            // console.log('---- AAAA')
+            script = appPath+'/'+split[0]
+            scriptConfig.options = split.splice(1)
+          }
+          else {
+            // console.log('---- AAAB')
+            scriptConfig.command = split[0]
+            script = appPath+'/'+split[1]
+            options = split.splice(2)
+          }
+        }
+        else {
+          // console.log('---- AAB')
+          script = appPath+'/'+startScript
+        }
+      }
+      else {
+        // console.log('---- AB')
+        var serverJsExists = path.existsSync(appPath+'/server.js')
+        var appJsExists = path.existsSync(appPath+'/app.js')
+        if (serverJsExists) script = appPath+'/server.js'
+        else if (appJsExists) script = appPath+'/app.js'
+        else script = appPath
+      }
+    }
+  }
+
+  // console.log('------- SCRIPT : '+script)
+  
   if (!process.send) {
     var fork = require('child_process').fork
     fork( __dirname+'/bin/cli.js'
