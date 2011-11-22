@@ -299,6 +299,7 @@ function start(opts, cb) {
   }
   var monitor = new forever.Monitor(script, scriptConfig).start()
   monitor.on('start',function(){
+    cb(null,script)
     forever.startServer(monitor)
   })
 }
@@ -323,7 +324,19 @@ function restart(opts, cb) {
 //                                               stop
 //------------------------------------------------------------------------------
 
-function stop(opts, cb) {cb && cb('#TODO')}
+function stop(opts, cb) {
+  opts = opts || {}
+  if (opts.script === undefined) return cb('no script')
+  var runner = forever.stop(opts.script)
+  runner.on('stop',function(procs){
+    // fs.unlinkSync(procs[0].pidFile)
+    // fs.unlinkSync(config.pidPath+'/'+procs[0].uid+'.fvr')
+    cb && cb(null, opts.script)
+  })
+  runner.on('error',function(err){
+    return cb && cb('cant stop process: '+opts.script)
+  })
+}
 
 //------------------------------------------------------------------------------
 //                                               stopall
