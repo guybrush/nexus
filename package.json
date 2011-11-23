@@ -12,6 +12,7 @@
   , "dnode"       : "0.9.2"
   , "fstream"     : "https://github.com/isaacs/fstream/tarball/master"
   , "forever"     : "*"
+  , "hook.io"     : "*"
   , "node-uuid"   : "1.2.0"
   , "npm"         : "1.0.106"
   , "optimist"    : "0.2.8"

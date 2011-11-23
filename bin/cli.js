@@ -12,44 +12,21 @@ var nexus = require('../index.js')
     , ''
     , 'commands:'
     , ''
-    , '    version    .. print version-number'
-    , '    config     .. get/set config'
-    , '    install    .. install packages'
-    , '    uninstall  .. uninstall packages'
-    , '    ls         .. list installed packages'
-    , '    ps         .. list of current running programs'
-    , '    start      .. start program'
-    , '    restart    .. restart running program'
-    , '    stop       .. stop running program'
-    , '    stopall    .. stop all running programs'
-    // , '    stdin      .. access stdin'
-    // , '    stdout     .. access stdout'
-    // , '    stderr     .. access stderr'
-    , '    server     .. start dnode-server'
-    , '    remote     .. connect to remote nexus'
+    , '    version   .. print version-number'
+    , '    config    .. get/set config'
+    , '    install   .. install packages'
+    , '    uninstall .. uninstall packages'
+    , '    ls        .. list installed packages'
+    , '    ps        .. list of current running programs'
+    , '    start     .. start program'
+    , '    restart   .. restart running program'
+    , '    stop      .. stop running program'
+    , '    stopall   .. stop all running programs'
+    , '    hook      .. start a nexus-hook.io-hook'
     , ''
     ].join('\n')
     
-if (argv._[0] == 'remote') {
-  nexus.remote( {key:argv.k,cert:argv.c,host:argv.h,port:argv.p,remote:argv.r}
-              , function(err, remote){
-    if (err) { console.log(err) }
-    else {
-      nexus = remote
-      argv._.shift()
-      //process.stdin.pipe(process.stdout)
-      process.stdin.resume()
-      process.stdin.on('data',function(data) {
-        var cmd = data.toString().replace('\n','')
-        argv = opti(cmd.split(' ')).argv
-        parseArgs()
-      })
-      parseArgs()
-    }
-  })
-} else {
-  parseArgs()
-}
+parseArgs()
 
 function parseArgs() {
   switch (argv._.shift()) {
@@ -108,9 +85,9 @@ function parseArgs() {
     case 'stderr':
     case 'stdout':
     case 'stdin': console.log('#TODO'); break
-    case 'server':
+    case 'hook':
       nexus.start
-        ( { script  : __dirname+'/server.js'
+        ( { script  : __dirname+'/hook.js'
           , options : []
           }
         , function(err,proc){console.log(err ? err : proc)}

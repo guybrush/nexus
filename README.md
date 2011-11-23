@@ -10,11 +10,13 @@
                                               \_`---´___`---´-´
                                                /../..\ /..\..\
 
-* nexus is basically a mashup of [npm], [dnode] and [forever].
-* nexus provides a cli and a dnode-interface to install, uninstall, start, stop 
+* nexus is basically a mashup of [npm], [hook.io] and [forever].
+* nexus provides a cli and a hook.io-hook to install, uninstall, start, stop 
   and observe local and remote programs (npm packages).
 * all the config, logs and programs live in `~/.nexus` by default.
-* this is still *super-alpha*. 
+* nexus is still *super-alpha*. 
+* nexus may be obsolete since one can do all these things with [hook.io](?). in
+  that case see this project as my learning-by-doing-thing `:)`.
 
 ## install
 
@@ -30,7 +32,7 @@ TBA (look at the code for now)
 
 TBA (look at the code for now)
 
-[dnode]: https://github.com/substack/dnode
+[hook.io]: https://github.com/hookio/hook.io
 [forever]: https://github.com/nodejitsu/forever
 [node]: http://nodejs.org
 [npm]: https://npmjs.org

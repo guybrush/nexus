@@ -2,24 +2,25 @@
  // nexus (remote program installation and control)
 //
 
-var fs      = require('fs')
-  , path    = require('path')
-  , fstream = require('fstream')
-  , util    = require('util')
-  , net     = require('net')
-  , fork    = require('child_process').fork
-  , spawn   = require('child_process').spawn
-  , exec    = require('child_process').exec
+var fs       = require('fs')
+  , path     = require('path')
+  , fstream  = require('fstream')
+  , util     = require('util')
+  , net      = require('net')
+  , fork     = require('child_process').fork
+  , spawn    = require('child_process').spawn
+  , exec     = require('child_process').exec
   , execFile = require('child_process').execFile
-  , dnode   = require('dnode')
-  , AA      = require('async-array')
-  , pf      = require('portfinder')
-  , forever = require('forever')
-  , rimraf  = require('rimraf') 
-  , npm     = require('npm')
-  , uuid    = require('node-uuid')
-  , _config = config()
-  , _pkg    = require('./package.json')
+  , dnode    = require('dnode')
+  , AA       = require('async-array')
+  , pf       = require('portfinder')
+  , forever  = require('forever')
+  , rimraf   = require('rimraf') 
+  , npm      = require('npm')
+  , uuid     = require('node-uuid')
+  , _config  = config()
+  , _pkg     = require('./package.json')
+  , hook // uninitialized, if set it means the hook is running
 
 forever.load( { root     : _config.logs
               , pidPath  : _config.pids
@@ -32,26 +33,17 @@ forever.load( { root     : _config.logs
 module.exports = exports =
   { version   : _pkg.version
   , config    : config
-
   , install   : install
   , uninstall : uninstall
   , link      : link
-
   , ls        : ls
-  , ps        : ps
-
   , start     : start
   , restart   : restart
   , stop      : stop
   , stopall   : stopall
-
-  , stderr    : stderr
-  , stdout    : stdout
-  , stdin     : stdin
-
-  , remote    : remote
+  , ps        : ps
   }
-
+  
 //------------------------------------------------------------------------------
 //                                               version
 //------------------------------------------------------------------------------
@@ -176,20 +168,6 @@ function ls(opts, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               ps
-//------------------------------------------------------------------------------
-//
-// ps({format:true},function(err,data){})
-//
-function ps(opts, cb) {
-  opts = opts || {}
-  forever.list(opts.format,function(err,procs){
-    if (procs) return cb(null, procs)
-    forever.list(opts.format,cb)
-  })
-}
-
-//------------------------------------------------------------------------------
 //                                               start
 //------------------------------------------------------------------------------
 //
@@ -205,18 +183,8 @@ function ps(opts, cb) {
 function start(opts, cb) {
   
   opts = opts || {}
-  if (!opts.script) return cb('no script')
+  if (!opts.script) return cb('no script')  
   
-  var scriptConfig =
-    { sourceDir : '/'
-    , command   : opts.command || 'node'
-    , options   : opts.options || []
-    , forever   : opts.forever || true
-    , max       : opts.max     || 10
-    , env       : opts.env     || process.env
-    , silent    : true
-    }         
-   
   // #TODO generate script-path - this may need some refactor :D
   
   // nexus start /some/file
@@ -238,7 +206,7 @@ function start(opts, cb) {
   //       : fs.stat(appName+'/server.js') || fs.stat(appName+'/app.js')
   //         ? script = appName+'/server.js' || appName+'/server.js'
   //         : script = appName // this is most likely an error..
-  //     : script CWD+'/'+appName
+  //     : script CWD+'/'+appName // this is most likely an error..
   
   // handle `nexus start /some/file` and `nexus start ./some/file`
   var script = 
@@ -296,22 +264,16 @@ function start(opts, cb) {
         else script = appPath
       }
     }
-  }
+  }  
 
-  // console.log('------- SCRIPT : '+script)
-  
-  if (!process.send) {
-    fork( __dirname+'/bin/cli.js'
-        , ['start',script].concat(scriptConfig.options)
-        , {env:scriptConfig.env} )
-    process.exit(0)  
-  }
-  var monitor = new forever.Monitor(script, scriptConfig).start()
-  monitor.on('start',function(){
-    var data = opts.format ? forever.format(monitor) : monitor
+  opts.options = opts.options || []
+  var child = fork( __dirname+'/bin/monitor.js'
+                  , [script].concat(opts.options)
+                  , {env:process.env} )
+  child.on('message',function(m){
+    console.log('got message piped through: '+m)
     cb(null,script)
-    forever.startServer(monitor)
-  }) 
+  })  
 }
 
 //------------------------------------------------------------------------------
@@ -367,73 +329,16 @@ function stopall(opts, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               stdin
+//                                               ps
 //------------------------------------------------------------------------------
-
-function stdin(opts, cb) {cb && cb('#TODO')}
-
-//------------------------------------------------------------------------------
-//                                               stdout
-//------------------------------------------------------------------------------
-
-function stdout(opts, cb) {cb && cb('#TODO')}
-
-//------------------------------------------------------------------------------
-//                                               stderr
-//------------------------------------------------------------------------------
-
-function stderr(opts, cb) {cb && cb('#TODO')}
-
-//------------------------------------------------------------------------------
-//                                               remote
-//------------------------------------------------------------------------------
-
-function remote(opts, cb) {
-  return cb('#TODO')
-  /*************************** /
-  var opts = opts || {}
-    , remote = (opt.remote && config.remotes[opts.remote])
-               ? config.remotes[opts.remote] : false
-    , port = opts.port || (remote && remote.port) ? remote.port : config.defaults.tlsPort
-    , host = opts.host || (remote && remote.host) ? remote.host : 'localhost'
-    , keyFile  = opts.key  || config.defaults.key
-    , certFile = opts.cert || config.defaults.cert
-    , key = fs.readFileSync(keyFile)
-    , cert = fs.readFileSync(certFile)
-    , options = {key:key,cert:cert}
-
-  console.log('connecting to '+host+':'+port)
-  dnode.connect(host, port, options, function(remote,con) {
-    cb(null,remote)
-  }).on('error',function(err){cb(err)})
-  //***************************/
-}
-
-
-
-/*************************************** /
-
-var keyA  = keyB  = config.defaults.key
-  , certA = certB = config.defaults.cert
-console.log('trying to connect')
-dnode({server:function(cb){cb('hello i am the server')}}).listen
-  ( 4444
-  , { key  : fs.readFileSync(keyA)
-    , cert : fs.readFileSync(certA)
-    , ca   : [fs.readFileSync(certB)]
-    , requestCert: true
-    , rejectUnauthorized: true
-    }
-  , function(remote){remote.client(function(data){console.log(data)})}
-  ).on('ready',function(){
-    dnode({client:function(cb){cb('hello i am the client')}}).connect
-      ( 4444
-      , { key  : fs.readFileSync(keyB)
-        , cert : fs.readFileSync(certB)
-        }
-      , function(remote){remote.server(function(data){console.log(data)})}
-      )
+//
+// ps({format:true},function(err,data){})
+//
+function ps(opts, cb) {
+  opts = opts || {}
+  forever.list(opts.format,function(err,procs){
+    if (procs) return cb(null, procs)
+    forever.list(opts.format,cb)
   })
-
-/***************************************/
+}
 
