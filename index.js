@@ -320,15 +320,19 @@ function restart(opts, cb) {
   opts = opts || {}
   if (opts.script === undefined) return cb('no script')
 
-  forever.list(false,function(err,allProcs){
-    var procs = forever.findByIndex(opts.script, allProcs)
-      || forever.findByScript(opts.script, allProcs)
-    if (!procs && i<3) restart(opts,cb)
-    var child = spawn(__dirname+'/bin/cli.js',['stop',opts.script])
-    child.on('exit',function(){
-      start({script:procs[0].file,options:procs[0].options},cb)
-    })
+  stop({script:opts.script},function(err,proc){
+    start({script:proc.file,options:proc.options},cb)
   })
+    
+  // forever.list(false,function(err,allProcs){
+  //   var procs = forever.findByIndex(opts.script, allProcs)
+  //     || forever.findByScript(opts.script, allProcs)
+  //   if (!procs && i<3) restart(opts,cb)
+  //   var child = spawn(__dirname+'/bin/cli.js',['stop',opts.script])
+  //   child.on('exit',function(){
+  //     start({script:procs[0].file,options:procs[0].options},cb)
+  //   })
+  // })
 }
 
 //------------------------------------------------------------------------------
