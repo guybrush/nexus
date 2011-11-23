@@ -48,8 +48,6 @@ function parseArgs() {
         console.log(err ? err : 'uninstalled '+argv._[0])
       })
       break
-    case 'git':
-      nexus.git(argv._[0],function(err,data){console.log(err ? err : data)})
     case 'link':
       nexus.link(argv._[0],function(err,data){console.log(err ? err : data)})
       break
@@ -82,9 +80,6 @@ function parseArgs() {
         console.log(err ? err : {'stopped processes':procs})
       })
       break
-    case 'stderr':
-    case 'stdout':
-    case 'stdin': console.log('#TODO'); break
     case 'hook':
       nexus.start
         ( { script  : __dirname+'/hook.js'

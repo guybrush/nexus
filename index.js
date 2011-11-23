@@ -168,6 +168,20 @@ function ls(opts, cb) {
 }
 
 //------------------------------------------------------------------------------
+//                                               ps
+//------------------------------------------------------------------------------
+//
+// ps({format:true},function(err,data){})
+//
+function ps(opts, cb) {
+  opts = opts || {}
+  forever.list(opts.format,function(err,procs){
+    if (procs) return cb(null, procs)
+    forever.list(opts.format,cb)
+  })
+}
+
+//------------------------------------------------------------------------------
 //                                               start
 //------------------------------------------------------------------------------
 //
@@ -181,10 +195,21 @@ function ls(opts, cb) {
 //      )
 //
 function start(opts, cb) {
-  
+  cb = cb || function(){}
   opts = opts || {}
+  opts.options = opts.options || []
   if (!opts.script) return cb('no script')  
   
+  var scriptConfig =
+    { sourceDir : '/'
+    , command   : opts.command || 'node'
+    , options   : opts.options
+    , forever   : true
+    , max       : 10
+    , env       : process.env
+    , silent    : true
+    } 
+    
   // #TODO generate script-path - this may need some refactor :D
   
   // nexus start /some/file
@@ -266,14 +291,21 @@ function start(opts, cb) {
     }
   }  
 
-  opts.options = opts.options || []
-  var child = fork( __dirname+'/bin/monitor.js'
-                  , [script].concat(opts.options)
-                  , {env:process.env} )
-  child.on('message',function(m){
-    console.log('got message piped through: '+m)
-    cb(null,script)
-  })  
+  if (!process.send) {
+    var child = fork( __dirname+'/bin/cli.js' 
+                    , ['start',script].concat(opts.options) 
+                    , { env:process.env } )  
+    child.on('message',function(m){            
+      cb(script)
+      process.exit(0)
+    })
+  } else {
+    var monitor = new forever.Monitor(script, scriptConfig).start()
+    monitor.on('start',function(){
+      forever.startServer(monitor)
+      process.send('ready')
+    })
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -325,20 +357,6 @@ function stopall(opts, cb) {
   var runner = forever.stopAll()
   runner.on('stopAll', function (procs) {
     cb && cb(null, procs)
-  })
-}
-
-//------------------------------------------------------------------------------
-//                                               ps
-//------------------------------------------------------------------------------
-//
-// ps({format:true},function(err,data){})
-//
-function ps(opts, cb) {
-  opts = opts || {}
-  forever.list(opts.format,function(err,procs){
-    if (procs) return cb(null, procs)
-    forever.list(opts.format,cb)
   })
 }
 
