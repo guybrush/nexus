@@ -81,7 +81,7 @@ function config(key, value, cb) {
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
   currConfig.host    = fileConfig.host    || '127.0.0.1'
-  currConfig.port    = fileConfig.port    || 5001
+  currConfig.port    = fileConfig.port    || 5000
   currConfig.remotes = fileConfig.remotes || { localhost : 
                                                { host : currConfig.host
                                                , port : currConfig.port } }
@@ -293,17 +293,16 @@ function start(opts, cb) {
 
   if (!process.send) {
     var child = fork( __dirname+'/bin/cli.js' 
-                    , ['start',script].concat(opts.options) 
-                    , { env:process.env } )  
-    child.on('message',function(m){            
-      cb(script)
-      process.exit(0)
-    })
+                    , ['start',script].concat(scriptConfig.options) 
+                    , { env:process.env } )
+    // child.on('message',function(m){cb(script);process.exit(0)})
+    process.exit(0)
   } else {
     var monitor = new forever.Monitor(script, scriptConfig).start()
     monitor.on('start',function(){
       forever.startServer(monitor)
-      process.send('ready')
+      cb(null,script)
+      // process.send('ready')
     })
   }
 }
@@ -314,9 +313,7 @@ function start(opts, cb) {
 //
 // restart({},function(err,data){})
 //
-var i = 0
 function restart(opts, cb) {
-  i++
   opts = opts || {}
   if (opts.script === undefined) return cb('no script')
 
