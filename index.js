@@ -20,6 +20,7 @@ var fs       = require('fs')
   , _pkg     = require('./package.json')
   , procs    = {}
   , toStop   = []
+  , subscriptions = {}
   
 ee.onAny(function(){
   var args = [].slice.call(arguments)
@@ -210,9 +211,15 @@ function ps(cb) {
 
 function start(opts, cb) {
   parseStart(opts, function(err, data){
+    var env = process.env
+    if (data.env) {
+      for (var x in data.env)
+        env[x] = data.env[x]
+    }
+      
     var child = spawn( data.command
                      , [data.script].concat(data.options)
-                     , { env : data.env
+                     , { env : env
                        , cwd : data.cwd
                        } )
     
@@ -222,6 +229,8 @@ function start(opts, cb) {
       procs[id] = data
       procs[id].id = id
       procs[id].crashed = 0
+      procs[id].ctime = Date.now()
+      procs[id].env = data.env
     }
 
     procs[id].pid = child.pid
@@ -252,6 +261,7 @@ function start(opts, cb) {
         }
       }
     })
+    cb && cb(null, procs[id])
   })
 }
 
@@ -265,8 +275,8 @@ function restart(id, cb) {
   startOpts.script  = running[id].script
   startOpts.options = running[id].options
   startOpts.id      = id
-  stop(id,function(err,data){
-    start(startOpts,cb)
+  stop(id, function(err,data){
+    start(startOpts, cb)
   })
 }
 
@@ -277,6 +287,7 @@ function restart(id, cb) {
 function stop(id, cb) {
   toStop.push(id)
   process.kill(procs[id].pid)
+  cb && cb(null, id)
 }
 
 //------------------------------------------------------------------------------
@@ -284,18 +295,25 @@ function stop(id, cb) {
 //------------------------------------------------------------------------------
 
 function stopall(cb) {
+  var len = 0
   for (var proc in procs) {
+    len++
     stop(proc)
   }  
+  cb(null, len)
 }
 
 //------------------------------------------------------------------------------
 //                                               subscribe
 //------------------------------------------------------------------------------
 
-function subscribe(opts, cb) {}
+function subscribe(opts, cb) {
 
-function unsubscribe(opts, cb) {}
+}
+
+function unsubscribe(opts, cb) {
+
+}
 
 //------------------------------------------------------------------------------
 //                                               remote
@@ -336,7 +354,7 @@ function parseStart(opts, cb) {
   result.id = opts.id || null
   result.command = opts.command || 'node'
   result.options = opts.options || []
-  result.env = opts.env || process.env
+  result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
   
   // nexus start /some/file

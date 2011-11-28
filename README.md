@@ -15,8 +15,6 @@
   and observe local and remote programs (npm packages).
 * all the config, logs and programs live in `~/.nexus` by default.
 * nexus is still *super-alpha*.
-* you may want to check out haibu, forever or hook.io - which are all able to
-  do things nexus is trying to do (and the support is much better `:p`).
   
 ## install
 

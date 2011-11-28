@@ -3,7 +3,12 @@
 var nexus = require('../index')
   , opti  = require('optimist')
   , dnode = require('dnode')
+  , execFile = require('child_process').execFile
+  , exec = require('child_process').exec
+  , fork = require('child_process').fork
+  , spawn = require('child_process').spawn
   , argv  = opti.argv
+  , _conn
   , usage =
     [ ' ___  ___  _ _  _ _  ___'
     , '|   || -_||_\'_|| | ||_ -|'
@@ -50,21 +55,15 @@ var nexus = require('../index')
     }
 
 if (argv._[0] == 'server') {
-  var execFile = require('child_process').execFile
-  var fork = require('child_process').fork
   if (!process.send) {
-    var child = fork( __filename 
-                    , ['server'] 
-                    , { env:process.env } )
-    child.on('message',function(m){
-      console.log('pid: '+child.pid)
-      process.exit(0)
+    var childA = fork(__filename, ['server'], {env:process.env})
+    childA.on('message',function(m){
+      exit(m)
     })
   } else {
-    execFile(__dirname+'/server.js',function(error,stdout,stderr){
-      console.log('stdout: '+stdout)
-      if (error) console.log('exec error: ' + error)
-      process.send('ready')
+    var childB = fork(__dirname+'/server.js', [], {env:process.env})
+    childB.on('message',function(m){
+      process.send(m)
     })
   }
 }    
@@ -98,13 +97,14 @@ else {
 
   dnode.connect( {key:key,cert:cert,host:host,port:port}
                , function(remote, conn){
+    _conn = conn
     nexus = remote
     //argv._.shift()
     //process.stdin.pipe(process.stdout)
     process.stdin.resume()
     process.stdin.on('data',function(data) {
       var cmd = data.toString().replace('\n','')
-      console.log('COMMAND',cmd)
+      //console.log('COMMAND',cmd)
       argv = opti(cmd.split(' ')).argv
       parseArgs()
     })
@@ -115,50 +115,59 @@ else {
 function parseArgs() {
   switch (argv._.shift()) {
     case 'version':
-      console.log('v'+nexus.version)
+      exit('v'+nexus.version)
       break
     case 'config':
-      nexus.config(function(err, data){console.log(err ? err : data)})
+      nexus.config(function(err, data){
+        if (err) return exit(err)
+        exit(data)
+      })
       break
     case 'ls':
-      nexus.ls
-        ( argv._[0]
-        , function(err, data){console.log(err ? err : data)})
+      nexus.ls(argv._[0], function(err, data){
+        if (err) return exit(err)
+        exit(data)
+      })
       break
     case 'install':
-      nexus.install
-        ( argv._[0]
-        , argv._[1]
-        , function(err,data){console.log(err ? err : data)})
+      nexus.install(argv._[0], argv._[1], function(err,data){
+        if (err) return exit(err)
+        exit(data)
+      })
       break
     case 'rm':
     case 'uninstall':
       nexus.uninstall(argv._[0],function(err,data){
-        console.log(err ? err : 'uninstalled '+argv._[0])
+        if (err) return exit(err)
+        exit(data)
       })
       break
     case 'link':
-      nexus.link(argv._[0],function(err,data){console.log(err ? err : data)})
+      nexus.link(argv._[0],function(err,data){
+        if (err) return exit(err)
+        exit(data)
+      })
       break
     case 'ps':
       nexus.ps(function(err,data){
-        if (err) return console.log(err)
-        for (var proc in data) {
-          delete data[proc].env
-        }
-        console.log(data)
+        if (err) return exit(err)
+        exit(data)
       })
       break
     case 'start':
       // #TODO check for nexus-start-options besides scripts-options
       
-      //var options = argv._.splice(process.argv.indexOf(argv._[0]))
+      var options = argv._.splice(process.argv.indexOf(argv._[0]))
       var options = []
-      console.log('start argv',argv,options,process.argv)
+      // console.log('start argv',argv,options,process.argv)
       nexus.start
         ( { script  : argv._[0]
-          , options : options } 
-        , function(err,data){console.log(err ? err : data)} )
+          , options : options 
+          , env     : {FOO:'BAR'} } 
+        , function(err,data){
+            if (err) return exit(err)
+            exit(data)
+          } )
       break
     case 'restart':
       nexus.restart
@@ -166,36 +175,24 @@ function parseArgs() {
         , function(err, proc){console.log(err ? err : {'restarted process':proc})})
       break
     case 'stop':
-      nexus.stop
-        ( argv._[0]
-        , function(err,proc){console.log(err ? err : proc)} )
-      break
-    case 'stopall':
-      nexus.stopall(null, function(err, procs){
-        console.log(err ? err : {'stopped processes':procs})
+      nexus.stop(argv._[0], function(err,data){
+        if (err) return exit(err)
+        exit(data)
       })
       break
-    case 'server':
-      var execFile = require('child_process').execFile
-      var fork = require('child_process').fork
-      if (!process.send) {
-        fork( __filename 
-            , ['server'] 
-            , { env:process.env } )
-        process.exit(0)
-      } else {
-        execFile(__dirname+'/server.js',function(error,stdout,stderr){
-          console.log('stdout: '+stdout)
-          if (error) console.log('exec error: ' + error)
-        })
-      }
+    case 'stopall':
+      nexus.stopall(function(err, data){
+        if (err) return exit(err)
+        exit(data)
+      })
       break
-    default: console.log(usage)
+    default: exit(usage)
   }
 }
 
 function exit(msg) {
   console.log(msg)
+  _conn && _conn.end()
   process.exit()
 }
 
