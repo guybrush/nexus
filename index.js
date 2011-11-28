@@ -4,27 +4,33 @@
 
 var fs       = require('fs')
   , path     = require('path')
-  , fstream  = require('fstream')
   , util     = require('util')
   , net      = require('net')
-  , fork     = require('child_process').fork
   , spawn    = require('child_process').spawn
-  , exec     = require('child_process').exec
-  , execFile = require('child_process').execFile
   , dnode    = require('dnode')
+  , fstream  = require('fstream')
   , AA       = require('async-array')
+  , EE2      = require('eventemitter2').EventEmitter2
+  , ee       = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
   , pf       = require('portfinder')
-  , forever  = require('forever')
   , rimraf   = require('rimraf') 
   , npm      = require('npm')
   , uuid     = require('node-uuid')
   , _config  = config()
   , _pkg     = require('./package.json')
-  , hook // uninitialized, if set it means the hook is running
-
-forever.load( { root     : _config.logs
-              , pidPath  : _config.pids
-              , sockPath : _config.socks } )  
+  , procs    = {}
+  , toStop   = []
+  
+ee.onAny(function(){
+  var args = [].slice.call(arguments)
+  //console.log.apply(this,[].concat(this.event,'→',args))
+  if (/^stdout/.test(this.event)) 
+    console.log.apply(this,[].concat(this.event,'→',args))
+  else if (/^stderr/.test(this.event))
+    console.log.apply(this,[].concat(this.event,'→',args))
+  else 
+    console.log.apply(this,[].concat(this.event))
+})
   
 //------------------------------------------------------------------------------
 //                                               exports
@@ -37,11 +43,13 @@ module.exports = exports =
   , uninstall : uninstall
   , link      : link
   , ls        : ls
+  , ps        : ps
   , start     : start
   , restart   : restart
   , stop      : stop
   , stopall   : stopall
-  , ps        : ps
+  , subscribe : subscribe
+  , remote    : remote
   }
   
 //------------------------------------------------------------------------------
@@ -53,11 +61,7 @@ function version(cb) {cb(null, _version); return _version}
 //------------------------------------------------------------------------------
 //                                               config
 //------------------------------------------------------------------------------
-//
-// config(function(err,data){})                          // get all config
-// config('some key',function(err,data){})               // get 1 config
-// config('some key','some value',function(err,data){})  // set config
-//
+
 function config(key, value, cb) {
   
   // #TODO get/set config
@@ -69,13 +73,12 @@ function config(key, value, cb) {
     , fileConfigPath = process.env.HOME+'/.nexus/config.json'
 
   try { fileConfig = require(fileConfigPath) }
-  catch (e) { /* no config.json, so we use hardcoded defaults */ }
+  catch (e) {} // no config.json, so we use hardcoded defaults
 
   currConfig.prefix  = fileConfig.prefix  || process.env.HOME+'/.nexus'
   currConfig.key     = fileConfig.key     || currConfig.prefix+'/nexus.key'
   currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
   currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
-  currConfig.socks   = fileConfig.socks   || currConfig.prefix+'/socks'
   currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
   currConfig.pids    = fileConfig.pids    || currConfig.prefix+'/pids'
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
@@ -87,8 +90,7 @@ function config(key, value, cb) {
                                                , port : currConfig.port } }
 
   var aa = new AA
-    ( [ currConfig.socks
-      , currConfig.pids
+    ( [ currConfig.pids
       , currConfig.keys
       , currConfig.logs
       , currConfig.apps
@@ -114,22 +116,29 @@ function config(key, value, cb) {
 //------------------------------------------------------------------------------
 //                                               install
 //------------------------------------------------------------------------------
-//
-// install('same-as-npm',function(err,data){})
-//
-function install(opts, cb) {
+
+function install(what, name, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  if (arguments[1] && typeof arguments[1] === 'string')
+    name = arguments[1]
+  else 
+    name = null
+
   npm.load({prefix:_config.tmp, global:true, loglevel:'silent'}, function(err){
     if (err) return cb(err)
-    npm.commands.install(opts, function(err, res){
+    npm.commands.install(what, function(err, res){
       if (err) return cb(err)
+      if (!name) name = res[0][0]
       var r = fstream.Reader(res[0][1])
-        , w = fstream.Writer( { path:_config.apps+'/'+res[0][0]
+        , w = fstream.Writer( { path:_config.apps+'/'+name
                               , type:'Directory' } )
       r.pipe(w)
       w.once('end',function(){
         // #TODO maybe delete _config.tmp+'/lib'
         // what if 2 guys install at the same time?
         rimraf(res[0][1],function(err){cb(err, res[0][0])})
+        cb(null, name)
       })
     })
   })
@@ -138,9 +147,7 @@ function install(opts, cb) {
 //------------------------------------------------------------------------------
 //                                               uninstall
 //------------------------------------------------------------------------------
-//
-// uninstall('app-name',function(err,data){})
-//
+
 function uninstall(opts, cb) {
   var path = _config.apps+'/'+opts
   fs.stat(path,function(err,stat){
@@ -163,54 +170,174 @@ function link(opts, cb) {
 //                                               ls
 //------------------------------------------------------------------------------
 
-function ls(opts, cb) {
-  fs.readdir(_config.apps,cb)
+function ls(what,cb) {
+  if (arguments[0] && typeof arguments[0] === 'string')
+    what = arguments[0]
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  
+  if (what) {
+    var pkg = require(_config.apps+'/'+what+'/package.json')
+    cb && cb(null,pkg)
+    return
+  }
+  
+  fs.readdir(_config.apps,function(err,data){
+    if (err) return cb(err)
+    var result = {}
+    var aa = new AA(data)
+    aa.map(function(x,i,next){
+      var pkg = require(_config.apps+'/'+x+'/package.json')
+      result[x] = pkg
+      next()
+    }).done(function(){
+      cb && cb(null,result)
+    }).exec()
+  })
 }
 
 //------------------------------------------------------------------------------
 //                                               ps
 //------------------------------------------------------------------------------
-//
-// ps({format:true},function(err,data){})
-//
-function ps(opts, cb) {
-  opts = opts || {}
-  forever.list(opts.format,function(err,procs){
-    if (procs) return cb(null, procs)
-    forever.list(opts.format,cb)
-  })
+
+function ps(cb) {
+  cb(null,procs)
 }
 
 //------------------------------------------------------------------------------
 //                                               start
 //------------------------------------------------------------------------------
-//
-// start( { command : 'node'             // executable
-//        , script  : '/path/to/script'
-//        , options : []
-//        , max     : 10                 // restart maximal 10 times
-//        , env     : {}                 // process.env
-//        }
-//      , function(err, data) {}
-//      )
-//
+
 function start(opts, cb) {
-  cb = cb || function(){}
-  opts = opts || {}
-  opts.options = opts.options || []
-  if (!opts.script) return cb('no script')  
-  
-  var scriptConfig =
-    { sourceDir : '/'
-    , command   : opts.command || 'node'
-    , options   : opts.options
-    , forever   : true
-    , max       : 10
-    , env       : process.env
-    , silent    : true
-    } 
+  parseStart(opts, function(err, data){
+    var child = spawn( data.command
+                     , [data.script].concat(data.options)
+                     , { env : data.env
+                       , cwd : data.cwd
+                       } )
     
-  // #TODO generate script-path - this may need some refactor :D
+    var id = opts.id || uuid()
+
+    if (!procs[id]) { 
+      procs[id] = data
+      procs[id].id = id
+      procs[id].crashed = 0
+    }
+
+    procs[id].pid = child.pid
+
+    ee.emit('started::'+id, procs[id])
+    child.stdout.on('data',function(data){
+      ee.emit('stdout::'+id, data.toString())
+    })
+    child.stderr.on('data',function(data){
+      ee.emit('stderr::'+id, data.toString())
+    })
+    child.on('exit',function(code){
+      ee.emit('exited::'+id, code)
+      if (code != 0) {
+        procs[id].crashed++
+        var toStopIndex = toStop.indexOf(id)
+        if (toStopIndex != -1) {
+          toStop.splice(toStopIndex)
+          delete procs[id]
+        }
+        else {
+          if (procs[id].crashed <= 10) {
+            opts.id = id
+            start(opts)
+          } else {
+            delete procs[id]
+          }
+        }
+      }
+    })
+  })
+}
+
+//------------------------------------------------------------------------------
+//                                               restart
+//------------------------------------------------------------------------------
+
+function restart(id, cb) {
+  var startOpts = {} 
+  startOpts.command = running[id].command
+  startOpts.script  = running[id].script
+  startOpts.options = running[id].options
+  startOpts.id      = id
+  stop(id,function(err,data){
+    start(startOpts,cb)
+  })
+}
+
+//------------------------------------------------------------------------------
+//                                               stop
+//------------------------------------------------------------------------------
+
+function stop(id, cb) {
+  toStop.push(id)
+  process.kill(procs[id].pid)
+}
+
+//------------------------------------------------------------------------------
+//                                               stopall
+//------------------------------------------------------------------------------
+
+function stopall(cb) {
+  for (var proc in procs) {
+    stop(proc)
+  }  
+}
+
+//------------------------------------------------------------------------------
+//                                               subscribe
+//------------------------------------------------------------------------------
+
+function subscribe(opts, cb) {}
+
+function unsubscribe(opts, cb) {}
+
+//------------------------------------------------------------------------------
+//                                               remote
+//------------------------------------------------------------------------------
+
+function remote(opts, cb) {
+
+  var opts = opts || {}
+    , remote = (opts.remote && config.remotes[opts.remote]) 
+               ? config.remotes[opts.remote] : false
+    , port = opts.port || (remote && remote.port) ? remote.port : config.defaults.tlsPort                  
+    , host = opts.host || (remote && remote.host) ? remote.host : 'localhost'
+    , keyFile  = opts.key  || config.defaults.key
+    , certFile = opts.cert || config.defaults.cert
+    , key = fs.readFileSync(keyFile)
+    , cert = fs.readFileSync(certFile)                                            
+    , options = {key:key,cert:cert}
+  
+  console.log('connecting to '+host+':'+port)
+  dnode.connect(host, port, options, function(remote,con) { 
+    cb(null,remote)
+  }).on('error',function(err){cb(err)})
+    
+  return null
+
+}
+
+//------------------------------------------------------------------------------
+//                                               parseStart
+//------------------------------------------------------------------------------
+
+function parseStart(opts, cb) {
+  var result = {}
+  
+  console.log('parseStart',opts)
+  
+  result.script = null
+  result.id = opts.id || null
+  result.command = opts.command || 'node'
+  result.options = opts.options || []
+  result.env = opts.env || process.env
+  result.cwd = opts.cwd || process.cwd()
   
   // nexus start /some/file
   //   script = /some/file 
@@ -234,7 +361,7 @@ function start(opts, cb) {
   //     : script CWD+'/'+appName // this is most likely an error..
   
   // handle `nexus start /some/file` and `nexus start ./some/file`
-  var script = 
+  result.script = 
     /^\//.test(opts.script) 
       ? opts.script 
       : /^\.\//.test(opts.script)
@@ -242,15 +369,15 @@ function start(opts, cb) {
         : null
   
   // handle `nexus start appName/path/to/script`
-  if (!script && /\//.test(opts.script)) {
+  if (!result.script && /\//.test(opts.script)) {
     var maybeApp = opts.script.split('/')[0]
       , isApp = path.existsSync(_config.apps+'/'+maybeApp)
-    if (isApp) script = _config.apps+'/'+opts.script
-    else script = process.cwd()+'/'+opts.script
+    if (isApp) result.script = _config.apps+'/'+opts.script
+    else result.script = process.cwd()+'/'+opts.script
   }
 
   // handle `nexus start appName`
-  if (!script) {
+  if (!result.script) {
     var maybeApp = opts.script.split('/')[0]
     if (path.existsSync(_config.apps+'/'+maybeApp)) {
       // console.log('---- A')
@@ -265,99 +392,36 @@ function start(opts, cb) {
           var isScript = path.existsSync(appPath+'/'+split[0])
           if (isScript) {
             // console.log('---- AAAA')
-            script = appPath+'/'+split[0]
-            scriptConfig.options = split.splice(1)
+            result.script = appPath+'/'+split[0]
+            result.options = split.splice(1)
           }
           else {
             // console.log('---- AAAB')
-            scriptConfig.command = split[0]
-            script = appPath+'/'+split[1]
-            options = split.splice(2)
+            result.command = split[0]
+            result.script = appPath+'/'+split[1]
+            result.options = split.splice(2)
           }
         }
         else {
           // console.log('---- AAB')
-          script = appPath+'/'+startScript
+          result.script = appPath+'/'+startScript
         }
       }
       else {
         // console.log('---- AB')
         var serverJsExists = path.existsSync(appPath+'/server.js')
         var appJsExists = path.existsSync(appPath+'/app.js')
-        if (serverJsExists) script = appPath+'/server.js'
-        else if (appJsExists) script = appPath+'/app.js'
-        else script = appPath
+        if (serverJsExists) result.script = appPath+'/server.js'
+        else if (appJsExists) result.script = appPath+'/app.js'
+        else result.script = appPath
       }
     }
-  }  
-
-  if (!process.send) {
-    var child = fork( __dirname+'/bin/cli.js' 
-                    , ['start',script].concat(scriptConfig.options) 
-                    , { env:process.env } )
-    // child.on('message',function(m){cb(script);process.exit(0)})
-    process.exit(0)
-  } else {
-    var monitor = new forever.Monitor(script, scriptConfig).start()
-    monitor.on('start',function(){
-      forever.startServer(monitor)
-      cb(null,script)
-      // process.send('ready')
-    })
   }
-}
-
-//------------------------------------------------------------------------------
-//                                               restart
-//------------------------------------------------------------------------------
-//
-// restart({},function(err,data){})
-//
-function restart(opts, cb) {
-  opts = opts || {}
-  if (opts.script === undefined) return cb('no script')
-
-  stop({script:opts.script},function(err,proc){
-    start({script:proc.file,options:proc.options},cb)
-  })
-    
-  // forever.list(false,function(err,allProcs){
-  //   var procs = forever.findByIndex(opts.script, allProcs)
-  //     || forever.findByScript(opts.script, allProcs)
-  //   if (!procs && i<3) restart(opts,cb)
-  //   var child = spawn(__dirname+'/bin/cli.js',['stop',opts.script])
-  //   child.on('exit',function(){
-  //     start({script:procs[0].file,options:procs[0].options},cb)
-  //   })
-  // })
-}
-
-//------------------------------------------------------------------------------
-//                                               stop
-//------------------------------------------------------------------------------
-
-function stop(opts, cb) {
-  opts = opts || {}
-  if (opts.script === undefined) return cb('no script')
-  var runner = forever.stop(opts.script)
-  runner.on('stop',function(procs){
-    // fs.unlinkSync(procs[0].pidFile)
-    // fs.unlinkSync(config.pidPath+'/'+procs[0].uid+'.fvr')
-    cb && cb(null, procs[0])
-  })
-  runner.on('error',function(err){
-    return cb && cb('cant stop process: '+opts.script)
-  })
-}
-
-//------------------------------------------------------------------------------
-//                                               stopall
-//------------------------------------------------------------------------------
-
-function stopall(opts, cb) {
-  var runner = forever.stopAll()
-  runner.on('stopAll', function (procs) {
-    cb && cb(null, procs)
-  })
+  
+  var split = result.script.split('/')
+  split.pop()
+  result.cwd = split.join('/')
+  
+  cb(null, result)
 }
 

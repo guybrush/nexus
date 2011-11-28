@@ -4,7 +4,8 @@ var Hook = require('hook.io').Hook
   , nexus = require('../index')
   , config = nexus.config()
   , hook = new Hook({name:'nexus'})
-
+  , spawn = require('child_process').spawn
+  
 hook.on('hook::ready',function(){})
 hook.on('*::nexus-config',nexus.config)
 hook.on('*::nexus-install',nexus.install)
@@ -17,6 +18,5 @@ hook.on('*::nexus-stop',nexus.stop)
 hook.on('*::nexus-stopall',nexus.stopall)
 hook.on('*::nexus-ps',nexus.ps)
  
-hook.start(5000,function(){
-  console.log(':'+config.port)
-})
+hook.start(5000,function(){console.log(':5000')})
+
