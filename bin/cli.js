@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var nexus = require('../index')
+  , _config = nexus.config()
   , opti  = require('optimist')
   , dnode = require('dnode')
   , execFile = require('child_process').execFile
@@ -14,7 +15,7 @@ var nexus = require('../index')
     , '|   || -_||_\'_|| | ||_ -|'
     , '|_|_||___||_,_||___||___|v'+nexus.version
     , ''
-    , 'nexus [<command> [<options>]]'
+    , 'nexus [-r <remote>] [<command> [<options>]]'
     , ''
     , 'commands:'
     , ''
@@ -23,38 +24,58 @@ var nexus = require('../index')
     , '    config    .. get/set config'
     , '    install   .. install packages'
     , '    uninstall .. uninstall packages'
+    , '    link      .. like npm link (only local)'
     , '    ls        .. list installed packages'
+    , '    subscribe .. subscribe to events'
     , '    ps        .. list of current running programs'
     , '    start     .. start program'
     , '    restart   .. restart running program'
     , '    stop      .. stop running program'
     , '    stopall   .. stop all running programs'
-    , '    remote    .. access remote nexus-server'
-    , '    server    .. start a nexus-server'
+    , '    server    .. start a nexus-server (only local)'
     , ''
+    , 'try `nexus help <command>` for more info'
     ].join('\n')
-  , help =
-    { help    : 'nexus help <command>' 
-    , version : 'nexus version'
-    , config  : 
-      [ 'nexus config               .. show all config'
-      , 'nexus config <key>         .. show value of config.<key>'
-      , 'nexus config <key> <value> .. set config.<key> to <value>'
-      , ''
-      ].join('\n')
-    , install : 
-      [ 'nexus install <tarball file> [<package-name>]'
-      , 'nexus install <tarball url> [<package-name>]'
-      , 'nexus install <folder> [<package-name>]'
-      , 'nexus install <pkg> [<package-name>]'
-      , 'nexus install <pkg>@<tag> [<package-name>]'
-      , 'nexus install <pkg>@<version> [<package-name>]'
-      , 'nexus install <pkg>@<version range> [<package-name>]'
-      , ''
-      ].join('\n')
-    }
+    
+var help = {}
+help.help      = 'nexus help <command>' 
+help.version   = 'nexus version'
+help.config    = [ 'nexus config               .. show all config'
+                 , 'nexus config <key>         .. show value of config.<key>'
+                 , 'nexus config <key> <value> .. set config.<key> to <value>'
+                 ].join('\n') 
+help.install   = [ 'nexus install <tarball url> [<package-name>]'
+                 , 'nexus install <pkg> [<package-name>]'
+                 , 'nexus install <pkg>@<tag> [<package-name>]'
+                 , 'nexus install <pkg>@<version> [<package-name>]'
+                 , 'nexus install <pkg>@<version range> [<package-name>]'
+                 , ''
+                 , 'works locally only:'
+                 , ''
+                 , 'nexus install <tarball file> [<package-name>]'
+                 , 'nexus install <folder> [<package-name>]'
+                 ].join('\n')
+help.uninstall = [ 'TBA (look at code for now)'
+                 , ''
+                 , 'note: shortcuts for "uninstall" is "rm"'
+                 ].join('\n')
+help.rm        = help.uninstall
+help.ls        = 'TBA (look at code for now)'
+help.subscribe = 'TBA (look at code for now)'
+help.ps        = 'TBA (look at code for now)'
+help.start     = 'TBA (look at code for now)'
+help.restart   = 'TBA (look at code for now)'
+help.stop      = 'TBA (look at code for now)'
+help.stopall   = 'TBA (look at code for now)'
+help.server    = 'TBA (look at code for now)'
 
-if (argv._[0] == 'server') {
+if (!argv._[0]) exit(usage)
+else if (argv._[0] == 'help') {
+  if (!argv._[1] || !help[argv._[1]]) 
+    return exit('unknown command: '+argv._[1])
+  exit(help[argv._[1]])
+}
+else if (argv._[0] == 'server') {
   if (!process.send) {
     var childA = fork(__filename, ['server'], {env:process.env})
     childA.on('message',function(m){
@@ -113,7 +134,8 @@ else {
 }
 
 function parseArgs() {
-  switch (argv._.shift()) {
+  var cmd = argv._.shift()
+  switch (cmd) {
     case 'version':
       exit('v'+nexus.version)
       break
@@ -186,7 +208,8 @@ function parseArgs() {
         exit(data)
       })
       break
-    default: exit(usage)
+    default: 
+      exit('unknown command: '+cmd)
   }
 }
 
