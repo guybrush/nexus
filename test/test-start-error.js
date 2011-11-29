@@ -6,9 +6,9 @@ var test = require('tap').test
   , port = Math.floor(Math.random() * 40000 + 10000)
 
 test('install-tarball-url-invalid-domain', function(t) {
+  t.plan(7)
   nexus.install({package:__dirname+'/fixtures/app-error'},function(err,data){
     t.notOk(err,'installing without error')
-    console.log('starting',{script:data,options:[port]})
     nexus.start({script:data,options:[port]},function(err,startedProc){
       t.notOk(err,'starting without error')
       setTimeout(function(){ // #TODO this is lame, nexus.subsribe needs to be done!
@@ -21,6 +21,7 @@ test('install-tarball-url-invalid-domain', function(t) {
               nexus.ps(function(err,procs){
                 t.ok(procs[startedProc.id],'nexus.ps still lists the proc with the same id')
                 t.equal(procs[startedProc.id].crashed,1,'nexus.ps says the proc has crashed 1 time')
+                nexus.stopall()
                 nexusServer.close()
                 t.end()
               })
