@@ -82,10 +82,20 @@ else if (argv._[0] == 'server') {
       exit(m)
     })
   } else {
-    var childB = fork(__dirname+'/server.js', [], {env:process.env})
-    childB.on('message',function(m){
-      process.send(m)
-    })
+    var childB = spawn(__dirname+'/server.js', [], {env:process.env})
+    process.send({pid:childB.pid})
+    
+    // var childB = fork(__dirname+'/server.js', [], {env:process.env})
+    // childB.on('message',function(m){
+    //   process.send(m)
+    // }
+    // var childB = execFile
+    //   ( __dirname+'/server.js', function(err,stdout,stderr){
+    //       console.log(stdout)
+    //       console.log(stderr)
+    //       if (err) process.send({error:err})
+    //       else process.send({pid:childB.pid})
+    //     } )
   }
 }    
 else if (argv._[0] == 'remote') {
@@ -216,6 +226,6 @@ function parseArgs() {
 function exit(msg) {
   console.log(msg)
   _conn && _conn.end()
-  process.exit()
+  process.exit(0)
 }
 
