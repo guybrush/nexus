@@ -89,6 +89,7 @@ else if (argv._[0] == 'server') {
     // childB.on('message',function(m){
     //   process.send(m)
     // }
+    
     // var childB = execFile
     //   ( __dirname+'/server.js', function(err,stdout,stderr){
     //       console.log(stdout)
