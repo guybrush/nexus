@@ -71,12 +71,17 @@ function config(key, value, cb) {
   if (key && !value && !cb) cb = key
   var currConfig = {}
     , fileConfig = {}
-    , fileConfigPath = process.env.HOME+'/.nexus/config.json'
+    , home = ( process.platform === "win32" // HAHA!
+             ? process.env.USERPROFILE
+             : process.env.HOME )
+  
+    
+  fileConfigPath = home+'/.nexus/config.json'
 
   try { fileConfig = require(fileConfigPath) }
   catch (e) {} // no config.json, so we use hardcoded defaults
 
-  currConfig.prefix  = fileConfig.prefix  || process.env.HOME+'/.nexus'
+  currConfig.prefix  = fileConfig.prefix  || home+'/.nexus'
   currConfig.key     = fileConfig.key     || currConfig.prefix+'/nexus.key'
   currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
   currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
