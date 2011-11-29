@@ -4,7 +4,7 @@ var test = require('tap').test
   , fs = require('fs')
   , http = require('http')
 
-test('install-tarball-url', function(t) {
+test('install tarball url', function(t) {
   t.plan(8)
   var port = Math.floor(Math.random() * 40000 + 10000)
   var server = http.createServer(function(req,res){

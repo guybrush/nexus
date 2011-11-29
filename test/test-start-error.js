@@ -5,7 +5,7 @@ var test = require('tap').test
   , http = require('http')
   , port = Math.floor(Math.random() * 40000 + 10000)
 
-test('install-tarball-url-invalid-domain', function(t) {
+test('start error', function(t) {
   t.plan(7)
   nexus.install({package:__dirname+'/fixtures/app-error'},function(err,data){
     t.notOk(err,'installing without error')
