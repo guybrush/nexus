@@ -161,7 +161,7 @@ function install(opts, cb) {
   var domain = opts.package.split('://')[1]
   domain = domain.split('/')[0]
   domain = domain.split(':')[0]
-  var split = domain.split('@')
+  var split = domain.split('@')      
   domain = split[split.length - 1]
   dns.lookup(domain,function(err,data,fam){
     if (err && domain!='localhost')
@@ -250,14 +250,14 @@ function ls(package,cb) {
     }).exec()
   })
 }
-
+                                          
 //------------------------------------------------------------------------------
 //                                               ps
 //------------------------------------------------------------------------------
 
 function ps(cb) {
   cb(null,procs)
-}
+}                                            
 
 //------------------------------------------------------------------------------
 //                                               start
@@ -265,6 +265,7 @@ function ps(cb) {
 
 function start(opts, cb) {
   parseStart(opts, function(err, data){
+    if (err) return cb(err)
     var env = process.env
     if (data.env) {
       for (var x in data.env)
@@ -401,8 +402,9 @@ function remote(opts, cb) {
 
 function parseStart(opts, cb) {
   var result = {}
-  
-  console.log('parseStart',opts)
+  opts = opts || {}
+  //console.log('parseStart',opts)        
+  if (!opts.script) return cb('no script defined')
   
   result.script = null
   result.id = opts.id || null
@@ -452,35 +454,35 @@ function parseStart(opts, cb) {
   if (!result.script) {
     var maybeApp = opts.script.split('/')[0]
     if (path.existsSync(_config.apps+'/'+maybeApp)) {
-      // console.log('---- A')
+      //console.log('---- A')
       var appPath = _config.apps+'/'+maybeApp
       var pkg = require(appPath+'/package.json')
       if (pkg.scripts && pkg.scripts.start) {
-        // console.log('---- AA')
+        //console.log('---- AA')
         var startScript = pkg.scripts.start
         if (/\w/.test(startScript)) {
-          // console.log('---- AAA')
+          //console.log('---- AAA')
           var split = startScript.split(' ')
           var isScript = path.existsSync(appPath+'/'+split[0])
           if (isScript) {
-            // console.log('---- AAAA')
+            //console.log('---- AAAA')
             result.script = appPath+'/'+split[0]
-            result.options = split.splice(1)
+            result.options = result.options || split.splice(1)
           }
-          else {
-            // console.log('---- AAAB')
+          else {                      
+            //console.log('---- AAAB')
             result.command = split[0]
             result.script = appPath+'/'+split[1]
-            result.options = split.splice(2)
+            result.options = result.options || split.splice(2)
           }
         }
         else {
-          // console.log('---- AAB')
+          //console.log('---- AAB')
           result.script = appPath+'/'+startScript
         }
       }
       else {
-        // console.log('---- AB')
+        //console.log('---- AB')
         var serverJsExists = path.existsSync(appPath+'/server.js')
         var appJsExists = path.existsSync(appPath+'/app.js')
         if (serverJsExists) result.script = appPath+'/server.js'
@@ -493,7 +495,7 @@ function parseStart(opts, cb) {
   var split = result.script.split('/')
   split.pop()
   result.cwd = split.join('/')
-  
+  //console.log('parseStart',result)
   cb(null, result)
 }
 

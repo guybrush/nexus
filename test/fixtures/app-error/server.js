@@ -1,7 +1,7 @@
-var port = process.argv[2] || 3002
-  , i = 0
+var port = process.argv[2] || Math.floor(Math.random() * 40000 + 10000)
 require('http').createServer(function(req,res){
-  console.log('request '+ i++)
+  console.log('incomming request')
   res.end('hello - i will crash now.. see you later! (hopefully)')
-  if (i >= 2) throw(new Error('i crashed hard'))
+  if (req.url!='/favicon.ico') throw(new Error('i crashed hard'))
 }).listen(port,function(){console.log('listening on :'+port)})
+
