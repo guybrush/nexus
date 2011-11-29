@@ -16,6 +16,7 @@ var fs       = require('fs')
   , rimraf   = require('rimraf') 
   , npm      = require('npm')
   , uuid     = require('node-uuid')
+  , mkdirp   = require('mkdirp')
   , _config  = config()
   , _pkg     = require('./package.json')
   , procs    = {}
@@ -74,8 +75,7 @@ function config(key, value, cb) {
     , home = ( process.platform === "win32" // HAHA!
              ? process.env.USERPROFILE
              : process.env.HOME )
-  
-    
+
   fileConfigPath = home+'/.nexus/config.json'
 
   try { fileConfig = require(fileConfigPath) }
@@ -86,7 +86,6 @@ function config(key, value, cb) {
   currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
   currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
   currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
-  currConfig.pids    = fileConfig.pids    || currConfig.prefix+'/pids'
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
   currConfig.host    = fileConfig.host    || '127.0.0.1'
@@ -96,8 +95,7 @@ function config(key, value, cb) {
                                                , port : currConfig.port } }
 
   var aa = new AA
-    ( [ currConfig.pids
-      , currConfig.keys
+    ( [ currConfig.keys
       , currConfig.logs
       , currConfig.apps
       , currConfig.tmp
@@ -106,10 +104,11 @@ function config(key, value, cb) {
   aa.map(function(x, i, next){
     fs.lstat(x, function(err){
       if (!err) return next()
-      var w = fstream.Writer({path:x,type:'Directory'})
-      // w.on('error',function(err){next(err)})
-      w.once('end',function(){next()})
-      w.end()
+      mkdirp(x,0755,function(err){next(err)})
+      // var w = fstream.Writer({path:x,type:'Directory'})
+      // // w.on('error',function(err){next(err)})
+      // w.once('end',function(){next()})
+      // w.end()
     })
   }).done(function(err, data){
     if (err) return cb && cb(err)
@@ -123,31 +122,80 @@ function config(key, value, cb) {
 //                                               install
 //------------------------------------------------------------------------------
 
-function install(what, name, cb) {
+function install(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
-  if (arguments[1] && typeof arguments[1] === 'string')
-    name = arguments[1]
-  else 
-    name = null
+  else
+    cb = function() {}
+  
+  opts = opts || {}
+  if (!opts.package) return cb('no package')
 
-  npm.load({prefix:_config.tmp, global:true, loglevel:'silent'}, function(err){
-    if (err) return cb(err)
-    npm.commands.install(what, function(err, res){
+  /* * /
+  // #TODO this is not cool - maybe factor monitor out..
+  // all this install, uninstall, .. -code just throws way too much
+  var execFile = require('child_process').execFile
+  var child = execFile( __dirname+'/node_modules/.bin/npm'
+                      , ['install',opts.package,'--parsable']
+                      , {cwd:_config.tmp} )
+  var stdout = [], stderr = []
+  child.stdout.on('data',function(data){stdout.push(data)})
+  child.stderr.on('data',function(data){stderr.push(data)})
+  child.on('exit',function(code){
+    // this is super-dirty.. to avoid throwing npm..
+    if (code !== 0) return cb(stderr.join('\n'))
+    var res = stdout[0].split('\n')
+    for (var i=0,len=res.length; i<len; i++)
+      res[i] = res[i].split(' ')
+    res[0][1] = _config.tmp+'/'+res[0][1]
+    copyToName(res)
+  })
+  /* */
+
+  if (!(/:\/\//.test(opts.package))) 
+    return installPackage() 
+  // this code sucks in general .. but ye ..
+  // install via authed http? not implemented yet :D 
+  // (on the cli ssh-agent might help with ssh-transport)
+  var dns = require('dns')
+  var domain = opts.package.split('://')[1]
+  domain = domain.split('/')[0]
+  domain = domain.split(':')[0]
+  var split = domain.split('@')
+  domain = split[split.length - 1]
+  dns.lookup(domain,function(err,data,fam){
+    if (err && domain!='localhost')
+      return cb(err)
+    installPackage()
+  })
+  
+  function installPackage() {
+    npm.load({prefix:_config.tmp, global:true, loglevel:'silent', exit:false}, function(err){
       if (err) return cb(err)
-      if (!name) name = res[0][0]
-      var r = fstream.Reader(res[0][1])
-        , w = fstream.Writer( { path:_config.apps+'/'+name
-                              , type:'Directory' } )
-      r.pipe(w)
-      w.once('end',function(){
-        // #TODO maybe delete _config.tmp+'/lib'
-        // what if 2 guys install at the same time?
-        rimraf(res[0][1],function(err){cb(err, res[0][0])})
-        cb(null, name)
+      npm.commands.install(opts.package, function(err, res) {
+        if (err) return cb(err)
+        var name = opts.name || res[0][0]
+        if (path.existsSync(_config.apps+'/'+name)) {
+          var found = false, i = 0
+          while (!found) {
+            if (!path.existsSync(_config.apps+'/'+name+'_'+(++i))) 
+              found = true
+          }
+          name = name+'_'+i
+        }
+        
+        var r = fstream.Reader( res[0][1] )
+          , w = fstream.Writer( { path:_config.apps+'/'+name
+                                , mode: 0755
+                                , type:'Directory' } )
+        r.pipe(w)
+        r.on('error',function(err){cb(err)})
+        r.once('end',function(){
+          rimraf(res[0][1],function(err){cb(err, name)})
+        })
       })
     })
-  })
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -176,16 +224,17 @@ function link(opts, cb) {
 //                                               ls
 //------------------------------------------------------------------------------
 
-function ls(what,cb) {
+function ls(package,cb) {
   if (arguments[0] && typeof arguments[0] === 'string')
     what = arguments[0]
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   
-  if (what) {
-    var pkg = require(_config.apps+'/'+what+'/package.json')
-    cb && cb(null,pkg)
-    return
+  if (package) {
+    if (!path.existsSync(_config.apps+'/'+package+'/package.json'))
+      return cb('package is not installed: '+package)
+    var pkg = require(_config.apps+'/'+package+'/package.json')
+    return cb && cb(null,pkg)
   }
   
   fs.readdir(_config.apps,function(err,data){

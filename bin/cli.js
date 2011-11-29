@@ -8,6 +8,7 @@ var nexus = require('../index')
   , exec = require('child_process').exec
   , fork = require('child_process').fork
   , spawn = require('child_process').spawn
+  , fs = require('fs')
   , argv  = opti.argv
   , _conn
   , usage =
@@ -87,11 +88,18 @@ else if (argv._[0] == 'server') {
   if (!process.send) {
     var childA = fork(__filename, ['server'], {env:process.env})
     childA.on('message',function(m){
-      exit(m)
+      // exit(m)
     })
   } else {
     var childB = spawn(__dirname+'/server.js', [], {env:process.env})
     process.send({pid:childB.pid})
+    var errFile = fs.createWriteStream(_config.prefix+'/nexus.err')
+    var outFile = fs.createWriteStream(_config.prefix+'/nexus.out')
+    childB.stdout.pipe(outFile)
+    childB.stderr.pipe(errFile)
+    childB.stdout.on('data',function(data){console.log(data.toString())})
+    childB.stderr.on('data',function(data){console.log(data.toString())})
+    
     
     // var childB = fork(__dirname+'/server.js', [], {env:process.env})
     // childB.on('message',function(m){
@@ -171,7 +179,9 @@ function parseArgs() {
       })
       break
     case 'install':
-      nexus.install(argv._[0], argv._[1], function(err,data){
+      nexus.install( { package:argv._[0]
+                     , name:argv._[1] 
+                     , cwd:process.cwd() }, function(err,data){
         if (err) return exit(err)
         exit(data)
       })

@@ -9,7 +9,7 @@
 , "scripts" : { "test" : "node node_modules/tap/bin/tap.js test/*.js" }
 , "dependencies" :
   { "async-array"   : "0.1.7"
-  , "fstream"       : "0.1.1"
+  , "fstream"       : "https://github.com/isaacs/fstream/tarball/master"
   , "dnode"         : "0.9.2"
   , "eventemitter2" : "*"
   , "node-uuid"     : "1.2.0"
