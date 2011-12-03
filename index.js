@@ -2,11 +2,14 @@
  // nexus (remote program installation and control)
 //
 
+module.exports = nexus
+
 var fs       = require('fs')
   , path     = require('path')
   , util     = require('util')
   , net      = require('net')
   , spawn    = require('child_process').spawn
+  , fork     = require('child_process').fork
   , dnode    = require('dnode')
   , fstream  = require('fstream')
   , AA       = require('async-array')
@@ -17,48 +20,43 @@ var fs       = require('fs')
   , npm      = require('npm')
   , uuid     = require('node-uuid')
   , mkdirp   = require('mkdirp')
-  , _config  = config()
   , _pkg     = require('./package.json')
+  , _config  = config()
   , procs    = {}
   , toStop   = []
   , subscriptions = {}
-  
-ee.onAny(function(){
-  var args = [].slice.call(arguments)
-  //console.log.apply(this,[].concat(this.event,'→',args))
-  if (/^stdout/.test(this.event)) 
-    console.log.apply(this,[].concat(this.event,'→',args))
-  else if (/^stderr/.test(this.event))
-    console.log.apply(this,[].concat(this.event,'→',args))
-  else 
-    console.log.apply(this,[].concat(this.event))
-})
-  
+
 //------------------------------------------------------------------------------
 //                                               exports
 //------------------------------------------------------------------------------
-
-module.exports = exports =
-  { version   : _pkg.version
-  , config    : config
-  , install   : install
-  , uninstall : uninstall
-  , link      : link
-  , ls        : ls
-  , ps        : ps
-  , start     : start
-  , restart   : restart
-  , stop      : stop
-  , stopall   : stopall
-  , subscribe : subscribe
-  , remote    : remote
+  
+function nexus(opts) {
+  function server(remote, conn) { 
+    console.log('nexus> connection '+conn.id)
+    conn.on('remote',function(rem){
+      console.log('nexus> remote '+conn.id,remote)
+    })
+    this.version   = version
+    this.config    = config
+    this.ls        = ls
+    this.install   = install
+    this.uninstall = uninstall
+    this.ps        = ps
+    this.start     = start
+    this.restart   = restart
+    this.stop      = stop
+    this.stopall   = stopall
+    this.subscribe = subscribe
+    this.remote    = remote
   }
+  return server
+}
   
 //------------------------------------------------------------------------------
 //                                               version
 //------------------------------------------------------------------------------
 
-function version(cb) {cb(null, _version); return _version}
+function version(cb) {cb(null, _pkg.version); return _pkg.version}
 
 //------------------------------------------------------------------------------
 //                                               config
@@ -85,6 +83,7 @@ function config(key, value, cb) {
   currConfig.key     = fileConfig.key     || currConfig.prefix+'/nexus.key'
   currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
   currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
+  currConfig.sockets = fileConfig.sockets || currConfig.prefix+'/sockets'
   currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
@@ -98,6 +97,7 @@ function config(key, value, cb) {
     ( [ currConfig.keys
       , currConfig.logs
       , currConfig.apps
+      , currConfig.sockets
       , currConfig.tmp
       ] )
 
@@ -130,27 +130,6 @@ function install(opts, cb) {
   
   opts = opts || {}
   if (!opts.package) return cb('no package')
-
-  /* * /
-  // #TODO this is not cool - maybe factor monitor out..
-  // all this install, uninstall, .. -code just throws way too much
-  var execFile = require('child_process').execFile
-  var child = execFile( __dirname+'/node_modules/.bin/npm'
-                      , ['install',opts.package,'--parsable']
-                      , {cwd:_config.tmp} )
-  var stdout = [], stderr = []
-  child.stdout.on('data',function(data){stdout.push(data)})
-  child.stderr.on('data',function(data){stderr.push(data)})
-  child.on('exit',function(code){
-    // this is super-dirty.. to avoid throwing npm..
-    if (code !== 0) return cb(stderr.join('\n'))
-    var res = stdout[0].split('\n')
-    for (var i=0,len=res.length; i<len; i++)
-      res[i] = res[i].split(' ')
-    res[0][1] = _config.tmp+'/'+res[0][1]
-    copyToName(res)
-  })
-  /* */
 
   if (!(/:\/\//.test(opts.package))) 
     return installPackage() 
@@ -271,7 +250,19 @@ function start(opts, cb) {
       for (var x in data.env)
         env[x] = data.env[x]
     }
-      
+    
+    var child = fork(__dirname+'/bin/monitor.js')
+    
+    child.on('message',function(m){
+      if (m.error) return cb(m.error)
+      cb(null, m.data)
+    })
+    
+    //child.stderr.on('data',function(data){cb(data)})
+    
+    child.send(data)
+  })
+    /*
     var child = spawn( data.command
                      , [data.script].concat(data.options)
                      , { env : env
@@ -318,6 +309,7 @@ function start(opts, cb) {
     })
     cb && cb(null, procs[id])
   })
+  */
 }
 
 //------------------------------------------------------------------------------
@@ -498,4 +490,6 @@ function parseStart(opts, cb) {
   //console.log('parseStart',result)
   cb(null, result)
 }
+
+/* */
 

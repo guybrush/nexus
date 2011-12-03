@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var nexus = require('../index')
-  , _config = nexus.config()
+  // , _config = nexus.config()
   , opti  = require('optimist')
   , dnode = require('dnode')
   , execFile = require('child_process').execFile
@@ -23,17 +23,18 @@ var nexus = require('../index')
     , '    help      .. help for each command'
     , '    version   .. print version-number'
     , '    config    .. get/set config'
+    , '    ls        .. list installed packages'
     , '    install   .. install packages'
     , '    uninstall .. uninstall packages'
     , '    link      .. like npm link (only local)'
-    , '    ls        .. list installed packages'
-    , '    subscribe .. subscribe to events'
     , '    ps        .. list of current running programs'
     , '    start     .. start program'
     , '    restart   .. restart running program'
     , '    stop      .. stop running program'
     , '    stopall   .. stop all running programs'
-    , '    server    .. start a nexus-server (only local)'
+    , '    subscribe .. subscribe to events'
+    , '    remote    .. connect to remote nexus'
+    , '    server    .. start a nexus-interface-server (only local)'
     , ''
     , 'try `nexus help <command>` for more info'
     ].join('\n')
@@ -86,33 +87,17 @@ else if (argv._[0] == 'help') {
 }
 else if (argv._[0] == 'server') {
   if (!process.send) {
+    console.log('forking')
     var childA = fork(__filename, ['server'], {env:process.env})
     childA.on('message',function(m){
-      // exit(m)
+      exit(m)
     })
   } else {
-    var childB = spawn(__dirname+'/server.js', [], {env:process.env})
-    process.send({pid:childB.pid})
-    var errFile = fs.createWriteStream(_config.prefix+'/nexus.err')
-    var outFile = fs.createWriteStream(_config.prefix+'/nexus.out')
-    childB.stdout.pipe(outFile)
-    childB.stderr.pipe(errFile)
-    childB.stdout.on('data',function(data){console.log(data.toString())})
-    childB.stderr.on('data',function(data){console.log(data.toString())})
-    
-    
-    // var childB = fork(__dirname+'/server.js', [], {env:process.env})
-    // childB.on('message',function(m){
-    //   process.send(m)
-    // }
-    
-    // var childB = execFile
-    //   ( __dirname+'/server.js', function(err,stdout,stderr){
-    //       console.log(stdout)
-    //       console.log(stderr)
-    //       if (err) process.send({error:err})
-    //       else process.send({pid:childB.pid})
-    //     } )
+    var server = dnode(nexus()).listen(5000)
+    server.on('ready',function(){
+      console.log('done')
+      process.send({pid:process.pid})
+    })
   }
 }    
 else if (argv._[0] == 'remote') {
@@ -138,7 +123,7 @@ else if (argv._[0] == 'remote') {
   })
 } 
 else {
-  var key = argv.k
+  var key  = argv.k
     , cert = argv.c
     , host = argv.h || 'localhost'
     , port = argv.p || 5000
