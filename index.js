@@ -12,7 +12,7 @@ var fs      = require('fs')
   , fstream = require('fstream')
   , AA      = require('async-array')
   , EE2     = require('eventemitter2').EventEmitter2
-  , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
+  , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners:20})
   , rimraf  = require('rimraf') 
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
@@ -22,10 +22,10 @@ var fs      = require('fs')
   , subscriptions = {}
 
 ee2.onAny(function(data){
-  console.log(this.event, data, subscriptions)
+  var self = this
   _.each(subscriptions,function(x,i){
-    if (x.events.indexOf(this.event)) {
-      x.emit && x.emit(this.event,data)
+    if (x.events.indexOf(self.event)) {
+      x.emit && x.emit(self.event,data)
     }
   })
 })
@@ -40,7 +40,7 @@ function nexus(opts) {
       if (rem.type && rem.type == 'NEXUS_MONITOR') {
         ee2.emit('monitor::'+conn.id+'::connected')
         procs[conn.id] = rem
-        rem.subscribe('*',function(event,data){
+        rem.subscribe('**',function(event,data){
           ee2.emit('monitor::'+conn.id+'::'+event,data)
         })
         conn.on('end',function(){
@@ -109,7 +109,7 @@ function config(key, value, cb) {
   currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
-  currConfig.host    = fileConfig.host    || '127.0.0.1'
+  currConfig.host    = fileConfig.host    || '0.0.0.0'
   currConfig.port    = fileConfig.port    || 5000
   currConfig.remotes = fileConfig.remotes || { localhost : 
                                                { host : currConfig.host
@@ -155,7 +155,8 @@ function install(opts, cb) {
 
   if (!(/:\/\//.test(opts.package))) 
     return installPackage() 
-  // this code sucks in general .. but ye ..
+  // this code sucks in general .. 
+  // but ye .. without npm will throw on non-valid domains
   // install via authed http? not implemented yet :D 
   // (on the cli ssh-agent might help with ssh-transport)
   var dns = require('dns')
@@ -285,8 +286,6 @@ function start(opts, cb) {
       cb(null, m.data)
     })
     
-    //child.stderr.on('data',function(data){cb(data)})
-    
     child.send(data)
   })
 }
@@ -339,7 +338,7 @@ function remote(opts, cb) {
     , remote = (opts.remote && config.remotes[opts.remote]) 
                ? config.remotes[opts.remote] : false
     , port = opts.port || (remote && remote.port) ? remote.port : config.defaults.tlsPort                  
-    , host = opts.host || (remote && remote.host) ? remote.host : 'localhost'
+    , host = opts.host || (remote && remote.host) ? remote.host : '0.0.0.0'
     , keyFile  = opts.key  || config.defaults.key
     , certFile = opts.cert || config.defaults.cert
     , key = fs.readFileSync(keyFile)
@@ -370,6 +369,10 @@ function parseStart(opts, cb) {
   result.options = opts.options || []
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
+  
+  try {
+    result.package = require(appPath+'/package.json')
+  } catch(e) {}
   
   // nexus start /some/file
   //   script = /some/file 
@@ -414,8 +417,9 @@ function parseStart(opts, cb) {
     if (path.existsSync(_config.apps+'/'+maybeApp)) {
       //console.log('---- A')
       var appPath = _config.apps+'/'+maybeApp
-      var pkg = require(appPath+'/package.json')
-      if (pkg.scripts && pkg.scripts.start) {
+      if (result.package 
+          && result.package.scripts 
+          && result.package.scripts.start) {
         //console.log('---- AA')
         var startScript = pkg.scripts.start
         if (/\w/.test(startScript)) {
