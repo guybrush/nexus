@@ -8,6 +8,7 @@ var fs      = require('fs')
   , path    = require('path')
   , fork    = require('child_process').fork
   , dnode   = require('dnode')
+  , _       = require('underscore')      
   , fstream = require('fstream')
   , AA      = require('async-array')
   , EE2     = require('eventemitter2').EventEmitter2
@@ -17,8 +18,18 @@ var fs      = require('fs')
   , mkdirp  = require('mkdirp')
   , _pkg    = require('./package.json')
   , _config = config()
+  , procs   = {}
   , subscriptions = {}
 
+ee2.onAny(function(data){
+  console.log(this.event, data, subscriptions)
+  _.each(subscriptions,function(x,i){
+    if (x.events.indexOf(this.event)) {
+      x.emit && x.emit(this.event,data)
+    }
+  })
+})
+  
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
@@ -84,7 +95,7 @@ function config(key, value, cb) {
     , home = ( process.platform === "win32" // HAHA!
              ? process.env.USERPROFILE
              : process.env.HOME )
-  console.log(process.env.HOME)
+  
   fileConfigPath = home+'/.nexus/config.json'
 
   try { fileConfig = require(fileConfigPath) }
@@ -266,13 +277,8 @@ function ps(cb) {
 function start(opts, cb) {
   parseStart(opts, function(err, data){
     if (err) return cb(err)
-    var env = process.env
-    if (data.env) {
-      for (var x in data.env)
-        env[x] = data.env[x]
-    }
     
-    var child = fork(__dirname+'/bin/monitor.js')
+    var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
     
     child.on('message',function(m){
       if (m.error) return cb(m.error)
@@ -360,7 +366,6 @@ function parseStart(opts, cb) {
   if (!opts.script) return cb('no script defined')
   
   result.script = null
-  result.id = opts.id || null
   result.command = opts.command || 'node'
   result.options = opts.options || []
   result.env = opts.env || {}

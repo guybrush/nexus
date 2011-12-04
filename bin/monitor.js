@@ -3,20 +3,23 @@
 var nexus = require('../')
   , dnode = require('dnode')
   , fork = require('child_process').fork
+  , spawn = require('child_process').spawn
   , psTree = require('ps-tree')
   , EE2 = require('eventemitter2').EventEmitter2
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
+  , dnodeMonitor
 
 if (!process.env.NEXUS_MONITOR) {
   console.log('monitor-parent> going to start monitor-child')
   process.on('message',function(data){
     console.log('monitor-parent> get message from parent',data)
-    var child = fork(__filename,[],{env:{NEXUS_MONITOR:true}})
+    process.env.NEXUS_MONITOR = true
+    var child = fork(__filename,[],{env:process.env})
     child.send(data)
     child.on('message',function(m){
       console.log('monitor-parent> get message from child',m)
       process.send(m)
-      setTimeout(function(){process.exit()},20)
+      process.exit()
     })
   })
 }
@@ -24,130 +27,102 @@ else {
   console.log('monitor-child> here we go')
   process.on('message',function(m){
     console.log('monitor-child> get message from parent',m)
-  })
-  var client = dnode(monitor)
-  client.connect( 5000
-                , {reconnect:100}
-                , function(remote,conn){
-    conn.on('remote',function(rem){
+    monitor(m,function(s){
       process.send({data:{pid:process.pid}})
+      dnodeMonitor = dnode(s)
+      dnodeMonitor.connect(5000,{reconnect:100})
+      dnodeMonitor.on('error',function(err){
+        if (err.code != 'ECONNREFUSED') console.log(err)
+      })
     })
-  })
-  client.on('error',function(err){
-    if (err.code != 'ECONNREFUSED')
-      process.send({error:err})
   })
 }
 
 
-function monitor(remote, conn) {
+function monitor(opts, cb) {
   var self = this
   
-  self.type = 'NEXUS_MONITOR'
-  self.monitorPid = process.pid
+  self.subscriptions = {}
   self.crashed = 0
+  self.ctime = Date.now()
+  self.env = opts.env
+  self.restartFlag = false
+  self.child = null
   
-  self.start = function() {
-    var child = spawn('node',[__dirname+'/testscript.js'])
-    ee2.emit('start')
-    self.pid = child.pid
-    self.ctime = Date.now()
-    self.env = {}
-    child.stdout.on('data',function(data){
+  start(function(){
+    function server(remote, conn) {
+      this.type = 'NEXUS_MONITOR'
+      this.monitorPid = process.pid
+      this.pid = self.child.pid
+      this.crashed = self.crashed
+      this.ctime = self.ctime
+      this.restart = restart
+      this.stop = stop
+      this.subscribe = function(event, cb) {
+        self.subscriptions[conn.id] = 
+          self.subscriptions[conn.id] || {events:[],emit:null}
+        if (self.subscriptions[conn.id].events.indexOf(event) != -1)
+          self.subscriptions[conn.id].events.push(event)
+        self.subscriptions[conn.id].emit = cb
+      }
+      this.unsubscribe = function(cb) {
+        delete self.subscriptions[conn.id]
+        cb()
+      }
+    }
+    cb(server)
+  })
+  
+  function start(cb) {
+    
+    delete process.env.NEXUS_MONITOR
+    var env = process.env
+    if (opts.env) {
+      for (var x in opts.env)
+        env[x] = opts.env[x]
+    }
+    
+    self.child = spawn( opts.command
+                      , [opts.script].concat(opts.options)
+                      , ['server.js']
+                      , { cwd : opts.cwd
+                        , env : env
+                        } )
+    
+    self.child.stdout.on('data',function(data){
       ee2.emit('stdout', data.toString())
     })
-    child.stderr.on('data',function(data){
+    self.child.stderr.on('data',function(data){
       ee2.emit('stderr', data.toString())
     })
-    child.on('exit',function(code){
+    self.child.on('exit',function(code){
       ee2.emit('exit', code)
       if (code != 0) {
         self.crashed++
-        if (!self.forceStop) return
-        else {
+        if (self.restart) {
           if (self.crashed <= 10) {
-            self.start()
+            restart()
           }
         }
       }
     })
+    cb && cb()
   }
   
-  self.stop = function(cb) {
-    self.forceStop = true
-    psTree(self.pid, function (err, children) {
+  function restart() {
+    self.restartFlag = true
+    stop(function(){start(function(){self.restartFlag = false})})
+  }
+  
+  function stop(cb) {
+    psTree(self.child.pid, function (err, children) {
       spawn('kill', ['-9'].concat(children.map(function (p) {return p.PID})))
     })
-    server.close()
-    cb()
-    process.exit(0)
-  }
-  
-  self.restart = function(cb) {
-    self.forceStop = true
-    psTree(self.pid, function (err, children) {
-      spawn('kill', ['-9'].concat(children.map(function (p) {return p.PID})))
-      // setTimeout(function(){start()},50)
-      start()
-    })
-  }
-  
-  self.subscribe = function(what, cb) {
-    ee2.on(what,function(data){
-      cb(null,this.event,data)
-    })
-  }
-}
-
-
-
-/*
-
-var child = spawn( data.command
-                 , [data.script].concat(data.options)
-                 , { env : env
-                   , cwd : data.cwd
-                   } )
-
-var id = opts.id || uuid()
-
-if (!procs[id]) { 
-  procs[id] = data
-  procs[id].id = id
-  procs[id].crashed = 0
-  procs[id].ctime = Date.now()
-  procs[id].env = data.env
-}
-
-procs[id].pid = child.pid
-
-ee.emit('started::'+id, procs[id])
-child.stdout.on('data',function(data){
-  ee.emit('stdout::'+id, data.toString())
-})
-child.stderr.on('data',function(data){
-  ee.emit('stderr::'+id, data.toString())
-})
-child.on('exit',function(code){
-  ee.emit('exited::'+id, code)
-  if (code != 0) {
-    procs[id].crashed++
-    var toStopIndex = toStop.indexOf(id)
-    if (toStopIndex != -1) {
-      toStop.splice(toStopIndex)
-      delete procs[id]
-    }
-    else {
-      if (procs[id].crashed <= 10) {
-        opts.id = id
-        start(opts)
-      } else {
-        delete procs[id]
-      }
+    cb && cb()
+    if (!self.restartFlag) {
+      dnodeMonitor && dnodeMonitor.destroy()
+      process.exit(0)
     }
   }
-})
-cb && cb(null, procs[id])
-
-*/
+}
 
