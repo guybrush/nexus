@@ -4,37 +4,39 @@
 
 module.exports = nexus
 
-var fs       = require('fs')
-  , path     = require('path')
-  , util     = require('util')
-  , net      = require('net')
-  , spawn    = require('child_process').spawn
-  , fork     = require('child_process').fork
-  , dnode    = require('dnode')
-  , fstream  = require('fstream')
-  , AA       = require('async-array')
-  , EE2      = require('eventemitter2').EventEmitter2
-  , ee       = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
-  , pf       = require('portfinder')
-  , rimraf   = require('rimraf') 
-  , npm      = require('npm')
-  , uuid     = require('node-uuid')
-  , mkdirp   = require('mkdirp')
-  , _pkg     = require('./package.json')
-  , _config  = config()
-  , procs    = {}
-  , toStop   = []
+var fs      = require('fs')
+  , path    = require('path')
+  , fork    = require('child_process').fork
+  , dnode   = require('dnode')
+  , fstream = require('fstream')
+  , AA      = require('async-array')
+  , EE2     = require('eventemitter2').EventEmitter2
+  , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
+  , rimraf  = require('rimraf') 
+  , npm     = require('npm')
+  , mkdirp  = require('mkdirp')
+  , _pkg    = require('./package.json')
+  , _config = config()
   , subscriptions = {}
 
 //------------------------------------------------------------------------------
-//                                               exports
+//                                               constructor
 //------------------------------------------------------------------------------
   
 function nexus(opts) {
-  function server(remote, conn) { 
-    console.log('nexus> connection '+conn.id)
+  function server(remote, conn) {
     conn.on('remote',function(rem){
-      console.log('nexus> remote '+conn.id,remote)
+      if (rem.type && rem.type == 'NEXUS_MONITOR') {
+        ee2.emit('monitor::'+conn.id+'::connected')
+        procs[conn.id] = rem
+        rem.subscribe('*',function(event,data){
+          ee2.emit('monitor::'+conn.id+'::'+event,data)
+        })
+        conn.on('end',function(){
+          ee2.emit('monitor::'+conn.id+'::disconnected')
+          delete procs[conn.id]
+        })
+      }
     })
     this.version   = version
     this.config    = config
@@ -46,8 +48,17 @@ function nexus(opts) {
     this.restart   = restart
     this.stop      = stop
     this.stopall   = stopall
-    this.subscribe = subscribe
     this.remote    = remote
+    this.subscribe = function(event, cb) {
+      subscriptions[conn.id] = subscriptions[conn.id] || {events:[],emit:null}
+      if (subscriptions[conn.id].events.indexOf(event) != -1)
+        subscriptions[conn.id].events.push(event)
+      subscriptions[conn.id].emit = cb
+    }
+    this.unsubscribe = function(cb) {
+      delete subscriptions[conn.id]
+      cb()
+    }
   }
   return server
 }
@@ -73,7 +84,7 @@ function config(key, value, cb) {
     , home = ( process.platform === "win32" // HAHA!
              ? process.env.USERPROFILE
              : process.env.HOME )
-
+  console.log(process.env.HOME)
   fileConfigPath = home+'/.nexus/config.json'
 
   try { fileConfig = require(fileConfigPath) }
@@ -170,7 +181,10 @@ function install(opts, cb) {
         r.pipe(w)
         r.on('error',function(err){cb(err)})
         r.once('end',function(){
-          rimraf(res[0][1],function(err){cb(err, name)})
+          rimraf(res[0][1],function(err){
+            ee2.emit('nexus::installed',name)
+            cb(err, name)
+          })
         })
       })
     })
@@ -185,7 +199,10 @@ function uninstall(opts, cb) {
   var path = _config.apps+'/'+opts
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
-    rimraf(_config.apps+'/'+opts,cb)  
+    rimraf(_config.apps+'/'+opts,function(){
+      ee2.emit('nexus::uninstalled',name)
+      cb()
+    })  
   })
 }
 
@@ -221,8 +238,12 @@ function ls(package,cb) {
     var result = {}
     var aa = new AA(data)
     aa.map(function(x,i,next){
-      var pkg = require(_config.apps+'/'+x+'/package.json')
-      result[x] = pkg
+      try {
+        var pkg = require(_config.apps+'/'+x+'/package.json')
+        result[x] = pkg
+      } catch(e) {
+        return next(e)
+      }
       next()
     }).done(function(){
       cb && cb(null,result)
@@ -262,54 +283,6 @@ function start(opts, cb) {
     
     child.send(data)
   })
-    /*
-    var child = spawn( data.command
-                     , [data.script].concat(data.options)
-                     , { env : env
-                       , cwd : data.cwd
-                       } )
-    
-    var id = opts.id || uuid()
-
-    if (!procs[id]) { 
-      procs[id] = data
-      procs[id].id = id
-      procs[id].crashed = 0
-      procs[id].ctime = Date.now()
-      procs[id].env = data.env
-    }
-
-    procs[id].pid = child.pid
-
-    ee.emit('started::'+id, procs[id])
-    child.stdout.on('data',function(data){
-      ee.emit('stdout::'+id, data.toString())
-    })
-    child.stderr.on('data',function(data){
-      ee.emit('stderr::'+id, data.toString())
-    })
-    child.on('exit',function(code){
-      ee.emit('exited::'+id, code)
-      if (code != 0) {
-        procs[id].crashed++
-        var toStopIndex = toStop.indexOf(id)
-        if (toStopIndex != -1) {
-          toStop.splice(toStopIndex)
-          delete procs[id]
-        }
-        else {
-          if (procs[id].crashed <= 10) {
-            opts.id = id
-            start(opts)
-          } else {
-            delete procs[id]
-          }
-        }
-      }
-    })
-    cb && cb(null, procs[id])
-  })
-  */
 }
 
 //------------------------------------------------------------------------------
@@ -348,18 +321,6 @@ function stopall(cb) {
     stop(proc)
   }  
   cb && cb(null, len)
-}
-
-//------------------------------------------------------------------------------
-//                                               subscribe
-//------------------------------------------------------------------------------
-
-function subscribe(opts, cb) {
-
-}
-
-function unsubscribe(opts, cb) {
-
 }
 
 //------------------------------------------------------------------------------

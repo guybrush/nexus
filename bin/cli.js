@@ -86,8 +86,8 @@ else if (argv._[0] == 'help') {
   exit(help[argv._[1]])
 }
 else if (argv._[0] == 'server') {
-  if (!process.send) {
-    console.log('forking')
+  if (!process.env.NEXUS_SERVER) {
+    process.env.NEXUS_SERVER = true
     var childA = fork(__filename, ['server'], {env:process.env})
     childA.on('message',function(m){
       exit(m)
@@ -95,53 +95,34 @@ else if (argv._[0] == 'server') {
   } else {
     var server = dnode(nexus()).listen(5000)
     server.on('ready',function(){
-      console.log('done')
       process.send({pid:process.pid})
     })
+    server.on('error',function(err){
+      process.send({error:err})
+    })
   }
-}    
-else if (argv._[0] == 'remote') {
-  var key = argv.k
-    , cert = argv.c
-    , host = argv.h || 'localhost'
-    , port = argh.p || 5000
-  dnode.connect( {key:key,cert:cert,host:host,port:port}
-               , function(err, remote){
-    if (err) { console.log(err) }
-    else {
-      nexus = remote
-      argv._.shift()
-      //process.stdin.pipe(process.stdout)
-      process.stdin.resume()
-      process.stdin.on('data',function(data) {
-        var cmd = data.toString().replace('\n','')
-        argv = opti(cmd.split(' ')).argv
-        parseArgs()
-      })
-      parseArgs()
-    }
-  })
 } 
 else {
-  var key  = argv.k
-    , cert = argv.c
-    , host = argv.h || 'localhost'
-    , port = argv.p || 5000
+  var opts = {}
+  opts.key  = argv.k
+  opts.cert = argv.c
+  opts.host = argv.h || 'localhost'
+  opts.port = argv.p || 5000
 
-  dnode.connect( {key:key,cert:cert,host:host,port:port}
-               , function(remote, conn){
+  var client = dnode({type:'NEXUS_CLI'})
+  client.connect(opts, function(remote, conn){
     _conn = conn
     nexus = remote
-    //argv._.shift()
-    //process.stdin.pipe(process.stdout)
     process.stdin.resume()
     process.stdin.on('data',function(data) {
       var cmd = data.toString().replace('\n','')
-      //console.log('COMMAND',cmd)
       argv = opti(cmd.split(' ')).argv
       parseArgs()
     })
     parseArgs()
+  })
+  client.on('error',function(err){
+    exit(err)
   })
 }
 
