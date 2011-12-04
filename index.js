@@ -7,6 +7,8 @@ module.exports = nexus
 var fs      = require('fs')
   , path    = require('path')
   , fork    = require('child_process').fork
+  , spawn = require('child_process').spawn
+  , execFile = require('child_process').execFile
   , dnode   = require('dnode')
   , _       = require('underscore')      
   , fstream = require('fstream')
@@ -284,10 +286,9 @@ function start(opts, cb) {
     child.on('message',function(m){
       if (m.error) return cb(m.error)
       cb(null, m.data)
-    })
-    
+    })                  
     child.send(data)
-  })
+  })                                         
 }
 
 //------------------------------------------------------------------------------

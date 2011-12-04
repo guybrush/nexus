@@ -5,6 +5,7 @@ var nexus = require('../')
   , _ = require('underscore')
   , fork = require('child_process').fork
   , spawn = require('child_process').spawn
+  , execFile = require('child_process').execFile
   , psTree = require('ps-tree')
   , EE2 = require('eventemitter2').EventEmitter2
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
@@ -33,17 +34,18 @@ else {
     })
   })
 }
-
-ee2.onAny(function(data){
-  var self = this
-  _.each(subscriptions,function(x,i){
-    if (x.events.indexOf(self.event)) {
-      x.emit && x.emit(self.event,data)
-    }
-  })
-})
-
+                       
 function monitor(opts, cb) {
+  
+  ee2.onAny(function(data){
+    var self = this
+    _.each(subscriptions,function(x,i){
+      if (x.events.indexOf(self.event)) {
+        x.emit && x.emit(self.event,data)
+      }
+    })
+  })
+  
   var self = this
   
   self.subscriptions = {}
@@ -107,6 +109,7 @@ function monitor(opts, cb) {
       if (code != 0) {
         self.crashed++
         if (self.crashed <= 10) {
+          // https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
           // https://github.com/joyent/node/issues/2254
           start()
         }

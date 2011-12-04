@@ -87,12 +87,14 @@ else if (argv._[0] == 'help') {
 }
 else if (argv._[0] == 'server') {
   if (!process.env.NEXUS_SERVER) {
+    process.title = 'nexus-server-parent'
     process.env.NEXUS_SERVER = true
     var childA = fork(__filename, ['server'], {env:process.env})
     childA.on('message',function(m){
       exit(m)
     })
   } else {
+    process.title = 'nexus-server'
     var server = dnode(nexus()).listen(5000)
     server.on('ready',function(){
       process.send({pid:process.pid})
