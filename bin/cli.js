@@ -89,19 +89,18 @@ else if (argv._[0] == 'server') {
   if (!process.env.NEXUS_SERVER) {
     process.title = 'nexus-server-parent'
     process.env.NEXUS_SERVER = true
-    var childA = fork(__filename, ['server'], {env:process.env})
-    childA.on('message',function(m){
-      exit(m)
-    })
+    var child = spawn('node', [__filename,'server'], {env:process.env})
+    child.stdout.on('data',function(d){console.log('nexus-server-stdout> '+d)})
+    child.stderr.on('data',function(d){console.log('nexus-server-stderr> '+d)})
+    // #FORKISSUE
+    // var child = fork(__filename, ['server'], {env:process.env})
+    exit()
   } else {
     process.title = 'nexus-server'
     var server = dnode(nexus()).listen(5000)
-    server.on('ready',function(){
-      process.send({pid:process.pid})
-    })
-    server.on('error',function(err){
-      process.send({error:err})
-    })
+    // #FORKISSUE
+    // server.on('ready',function(){process.send({pid:process.pid})})
+    // server.on('error',function(err){process.send({error:err})})
   }
 } 
 else {
@@ -175,7 +174,7 @@ function parseArgs() {
       break
     case 'start':
       // #TODO check for nexus-start-options besides scripts-options
-      
+      console.log('cli start')
       var options = argv._.splice(process.argv.indexOf(argv._[0]))
       var options = []
       // console.log('start argv',argv,options,process.argv)

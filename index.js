@@ -278,16 +278,27 @@ function ps(cb) {
 //------------------------------------------------------------------------------
 
 function start(opts, cb) {
+  
   parseStart(opts, function(err, data){
     if (err) return cb(err)
     
-    var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
-    
-    child.on('message',function(m){
-      if (m.error) return cb(m.error)
-      cb(null, m.data)
-    })                  
-    child.send(data)
+    process.env.NEXUS_MONITOR_DATA = JSON.stringify(data) 
+    console.log('starting')
+    var child = spawn( 'node'
+                     , [__dirname+'/bin/monitor.js']
+                     , {env:process.env} )
+    // child.stdout.on('data',function(d){console.log('nexus-start-stdout> '+d)})
+    // child.stderr.on('data',function(d){console.log('nexus-start-stderr> '+d)})
+    cb()
+
+    // #FORKISSUE
+    // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
+    // 
+    // child.on('message',function(m){
+    //   if (m.error) return cb(m.error)
+    //   cb(null, m.data)
+    // })                  
+    // child.send(data)
   })                                         
 }
 

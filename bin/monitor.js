@@ -10,6 +10,10 @@ var nexus = require('../')
   , EE2 = require('eventemitter2').EventEmitter2
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
 
+/****************************************************************************** /
+// #FORKISSUE
+// https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
+// https://github.com/joyent/node/issues/2254
 if (!process.env.NEXUS_MONITOR) {
   process.on('message',function(data){
     process.env.NEXUS_MONITOR = true
@@ -34,7 +38,28 @@ else {
     })
   })
 }
-                       
+/******************************************************************************/
+
+if (!process.env.NEXUS_MONITOR) {
+  process.env.NEXUS_MONITOR = true
+  var child = spawn('node',[__filename],{env:process.env})
+  // child.stdout.on('data',function(d){console.log('monitor-parent-stdout> '+d)})
+  // child.stderr.on('data',function(d){console.log('monitor-parent-stderr> '+d)})
+  process.exit(0)
+}
+else {
+  var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
+  delete process.env.NEXUS_MONITOR
+  delete process.env.NEXUS_MONITOR_DATA
+  monitor(opts,function(s){
+    var dnodeMonitor = dnode(s)
+    dnodeMonitor.connect(5000,{reconnect:100})
+    dnodeMonitor.on('error',function(err){
+      if (err.code != 'ECONNREFUSED') console.log(err)
+    })
+  })
+}
+
 function monitor(opts, cb) {
   
   ee2.onAny(function(data){
@@ -109,6 +134,7 @@ function monitor(opts, cb) {
       if (code != 0) {
         self.crashed++
         if (self.crashed <= 10) {
+          // #FORKISSUE
           // https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
           // https://github.com/joyent/node/issues/2254
           start()
