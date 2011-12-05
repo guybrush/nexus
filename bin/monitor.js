@@ -51,6 +51,7 @@ else {
   var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
   delete process.env.NEXUS_MONITOR
   delete process.env.NEXUS_MONITOR_DATA
+  process.title = 'nexus-monitor'
   monitor(opts,function(s){
     var dnodeMonitor = dnode(s)
     dnodeMonitor.connect(5000,{reconnect:100})

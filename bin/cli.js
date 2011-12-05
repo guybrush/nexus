@@ -94,7 +94,7 @@ else if (argv._[0] == 'server') {
     child.stderr.on('data',function(d){console.log('nexus-server-stderr> '+d)})
     // #FORKISSUE
     // var child = fork(__filename, ['server'], {env:process.env})
-    // exit()
+    exit()
   } else {
     process.title = 'nexus-server'
     var server = dnode(nexus()).listen(5000)

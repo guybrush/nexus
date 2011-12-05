@@ -308,7 +308,6 @@ function start(opts, cb) {
     return cb('start needs 2 arguments')
   
   parseStart(opts, function(err, data){
-    console.log('parsedStart',err,data)
     if (err) return cb(err)
     
     process.env.NEXUS_MONITOR_DATA = JSON.stringify(data) 
