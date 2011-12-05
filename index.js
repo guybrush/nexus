@@ -106,7 +106,6 @@ function config(key, value, cb) {
   currConfig.key     = fileConfig.key     || currConfig.prefix+'/nexus.key'
   currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
   currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
-  currConfig.sockets = fileConfig.sockets || currConfig.prefix+'/sockets'
   currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
@@ -116,15 +115,11 @@ function config(key, value, cb) {
                                                { host : currConfig.host
                                                , port : currConfig.port } }
 
-  var aa = new AA
-    ( [ currConfig.keys
-      , currConfig.logs
-      , currConfig.apps
-      , currConfig.sockets
-      , currConfig.tmp
-      ] )
-
-  aa.map(function(x, i, next){
+  new AA( [ currConfig.keys
+          , currConfig.logs
+          , currConfig.apps
+          , currConfig.tmp
+          ] ).map(function(x, i, next){
     fs.lstat(x, function(err){
       if (!err) return next()
       mkdirp(x,0755,function(err){next(err)})
@@ -156,7 +151,7 @@ function install(opts, cb) {
   if (!(/:\/\//.test(opts.package))) 
     return installPackage() 
   // this code sucks in general .. 
-  // but ye .. without npm will throw on non-valid domains
+  // but ye .. without this, npm will throw on non-valid domains
   // install via authed http? not implemented yet :D 
   // (on the cli ssh-agent might help with ssh-transport)
   var dns = require('dns')
@@ -172,7 +167,11 @@ function install(opts, cb) {
   })
   
   function installPackage() {
-    npm.load({prefix:_config.tmp, global:true, loglevel:'silent', exit:false}, function(err){
+    npm.load( { prefix:_config.tmp
+              , global:true
+              , loglevel:'silent'
+              , exit:false }
+            , function(err){
       if (err) return cb(err)
       npm.commands.install(opts.package, function(err, res) {
         if (err) return cb(err)
@@ -342,7 +341,7 @@ function restart(id, cb) {
     cb = function(){}
   
   if (!id || !procs[id]) 
-    return cb('process '+id+' does not run')
+    return cb('there is no process with id: '+id)
   
   procs[id].restart(cb)
 }
@@ -358,7 +357,7 @@ function stop(id, cb) {
     cb = function(){}
   
   if (!id || !procs[id]) 
-    return cb('process '+id+' does not run')
+    return cb('there is no process with id: '+id)
   
   procs[id].stop(cb)
 }
@@ -385,25 +384,6 @@ function remote(opts, cb) {
     cb = function(){}
  
   return cb('#TODO')
-  
-  var opts = opts || {}
-    , remote = (opts.remote && config.remotes[opts.remote]) 
-               ? config.remotes[opts.remote] : false
-    , port = opts.port || (remote && remote.port) ? remote.port : config.defaults.tlsPort                  
-    , host = opts.host || (remote && remote.host) ? remote.host : '0.0.0.0'
-    , keyFile  = opts.key  || config.defaults.key
-    , certFile = opts.cert || config.defaults.cert
-    , key = fs.readFileSync(keyFile)
-    , cert = fs.readFileSync(certFile)                                            
-    , options = {key:key,cert:cert}
-  
-  console.log('connecting to '+host+':'+port)
-  dnode.connect(host, port, options, function(remote,con) { 
-    cb(null,remote)
-  }).on('error',function(err){cb(err)})
-    
-  return null
-
 }
 
 //------------------------------------------------------------------------------
