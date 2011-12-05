@@ -84,6 +84,7 @@ function monitor(opts, cb) {
   self.restartFlag = false
   self.child = null
   self.command = opts.command
+  self.max = opts.max
   
   start(function(){
     function server(remote, conn) {
@@ -98,9 +99,12 @@ function monitor(opts, cb) {
           , script : self.script
           , options : self.options
           , command : self.command
+          , max : self.max
+          , running : (self.child ? true : false)
           }
         cb(null, info)
       }
+      this.destroy = destroy
       this.start = start
       this.restart = restart
       this.stop = stop
@@ -143,6 +147,7 @@ function monitor(opts, cb) {
     })
     child.on('exit',function(code){
       ee2.emit('exit', code)
+      self.child = null
       if (code != 0) {
         self.crashed++
         if (self.crashed <= 10) {
@@ -152,7 +157,7 @@ function monitor(opts, cb) {
           start()
         }
         else {
-          process.exit(0)
+          // process.exit(0)
         }
       }
     })
@@ -161,21 +166,21 @@ function monitor(opts, cb) {
   }
   
   function restart(cb) {
-    self.restartFlag = true
-    stop(function(){start(function(){
-      self.restartFlag = false
-      cb()
-    })})
+    stop(function(){start(function(){cb()})})
   }
   
   function stop(cb) {
-    psTree(self.child.pid, function (err, children) {
-      spawn('kill', ['-9'].concat(children.map(function (p) {return p.PID})))
-    })
-    if (!self.restartFlag) {
-      process.exit(0)
-    }
+    if (self.child && self.child.pid)
+      psTree(self.child.pid, function (err, children) {
+        spawn('kill', ['-9'].concat(children.map(function (p) {return p.PID})))
+      })
     cb && cb()
+  }
+  
+  function destroy(cb) {
+    if (self.child && self.child.pid) stop(cb)
+    else cb()
+    process.exit(0)
   }
 }
 

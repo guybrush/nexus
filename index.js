@@ -401,6 +401,7 @@ function parseStart(opts, cb) {
   result.options = opts.options || []
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
+  result.max = opts.max || 10
   
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
