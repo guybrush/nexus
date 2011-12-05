@@ -243,7 +243,7 @@ function ls(package, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   
-  if (arguments[0] && typeof arguments[0] === 'string')
+  if (arguments[0] && typeof arguments[0] === 'string') {
     package = arguments[0]
     path.exists(_config.apps+'/'+package+'/package.json',function(err){
       if (err) return cb('package is not installed: '+package)
@@ -308,6 +308,7 @@ function start(opts, cb) {
     return cb('start needs 2 arguments')
   
   parseStart(opts, function(err, data){
+    console.log('parsedStart',err,data)
     if (err) return cb(err)
     
     process.env.NEXUS_MONITOR_DATA = JSON.stringify(data) 
@@ -402,9 +403,15 @@ function parseStart(opts, cb) {
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
   
-  try {
-    result.package = require(appPath+'/package.json')
-  } catch(e) {}
+  var maybeApp = opts.script.split('/')[0]
+    , appPath = null
+  if (path.existsSync(_config.apps+'/'+maybeApp)) {
+    //console.log('---- A')
+    appPath = _config.apps+'/'+maybeApp
+    try {
+      result.package = require(appPath+'/package.json')
+    } catch(e) {}
+  }
   
   // nexus start /some/file
   //   script = /some/file 
@@ -445,47 +452,44 @@ function parseStart(opts, cb) {
 
   // handle `nexus start appName`
   if (!result.script) {
-    var maybeApp = opts.script.split('/')[0]
-    if (path.existsSync(_config.apps+'/'+maybeApp)) {
-      //console.log('---- A')
-      var appPath = _config.apps+'/'+maybeApp
-      if (result.package 
-          && result.package.scripts 
-          && result.package.scripts.start) {
-        //console.log('---- AA')
-        var startScript = pkg.scripts.start
-        if (/\w/.test(startScript)) {
-          //console.log('---- AAA')
-          var split = startScript.split(' ')
-          var isScript = path.existsSync(appPath+'/'+split[0])
-          if (isScript) {
-            //console.log('---- AAAA')
-            result.script = appPath+'/'+split[0]
-            result.options = result.options || split.splice(1)
-          }
-          else {                      
-            //console.log('---- AAAB')
-            result.command = split[0]
-            result.script = appPath+'/'+split[1]
-            result.options = result.options || split.splice(2)
-          }
+    if (result.package 
+        && result.package.scripts 
+        && result.package.scripts.start) {
+      //console.log('---- AA')
+      var startScript = result.package.scripts.start
+      if (/\w/.test(startScript)) {
+        //console.log('---- AAA')
+        var split = startScript.split(' ')
+        var isScript = path.existsSync(appPath+'/'+split[0])
+        if (isScript) {
+          //console.log('---- AAAA')
+          result.script = appPath+'/'+split[0]
+          result.options = result.options || split.splice(1)
         }
-        else {
-          //console.log('---- AAB')
-          result.script = appPath+'/'+startScript
+        else {                      
+          //console.log('---- AAAB')
+          result.command = split[0]
+          result.script = appPath+'/'+split[1]
+          result.options = result.options || split.splice(2)
         }
       }
       else {
-        //console.log('---- AB')
-        var serverJsExists = path.existsSync(appPath+'/server.js')
-        var appJsExists = path.existsSync(appPath+'/app.js')
-        if (serverJsExists) result.script = appPath+'/server.js'
-        else if (appJsExists) result.script = appPath+'/app.js'
-        else result.script = appPath
+        //console.log('---- AAB')
+        result.script = appPath+'/'+startScript
       }
     }
+    else if (appPath) {
+      //console.log('---- AB')
+      var serverJsExists = path.existsSync(appPath+'/server.js')
+      var appJsExists = path.existsSync(appPath+'/app.js')
+      if (serverJsExists) result.script = appPath+'/server.js'
+      else if (appJsExists) result.script = appPath+'/app.js'
+      else result.script = appPath
+    }
+    else 
+      return cb('invalid script')
   }
-  
+
   var split = result.script.split('/')
   split.pop()
   result.cwd = split.join('/')

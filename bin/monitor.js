@@ -78,8 +78,11 @@ function monitor(opts, cb) {
   self.ctime = 0
   self.env = opts.env
   self.package = opts.package
+  self.script = opts.script
+  self.options = opts.options
   self.restartFlag = false
   self.child = null
+  self.command = opts.command
   
   start(function(){
     function server(remote, conn) {
@@ -91,6 +94,9 @@ function monitor(opts, cb) {
           , crashed : self.crashed
           , ctime : self.ctime
           , package : self.package
+          , script : self.script
+          , options : self.options
+          , command : self.command
           }
         cb(null, info)
       }
