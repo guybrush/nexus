@@ -150,7 +150,7 @@ function monitor(opts, cb) {
       self.child = null
       if (code != 0) {
         self.crashed++
-        if (self.crashed <= 10) {
+        if (self.crashed <= self.max) {
           // #FORKISSUE
           // https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
           // https://github.com/joyent/node/issues/2254
