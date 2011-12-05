@@ -7,8 +7,7 @@ module.exports = nexus
 var fs      = require('fs')
   , path    = require('path')
   , fork    = require('child_process').fork
-  , spawn = require('child_process').spawn
-  , execFile = require('child_process').execFile
+  , spawn   = require('child_process').spawn
   , dnode   = require('dnode')
   , _       = require('underscore')      
   , fstream = require('fstream')
@@ -135,8 +134,7 @@ function config(key, value, cb) {
       // w.end()
     })
   }).done(function(err, data){
-    if (err) return cb && cb(err)
-    cb && cb(null, currConfig)
+    cb && cb(err, currConfig)
   }).exec()
 
   return currConfig
@@ -210,6 +208,14 @@ function install(opts, cb) {
 //------------------------------------------------------------------------------
 
 function uninstall(opts, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  
+  if (typeof arguments[0] === 'string')
+    opts = arguments[0]
+  else
+    return cb('not sure how to handle the parameter')
+  
   var path = _config.apps+'/'+opts
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
@@ -234,43 +240,59 @@ function link(opts, cb) {
 //                                               ls
 //------------------------------------------------------------------------------
 
-function ls(package,cb) {
-  if (arguments[0] && typeof arguments[0] === 'string')
-    what = arguments[0]
+function ls(package, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   
-  if (package) {
-    if (!path.existsSync(_config.apps+'/'+package+'/package.json'))
-      return cb('package is not installed: '+package)
-    var pkg = require(_config.apps+'/'+package+'/package.json')
-    return cb && cb(null,pkg)
-  }
-  
-  fs.readdir(_config.apps,function(err,data){
-    if (err) return cb(err)
-    var result = {}
-    var aa = new AA(data)
-    aa.map(function(x,i,next){
+  if (arguments[0] && typeof arguments[0] === 'string')
+    package = arguments[0]
+    path.exists(_config.apps+'/'+package+'/package.json',function(err){
+      if (err) return cb('package is not installed: '+package)
+      var pkg
       try {
-        var pkg = require(_config.apps+'/'+x+'/package.json')
-        result[x] = pkg
-      } catch(e) {
-        return next(e)
-      }
-      next()
-    }).done(function(){
-      cb && cb(null,result)
-    }).exec()
-  })
+        pkg = require(_config.apps+'/'+package+'/package.json')
+      } catch(e) { return cb(e) }
+      cb(null, pkg)
+    })
+  }
+  else {
+    fs.readdir(_config.apps,function(err,data){
+      if (err) return cb(err)
+      var result = {}
+      new AA(data).map(function(x,i,next){
+        try {
+          var pkg = require(_config.apps+'/'+x+'/package.json')
+          result[x] = pkg
+        } catch(e) {
+          return next(e)
+        }
+        next()
+      }).done(function(err,data){
+        cb && cb(err,result)
+      }).exec()
+    })
+  }
 }
                                           
 //------------------------------------------------------------------------------
 //                                               ps
 //------------------------------------------------------------------------------
 
-function ps(cb) {
-  cb(null,procs)
+function ps(proc, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  if (typeof arguments[0] === 'string' && procs[arguments[0]] && cb)
+    return procs[x].info(cb)
+  
+  var result = {}
+  new AA(Object.keys(procs)).map(function(x,i,next){
+    procs[x].info(function(err,data){
+      result[x] = data
+      next(err)
+    })
+  }).done(function(err,data){
+    cb && cb(err,result)
+  }).exec()
 }                                            
 
 //------------------------------------------------------------------------------
@@ -278,12 +300,19 @@ function ps(cb) {
 //------------------------------------------------------------------------------
 
 function start(opts, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  else
+    cb = function(){}
+  
+  if (arguments.length != 2) 
+    return cb('start needs 2 arguments')
   
   parseStart(opts, function(err, data){
     if (err) return cb(err)
     
     process.env.NEXUS_MONITOR_DATA = JSON.stringify(data) 
-    console.log('starting')
+
     var child = spawn( 'node'
                      , [__dirname+'/bin/monitor.js']
                      , {env:process.env} )
@@ -307,14 +336,15 @@ function start(opts, cb) {
 //------------------------------------------------------------------------------
 
 function restart(id, cb) {
-  var startOpts = {} 
-  startOpts.command = running[id].command
-  startOpts.script  = running[id].script
-  startOpts.options = running[id].options
-  startOpts.id      = id
-  stop(id, function(err,data){
-    start(startOpts, cb)
-  })
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  else
+    cb = function(){}
+  
+  if (!id || !procs[id]) 
+    return cb('process '+id+' does not run')
+  
+  procs[id].restart(cb)
 }
 
 //------------------------------------------------------------------------------
@@ -322,9 +352,15 @@ function restart(id, cb) {
 //------------------------------------------------------------------------------
 
 function stop(id, cb) {
-  toStop.push(id)
-  process.kill(procs[id].pid)
-  cb && cb(null, id)
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  else
+    cb = function(){}
+  
+  if (!id || !procs[id]) 
+    return cb('process '+id+' does not run')
+  
+  procs[id].stop(cb)
 }
 
 //------------------------------------------------------------------------------
@@ -332,12 +368,10 @@ function stop(id, cb) {
 //------------------------------------------------------------------------------
 
 function stopall(cb) {
-  var len = 0
-  for (var proc in procs) {
-    len++
-    stop(proc)
-  }  
-  cb && cb(null, len)
+  if (!cb) cb = function() {}
+  new AA(Object.keys(procs)).map(function(x,i,next){
+    procs[x].stop(next)
+  }).done(cb).exec()
 }
 
 //------------------------------------------------------------------------------
@@ -345,7 +379,13 @@ function stopall(cb) {
 //------------------------------------------------------------------------------
 
 function remote(opts, cb) {
-
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  else
+    cb = function(){}
+ 
+  return cb('#TODO')
+  
   var opts = opts || {}
     , remote = (opts.remote && config.remotes[opts.remote]) 
                ? config.remotes[opts.remote] : false
@@ -472,6 +512,4 @@ function parseStart(opts, cb) {
   //console.log('parseStart',result)
   cb(null, result)
 }
-
-/* */
 

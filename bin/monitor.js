@@ -84,11 +84,16 @@ function monitor(opts, cb) {
   start(function(){
     function server(remote, conn) {
       this.type = 'NEXUS_MONITOR'
-      this.monitorPid = process.pid
-      this.pid = self.child.pid
-      this.crashed = self.crashed
-      this.ctime = self.ctime
-      this.package = self.package
+      this.info = function(cb) {
+        var info = 
+          { monitorPid : process.pid
+          , pid : self.child.pid
+          , crashed : self.crashed
+          , ctime : self.ctime
+          , package : self.package
+          }
+        cb(null, info)
+      }
       this.start = start
       this.restart = restart
       this.stop = stop
