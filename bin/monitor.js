@@ -66,7 +66,7 @@ function monitor(opts, cb) {
   ee2.onAny(function(data){
     var self = this
     _.each(subscriptions,function(x,i){
-      if (x.events.indexOf(self.event)) {
+      if (x.events.indexOf(self.event) != -1) {
         x.emit && x.emit(self.event,data)
       }
     })
@@ -137,6 +137,8 @@ function monitor(opts, cb) {
                        , env : env
                        } )
     
+    self.child = child
+    
     self.ctime = Date.now()
     
     child.stdout.on('data',function(data){
@@ -161,7 +163,7 @@ function monitor(opts, cb) {
         }
       }
     })
-    self.child = child
+    
     cb && cb()
   }
   

@@ -25,7 +25,7 @@ var fs      = require('fs')
 ee2.onAny(function(data){
   var self = this
   _.each(subscriptions,function(x,i){
-    if (x.events.indexOf(self.event)) {
+    if (x.events.indexOf(self.event) != -1) {
       x.emit && x.emit(self.event,data)
     }
   })
