@@ -123,6 +123,8 @@ function monitor(opts, cb) {
                        , env : env
                        } )
 
+    ee2.emit('start', self.child.pid)
+    
     self.ctime = Date.now()
 
     self.child.stdout.on('data',function(data){
@@ -137,7 +139,9 @@ function monitor(opts, cb) {
       if ((code != 0) && !self.stopFlag) {
         self.crashed++
         if (self.crashed < self.max) {
-          start()
+          setTimeout(function(){
+            start()
+          },200)
         }
       }
     })

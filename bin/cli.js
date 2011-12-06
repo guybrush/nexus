@@ -22,14 +22,12 @@ var nexus = require('../index')
     , '    ls         .. list installed packages'
     , '    install    .. install packages'
     , '    uninstall  .. uninstall packages'
-    , '    link       .. like npm link'
     , '    ps         .. list of current running (and crashed) programs'
     , '    start      .. start a program'
-    , '    restart    .. restart a running (or crashed) program'
+    , '    restart    .. restart a running (or max crashed) program'
     , '    stop       .. stop a running program'
     , '    stopall    .. stop all running programs'
     , '    subscribe  .. subscribe to events'
-    , '    remote     .. connect to remote nexus'
     , '    server     .. start a nexus-server'
     , '    help       .. try `nexus help <command>` for more info'
     , ''
@@ -38,6 +36,9 @@ var nexus = require('../index')
 var help = {}
 help.version   = 'nexus version .. will print the version of installed nexus'
 help.config    = [ 'nexus config               .. show all config'
+                 , ''
+                 , 'not implemented yet .. :'
+                 , ''
                  , 'nexus config <key>         .. show value of config.<key>'
                  , 'nexus config <key> <value> .. set config.<key> to <value>'
                  ].join('\n')
@@ -60,19 +61,54 @@ help.install   = [ 'nexus install <tarball url> [<package-name>] [<option>]'
                  , ''
                  , 'nexus install http://git.web/foo.git/snapshot/a1b2asd.tar.gz -p commit=a1b2asd foo-with-some-feature'
                  ].join('\n')
-help.uninstall = [ 'TBA (look at code for now)'
+help.uninstall = [ 'nexus uninstall <name>'
                  , ''
                  , 'note: shortcut for "uninstall" is "rm"'
                  ].join('\n')
 help.rm        = help.uninstall
-help.ls        = 'TBA (look at code for now)'
-help.subscribe = 'TBA (look at code for now)'
-help.ps        = 'TBA (look at code for now)'
-help.start     = 'TBA (look at code for now)'
-help.restart   = 'TBA (look at code for now)'
-help.stop      = 'TBA (look at code for now)'
-help.stopall   = 'TBA (look at code for now)'
-help.server    = 'TBA (look at code for now)'
+help.ls        = 'nexus ls .. there are no parameters'
+help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
+                 , ''
+                 , '<event> is a wildcarded eventemitter2-event'
+                 , ''
+                 , 'examples:'
+                 , ''
+                 , 'nexus subscribe *                      .. subscribe to all events'
+                 , 'nexus subscribe monitor::<id>::*       .. only events from that monitor'
+                 , 'nexus subscribe monitor::<id>::stdout  .. '
+                 , 'nexus subscribe monitor::<id>::stderr  .. '
+                 , 'nexus subscribe monitor::<id>::start   .. the program has been restarted'
+                 , 'nexus subscribe monitor::<id>::exit    .. '
+                 , 'nexus subscribe monitor::*::exit       .. '
+                 , 'nexus subscribe nexus::installed       .. when packages get installed'
+                 , 'nexus subscribe nexus::error           .. listen for nexus errors'
+                 ].join('\n')
+help.ps        = 'nexus ps [<id>]'
+help.start     = [ "nexus start /some/file                                             "
+                 , "  script = /some/file                                              "
+                 , "nexus start ./some/file                                            "
+                 , "  script = CWD+'/some/file'                                        "
+                 , "nexus start appName/path/to/script                                 "
+                 , "  appName is an app                                                "
+                 , "    ? script = _config.apps+'/appName/path/to/script'              "
+                 , "    : script = CWD+'/appName/path/to/script'                       "
+                 , "nexus start appName                                                "
+                 , "  appName is an app                                                "
+                 , "    ? look for package.json-startScript                            "
+                 , "      ? starScript.split(' ')                                      "
+                 , "        ? fs.stat([0])                                             "
+                 , "          ? script = [0], options = [>0]                           "
+                 , "          : command = [0], script = [1], options = [>1]            "
+                 , "        : script = _config.apps+'/appName/'+startScript            "
+                 , "      : fs.stat(appName+'/server.js') || fs.stat(appName+'/app.js')"
+                 , "        ? script = appName+'/server.js' || appName+'/server.js'    "
+                 , "        : script = appName // this is most likely an error..       "
+                 , "    : script CWD+'/'+appName // this is most likely an error..     "
+                 ].join('\n')
+help.restart   = 'nexus restart <id>'
+help.stop      = 'nexus stop <id>'
+help.stopall   = 'nexus stopall .. there are no parameters'
+help.server    = 'nexus server [-p <port>] [-h <host>] [-c <path to configFile>]'
 
 if (!argv._[0]) exit(usage)
 else if (argv._[0] == 'help') {
@@ -160,12 +196,6 @@ function parseArgs() {
     case 'rm':
     case 'uninstall':
       nexus.uninstall(argv._[0], function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
-      break
-    case 'link':
-      nexus.link(argv._[0], function(err, data){
         if (err) return exit(err)
         exit(data)
       })
