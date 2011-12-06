@@ -93,7 +93,10 @@ function monitor(opts, cb) {
 
   start(function(){
     function server(remote, conn) {
-      this.type = 'NEXUS_MONITOR'
+      if (self.script == __dirname+'/server.js')
+        this.type = 'NEXUS_SERVER_MONITOR'
+      else
+        this.type = 'NEXUS_MONITOR'
       this.info = info
       this.start = start
       this.restart = restart
@@ -175,7 +178,8 @@ function monitor(opts, cb) {
     else {
       self.stopFlag = false
       cb && info(cb)
-      if (!self.restartFlag) process.exit(0)
+      if (!self.restartFlag)
+        setTimeout(function(){process.exit(0)},50)
     }
   }
 

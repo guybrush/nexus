@@ -4,8 +4,6 @@ var nexus = require('../index')
   , _config = nexus.config()
   , opti  = require('optimist')
   , dnode = require('dnode')
-  , fork = require('child_process').fork
-  , spawn = require('child_process').spawn
   , argv  = opti.argv
   , _conn
   , usage =
@@ -17,19 +15,19 @@ var nexus = require('../index')
     , ''
     , 'commands:'
     , ''
-    , '    version    .. print version-number'
-    , '    config     .. get/set config'
-    , '    ls         .. list installed packages'
-    , '    install    .. install packages'
-    , '    uninstall  .. uninstall packages'
-    , '    ps         .. list of current running (and crashed) programs'
-    , '    start      .. start a program'
-    , '    restart    .. restart a running (or max crashed) program'
-    , '    stop       .. stop a running program'
-    , '    stopall    .. stop all running programs'
-    , '    subscribe  .. subscribe to events'
-    , '    server     .. start a nexus-server'
-    , '    help       .. try `nexus help <command>` for more info'
+    , '    version   .. print version-number'
+    , '    config    .. get/set config'
+    , '    ls        .. list installed packages'
+    , '    install   .. install packages'
+    , '    uninstall .. uninstall packages'
+    , '    ps        .. list of current running (and crashed) programs'
+    , '    start     .. start a program'
+    , '    restart   .. restart a running (or max crashed) program'
+    , '    stop      .. stop a running program'
+    , '    stopall   .. stop all running programs'
+    , '    subscribe .. subscribe to events'
+    , '    server    .. start/stop/restart the nexus-server'
+    , '    help      .. try `nexus help <command>` for more info'
     , ''
     ].join('\n')
 
@@ -108,32 +106,19 @@ help.start     = [ "nexus start /some/file                                      
 help.restart   = 'nexus restart <id>'
 help.stop      = 'nexus stop <id>'
 help.stopall   = 'nexus stopall .. there are no parameters'
-help.server    = 'nexus server [-p <port>] [-h <host>] [-c <path to configFile>]'
+help.server    = ['nexus server .. (without any options) will print information'
+                 ,'                about the server - if it is running'
+                 ,''
+                 ,'nexus server start [-p <port>] [-h <host>] [-c <path to configFile>]'
+                 ,'nexus server stop'
+                 ,'nexus server restart'
+                 ].join('\n')
 
-if (!argv._[0]) exit(usage)
+if (!argv._[0]) exit(null, usage)
 else if (argv._[0] == 'help') {
   if (!argv._[1] || !help[argv._[1]])
-    return exit(usage)
-  exit(help[argv._[1]])
-}
-else if (argv._[0] == 'server') {
-  if (!process.env.NEXUS_SERVER) {
-    process.title = 'nexus-server-parent'
-    process.env.NEXUS_SERVER = true
-    var child = spawn('node', [__filename,'server'], {env:process.env})
-    child.stdout.on('data',function(d){console.log('server-stdout> '+d)})
-    child.stderr.on('data',function(d){console.log('server-stderr> '+d)})
-    exit({pid:child.pid,port:_config.port,host:_config.host})
-    // #FORKISSUE
-    // var child = fork(__filename, ['server'], {env:process.env})
-    // child.on('message',function(m){exit(m)})
-  } else {
-    process.title = 'nexus-server'
-    var server = dnode(nexus()).listen(_config.port)
-    // #FORKISSUE
-    // server.on('ready',function(){process.send({pid:process.pid})})
-    // server.on('error',function(err){process.send({error:err})})
-  }
+    return exit(null, usage)
+  exit(null, help[argv._[1]])
 }
 else {
   var opts = {}
@@ -156,9 +141,11 @@ else {
   })
   client.on('error',function(err){
     if (err.code == 'ECONNREFUSED') {
-      if (['version','config','ls','install','uninstall'
+      if (['version','config','ls','install','uninstall','server'
           ].indexOf(argv._[0]) != -1) {
-        parseArgs() // no running server required
+        // #TODO check if its the "localhost"-remote
+        // no running server required
+        parseArgs()
       }
       else return exit('server is not running')
     }
@@ -170,41 +157,26 @@ function parseArgs() {
   var cmd = argv._.shift()
   switch (cmd) {
     case 'version':
-      exit('v'+nexus.version())
+      exit(null,'v'+nexus.version())
       break
     case 'config':
-      nexus.config(function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+      nexus.config(exit)
       break
     case 'ls':
-      nexus.ls(argv._[0], function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+      nexus.ls(argv._[0], exit)
       break
     case 'install':
       nexus.install( { package : argv._[0]
                      , name    : argv._[1]
                      , cwd     : process.cwd() }
-                   , function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+                   , exit )
       break
     case 'rm':
     case 'uninstall':
-      nexus.uninstall(argv._[0], function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+      nexus.uninstall(argv._[0], exit)
       break
     case 'ps':
-      nexus.ps(function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+      nexus.ps(exit)
       break
     case 'start':
       // #TODO check for nexus-start-options besides scripts-options
@@ -215,38 +187,28 @@ function parseArgs() {
         ( { script  : argv._[0]
           , options : options
           , env     : {FOO:'BAR'} }
-        , function(err,data){
-            if (err) return exit(err)
-            exit(data)
-          } )
+        , exit )
       break
     case 'restart':
-      nexus.restart
-        ( process.argv[3]
-          , function(err, proc){
-              if (err) return exit(err)
-              exit(proc)
-            } )
+      nexus.restart(process.argv[3], exit)
       break
     case 'stop':
-      nexus.stop(process.argv[3], function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+      nexus.stop(process.argv[3], exit)
       break
     case 'stopall':
-      nexus.stopall(function(err, data){
-        if (err) return exit(err)
-        exit(data)
-      })
+      nexus.stopall(exit)
+      break
+    case 'server':
+      nexus.server({cmd:argv._[0]}, exit)
       break
     default:
       exit('unknown command: '+cmd)
   }
 }
 
-function exit(msg) {
-  console.log(msg)
+function exit(err,msg) {
+  if (err) console.log('ERROR:',err)
+  else console.log(msg)
   _conn && _conn.end()
   process.exit(0)
 }

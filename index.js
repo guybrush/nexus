@@ -8,6 +8,7 @@ nexus.config = config
 nexus.ls = ls
 nexus.install = install
 nexus.uninstall = uninstall
+nexus.server = server
 
 var fs      = require('fs')
   , path    = require('path')
@@ -25,6 +26,7 @@ var fs      = require('fs')
   , _pkg    = require('./package.json')
   , _config = config()
   , procs   = {}
+  , serverProc = null
   , subscriptions = {}
   , subscriptionListeners = {}
   
@@ -33,20 +35,21 @@ var fs      = require('fs')
 //------------------------------------------------------------------------------
 
 function nexus(opts) {
-  function server(remote, conn) {
+  function dnodeInterface(remote, conn) {
     var self = this
-    this.version    = version
-    this.config     = config
-    this.ls         = ls
-    this.install    = install
-    this.uninstall  = uninstall
-    this.ps         = ps
-    this.start      = start
-    this.restart    = restart
-    this.stop       = stop
-    this.stopall    = stopall
-    this.remote     = remote
-    this.subscribe  = function(event, emit, cb) {
+    this.version   = version
+    this.config    = config
+    this.ls        = ls
+    this.install   = install
+    this.uninstall = uninstall
+    this.ps        = ps
+    this.start     = start
+    this.restart   = restart
+    this.stop      = stop
+    this.stopall   = stopall
+    this.remote    = remote
+    this.server    = server
+    this.subscribe = function(event, emit, cb) {
       if (!subscriptions[event]) {
         subscriptions[event] = {}
         subscriptionListeners[event] = function(data){
@@ -82,10 +85,21 @@ function nexus(opts) {
           delete procs[conn.id]
         })
       }
+      if (rem.type && rem.type == 'NEXUS_SERVER_MONITOR') {
+        ee2.emit('nexus::server::connected')
+        serverProc = rem
+        rem.subscribe(function(event,data){
+          ee2.emit('nexus::server::'+event,data)
+        })
+        conn.on('end',function(){
+          ee2.emit('nexus::server::disconnected')
+          serverProc = null
+        })
+      } 
     })
     conn.on('end',function(){self.unsubscribe()})
   }
-  return server
+  return dnodeInterface
 }
 
 //------------------------------------------------------------------------------
@@ -390,6 +404,43 @@ function remote(opts, cb) {
     cb = function(){}
 
   return cb('#TODO')
+}
+
+//------------------------------------------------------------------------------
+//                                               server
+//------------------------------------------------------------------------------
+
+function server(opts, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  else
+    cb = function(){}
+  
+  if (arguments.length != 2)
+    serverProc.info(cb)
+  
+  opts = opts || {}
+  
+  if (opts.cmd && opts.cmd == 'start')
+    return start({script:__dirname+'/bin/server.js'},cb)
+  
+  if (opts.cmd && opts.cmd == 'stop') {
+    if (serverProc) {
+      cb(null,'will try to stop the server, if no error shows up - it worked :D')
+      return serverProc.stop(cb)
+    }
+    else return cb('server is not running')
+  }
+  
+  if (opts.cmd && opts.cmd == 'restart') {
+    cb(null,'will try to restart the server, if no error shows up - it worked :D')
+    return serverProc.restart(cb)
+  }
+  
+  if (serverProc)
+    return serverProc.info(cb)
+  
+  cb(null,'server is not running')
 }
 
 //------------------------------------------------------------------------------
