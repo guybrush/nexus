@@ -29,12 +29,17 @@ var fs      = require('fs')
   , serverProc = null
   , subscriptions = {}
   , subscriptionListeners = {}
+  , fileConfigPath = null
+  
+process.title = 'nexus'
   
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
 
-function nexus(opts) {
+function nexus(configPath) {
+  if (opts && typeof opts == 'string')
+    fileConfigPath = configPath
   function dnodeInterface(remote, conn) {
     var self = this
     this.version   = version
@@ -124,7 +129,7 @@ function config(key, value, cb) {
              ? process.env.USERPROFILE
              : process.env.HOME )
 
-  fileConfigPath = home+'/.nexus/config.json'
+  fileConfigPath = fileConfigPath || home+'/.nexus/config.js'
 
   try { fileConfig = require(fileConfigPath) }
   catch (e) {} // no config.json, so we use hardcoded defaults
@@ -137,10 +142,8 @@ function config(key, value, cb) {
   currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
   currConfig.host    = fileConfig.host    || '0.0.0.0'
-  currConfig.port    = fileConfig.port    || 5000
-  currConfig.remotes = fileConfig.remotes || { localhost :
-                                               { host : currConfig.host
-                                               , port : currConfig.port } }
+  currConfig.port    = fileConfig.port    || 0xf00
+  currConfig.remotes = fileConfig.remotes || {}
 
   new AA( [ currConfig.keys
           , currConfig.logs
@@ -397,12 +400,36 @@ function stopall(cb) {
 //                                               remote
 //------------------------------------------------------------------------------
 
-function remote(opts, cb) {
+function remote(rem, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
 
+  if (typeof rem == 'string' && _config.remotes[rem]) {
+    var opts = {}
+    opts.key = fs.readFileSync(keyFile)
+  }
+  
+  var opt = opt || {}
+    , remote = (opt.remote && config.remotes[opt.remote]) 
+               ? config.remotes[opt.remote] : false
+    , port = opt.port || (remote && remote.port) ? remote.port : config.defaults.tlsPort                  
+    , host = opt.host || (remote && remote.host) ? remote.host : 'localhost'
+    , keyFile  = opt.key  || config.defaults.key
+    , certFile = opt.cert || config.defaults.cert
+    , key = fs.readFileSync(keyFile)
+    , cert = fs.readFileSync(certFile)                                            
+    , options = {key:key,cert:cert}
+
+  console.log('connecting to '+host+':'+port)
+  dnode.connect(host, port, options, function(remote,con) { 
+    cb(null,remote)
+  }).on('error',function(err){cb(err)})
+    
+  return null
+  
+  
   return cb('#TODO')
 }
 
@@ -421,8 +448,10 @@ function server(opts, cb) {
   
   opts = opts || {}
   
-  if (opts.cmd && opts.cmd == 'start')
+  if (opts.cmd && opts.cmd == 'start') {
+    if (serverProc) return cb('server is already running')
     return start({script:__dirname+'/bin/server.js'},cb)
+  }
   
   if (opts.cmd && opts.cmd == 'stop') {
     if (serverProc) {

@@ -109,7 +109,7 @@ help.stopall   = 'nexus stopall .. there are no parameters'
 help.server    = ['nexus server .. (without any options) will print information'
                  ,'                about the server - if it is running'
                  ,''
-                 ,'nexus server start [-p <port>] [-h <host>] [-c <path to configFile>]'
+                 ,'nexus server start [-c <path to configFile>]'
                  ,'nexus server stop'
                  ,'nexus server restart'
                  ].join('\n')

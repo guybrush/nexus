@@ -3,8 +3,21 @@
 process.title = 'nexus-server'
 
 var nexus = require('../')
-  , _config = nexus.config()
   , dnode = require('dnode')
+  , AA = require('async-array')
+  , _config = nexus.config()
+  , opts = { port : _config.port
+           , host : _config.host }
+           
+var key = fs.readFileSync(_config.key)
+var cert = fs.readFileSync(_config.cert)
+var ca = [cert]
 
-var server = dnode(nexus()).listen(_config.port)
+opts.key = key
+opts.cert = cert
+opts.ca = ca
+opts.requestCert = true
+opts.rejectUnauthorized = true
+
+var server = dnode(nexus()).listen(opts)
   
