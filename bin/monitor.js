@@ -169,6 +169,7 @@ function monitor(opts, cb) {
       process.kill(self.child.pid, 'SIGKILL')
     }
     else {
+      self.stopFlag = false
       cb && info(cb)
       if (!self.restartFlag) process.exit(0)
     }
