@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var nexus = require('../')
+  , _config = nexus.config()
   , dnode = require('dnode')
   , _ = require('underscore')
   , fork = require('child_process').fork
@@ -43,18 +44,23 @@ else {
 if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
   var child = spawn('node',[__filename],{env:process.env})
-  // child.stdout.on('data',function(d){console.log('monitor-parent-stdout> '+d)})
-  // child.stderr.on('data',function(d){console.log('monitor-parent-stderr> '+d)})
-  process.exit(0)
+  child.stdout.on('data',function(d){console.log('monitorP-stdout> '+d)})
+  //child.stderr.on('data',function(d){console.log('monitorP-stderr> '+d)})
+  console.log({pid:child.pid})
+  //process.exit(0)
 }
 else {
   var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
   delete process.env.NEXUS_MONITOR
   delete process.env.NEXUS_MONITOR_DATA
   process.title = 'nexus-monitor'
-  monitor(opts,function(s){
+  monitor(opts, function(s) {
     var dnodeMonitor = dnode(s)
-    dnodeMonitor.connect(5000,{reconnect:100})
+    var opts = { port : _config.port
+               , host : _config.host
+               , reconnect : 100 }
+    console.log('MONITOR connecting to',opts)
+    dnodeMonitor.connect(opts)
     dnodeMonitor.on('error',function(err){
       if (err.code != 'ECONNREFUSED') console.log(err)
     })
@@ -65,7 +71,7 @@ function monitor(opts, cb) {
   
   ee2.onAny(function(data){
     var self = this
-    _.each(subscriptions,function(x,i){
+    _.each(self.subscriptions,function(x,i){
       if (x.events.indexOf(self.event) != -1) {
         x.emit && x.emit(self.event,data)
       }
@@ -81,18 +87,20 @@ function monitor(opts, cb) {
   self.package = opts.package
   self.script = opts.script
   self.options = opts.options
-  self.restartFlag = false
   self.child = null
   self.command = opts.command
   self.max = opts.max
+  self.restartFlag = false
   
   start(function(){
+    
     function server(remote, conn) {
+      console.log('MONITOR connected',remote)
       this.type = 'NEXUS_MONITOR'
       this.info = function(cb) {
         var info = 
           { monitorPid : process.pid
-          , pid : self.child.pid
+          , pid : self.child ? self.child.pid : null
           , crashed : self.crashed
           , ctime : self.ctime
           , package : self.package
@@ -100,8 +108,9 @@ function monitor(opts, cb) {
           , options : self.options
           , command : self.command
           , max : self.max
-          , running : (self.child ? true : false)
+          , running : self.child ? true : false
           }
+        console.log('MONITOR info',info)
         cb(null, info)
       }
       this.destroy = destroy
@@ -124,7 +133,7 @@ function monitor(opts, cb) {
   })
   
   function start(cb) {
-    
+    console.log('MONITOR start')
     var env = process.env
     if (opts.env) {
       for (var x in opts.env)
@@ -149,10 +158,11 @@ function monitor(opts, cb) {
     })
     child.on('exit',function(code){
       ee2.emit('exit', code)
+      console.log('child exit',self.restartFlag)
       self.child = null
-      if (code != 0) {
+      if (code != 0 && !self.restartFlag) {
         self.crashed++
-        if (self.crashed <= self.max) {
+        if (self.crashed < self.max) {
           // #FORKISSUE
           // https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
           // https://github.com/joyent/node/issues/2254
@@ -163,26 +173,29 @@ function monitor(opts, cb) {
         }
       }
     })
-    
     cb && cb()
   }
   
   function restart(cb) {
-    stop(function(){start(function(){cb()})})
+    console.log('MONITOR restart')
+    self.forceStop = true
+    self.crashed = 0
+    stop(function(){
+      setTimeout(function(){start(function(){
+        self.restartFlag = false
+        cb()
+      })},100)
+    })
   }
   
   function stop(cb) {
-    if (self.child && self.child.pid)
+    console.log('MONITOR stop')
+    if (self.child && self.child.pid && self.restartFlag)
       psTree(self.child.pid, function (err, children) {
         spawn('kill', ['-9'].concat(children.map(function (p) {return p.PID})))
       })
     cb && cb()
-  }
-  
-  function destroy(cb) {
-    if (self.child && self.child.pid) stop(cb)
-    else cb()
-    process.exit(0)
+    process.kill(0)
   }
 }
 

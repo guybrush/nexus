@@ -3,6 +3,11 @@
 //
 
 module.exports = nexus
+nexus.version = version
+nexus.config = config
+nexus.ls = ls
+nexus.install = install
+nexus.uninstall = uninstall
 
 var fs      = require('fs')
   , path    = require('path')
@@ -24,6 +29,7 @@ var fs      = require('fs')
 
 ee2.onAny(function(data){
   var self = this
+  console.log(this.event,data)
   _.each(subscriptions,function(x,i){
     if (x.events.indexOf(self.event) != -1) {
       x.emit && x.emit(self.event,data)
@@ -37,11 +43,13 @@ ee2.onAny(function(data){
   
 function nexus(opts) {
   function server(remote, conn) {
+    console.log('SERVER some1 connected ???',remote)
     conn.on('remote',function(rem){
+      console.log('SERVER some1 connected',rem)
       if (rem.type && rem.type == 'NEXUS_MONITOR') {
         ee2.emit('monitor::'+conn.id+'::connected')
         procs[conn.id] = rem
-        rem.subscribe('**',function(event,data){
+        rem.subscribe('*',function(event,data){
           ee2.emit('monitor::'+conn.id+'::'+event,data)
         })
         conn.on('end',function(){
@@ -50,18 +58,18 @@ function nexus(opts) {
         })
       }
     })
-    this.version   = version
-    this.config    = config
-    this.ls        = ls
-    this.install   = install
-    this.uninstall = uninstall
-    this.ps        = ps
-    this.start     = start
-    this.restart   = restart
-    this.stop      = stop
-    this.stopall   = stopall
-    this.remote    = remote
-    this.subscribe = function(event, cb) {
+    this.version    = version
+    this.config     = config
+    this.ls         = ls
+    this.install    = install
+    this.uninstall  = uninstall
+    this.ps         = ps
+    this.start      = start
+    this.restart    = restart
+    this.stop       = stop
+    this.stopall    = stopall
+    this.remote     = remote
+    this.subscribe  = function(event, cb) {
       subscriptions[conn.id] = subscriptions[conn.id] || {events:[],emit:null}
       if (subscriptions[conn.id].events.indexOf(event) != -1)
         subscriptions[conn.id].events.push(event)
@@ -79,7 +87,7 @@ function nexus(opts) {
 //                                               version
 //------------------------------------------------------------------------------
 
-function version(cb) {cb(null, _pkg.version); return _pkg.version}
+function version(cb) {cb && cb(null, _pkg.version); return _pkg.version}
 
 //------------------------------------------------------------------------------
 //                                               config
@@ -146,7 +154,7 @@ function install(opts, cb) {
     cb = function() {}
   
   opts = opts || {}
-  if (!opts.package) return cb('no package')
+  if (!opts.package) return cb('no package given to install')
 
   if (!(/:\/\//.test(opts.package))) 
     return installPackage() 
@@ -282,12 +290,14 @@ function ps(proc, cb) {
     cb = arguments[arguments.length - 1]
   if (typeof arguments[0] === 'string' && procs[arguments[0]] && cb)
     return procs[x].info(cb)
-  
+  console.log('PS',procs)
   var result = {}
   new AA(Object.keys(procs)).map(function(x,i,next){
+    console.log('PS '+x)
     procs[x].info(function(err,data){
+      console.log('PS info '+x,data)
       result[x] = data
-      next(err)
+      next(err,data)
     })
   }).done(function(err,data){
     cb && cb(err,result)
@@ -315,9 +325,15 @@ function start(opts, cb) {
     var child = spawn( 'node'
                      , [__dirname+'/bin/monitor.js']
                      , {env:process.env} )
-    // child.stdout.on('data',function(d){console.log('nexus-start-stdout> '+d)})
-    // child.stderr.on('data',function(d){console.log('nexus-start-stderr> '+d)})
-    cb()
+    child.stdout.on('data',function(d){
+      console.log(d+'')
+      cb(null,d+'')})
+    child.stdout.on('data',function(d){
+      console.log(d+'')
+      cb(d+'')})
+    child.on('error',function(e){
+      console.log(d+'')
+      cb(e+'')})
 
     // #FORKISSUE
     // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
