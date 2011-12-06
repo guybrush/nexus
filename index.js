@@ -43,9 +43,7 @@ ee2.onAny(function(data){
   
 function nexus(opts) {
   function server(remote, conn) {
-    console.log('SERVER some1 connected ???',remote)
     conn.on('remote',function(rem){
-      console.log('SERVER some1 connected',rem)
       if (rem.type && rem.type == 'NEXUS_MONITOR') {
         ee2.emit('monitor::'+conn.id+'::connected')
         procs[conn.id] = rem

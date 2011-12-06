@@ -46,8 +46,8 @@ if (!process.env.NEXUS_MONITOR) {
   var child = spawn('node',[__filename],{env:process.env})
   child.stdout.on('data',function(d){console.log('monitorP-stdout> '+d)})
   //child.stderr.on('data',function(d){console.log('monitorP-stderr> '+d)})
-  console.log({pid:child.pid})
-  //process.exit(0)
+  console.log({monitorPid:child.pid})
+  process.exit(0)
 }
 else {
   var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
@@ -58,8 +58,7 @@ else {
     var dnodeMonitor = dnode(s)
     var opts = { port : _config.port
                , host : _config.host
-               , reconnect : 100 }
-    console.log('MONITOR connecting to',opts)
+               , reconnect : 500 }
     dnodeMonitor.connect(opts)
     dnodeMonitor.on('error',function(err){
       if (err.code != 'ECONNREFUSED') console.log(err)
@@ -91,11 +90,11 @@ function monitor(opts, cb) {
   self.command = opts.command
   self.max = opts.max
   self.restartFlag = false
+  self.forceStop = false
+  self.env = opts.env
   
   start(function(){
-    
     function server(remote, conn) {
-      console.log('MONITOR connected',remote)
       this.type = 'NEXUS_MONITOR'
       this.info = function(cb) {
         var info = 
@@ -107,13 +106,12 @@ function monitor(opts, cb) {
           , script : self.script
           , options : self.options
           , command : self.command
+          , env : self.env
           , max : self.max
           , running : self.child ? true : false
           }
-        console.log('MONITOR info',info)
         cb(null, info)
       }
-      this.destroy = destroy
       this.start = start
       this.restart = restart
       this.stop = stop
@@ -133,69 +131,66 @@ function monitor(opts, cb) {
   })
   
   function start(cb) {
-    console.log('MONITOR start')
     var env = process.env
     if (opts.env) {
       for (var x in opts.env)
-        env[x] = opts.env[x]
+        env[x] = self.env[x]
     }
     
-    var child = spawn( opts.command
+    self.child = spawn( opts.command
                      , [opts.script].concat(opts.options)
                      , { cwd : opts.cwd
                        , env : env
                        } )
     
-    self.child = child
-    
     self.ctime = Date.now()
     
-    child.stdout.on('data',function(data){
+    self.child.stdout.on('data',function(data){
       ee2.emit('stdout', data.toString())
     })
-    child.stderr.on('data',function(data){
+    self.child.stderr.on('data',function(data){
       ee2.emit('stderr', data.toString())
     })
-    child.on('exit',function(code){
+    self.child.once('exit',function(code){
       ee2.emit('exit', code)
-      console.log('child exit',self.restartFlag)
       self.child = null
-      if (code != 0 && !self.restartFlag) {
+      if ((code != 0) && !self.restartFlag) {
         self.crashed++
         if (self.crashed < self.max) {
-          // #FORKISSUE
-          // https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
-          // https://github.com/joyent/node/issues/2254
           start()
-        }
-        else {
-          // process.exit(0)
         }
       }
     })
-    cb && cb()
+    cb && cb(null, {pid:self.child.pid})
   }
   
   function restart(cb) {
-    console.log('MONITOR restart')
-    self.forceStop = true
     self.crashed = 0
+    self.restartFlag = true
     stop(function(){
-      setTimeout(function(){start(function(){
+      setTimeout(function(){
         self.restartFlag = false
-        cb()
-      })},100)
+        start(cb)
+      },200)
     })
   }
   
   function stop(cb) {
-    console.log('MONITOR stop')
-    if (self.child && self.child.pid && self.restartFlag)
-      psTree(self.child.pid, function (err, children) {
-        spawn('kill', ['-9'].concat(children.map(function (p) {return p.PID})))
+    if (self.child && self.child.pid) {
+      var pid = self.child.pid
+      var timer = setTimeout(function(){cb('the process is unkillable :D #TODO')},1000)
+      self.child.once('exit',function(){
+        clearTimeout(timer)
+        cb && cb({pid:pid,monitorPid:process.pid})
+        if (!self.restartFlag) process.exit(0)
       })
-    cb && cb()
-    process.kill(0)
+      process.kill(self.child.pid, 'SIGKILL')
+    }
+    else {
+      cb && cb({monitorPid:process.pid})
+      if (!self.restartFlag) process.exit(0)
+    }   
   }
+  
 }
 

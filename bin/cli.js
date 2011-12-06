@@ -90,7 +90,7 @@ else if (argv._[0] == 'server') {
     var child = spawn('node', [__filename,'server'], {env:process.env})
     child.stdout.on('data',function(d){console.log('server-stdout> '+d)})
     child.stderr.on('data',function(d){console.log('server-stderr> '+d)})
-    // exit({pid:child.pid,port:_config.port,host:_config.host})
+    exit({pid:child.pid,port:_config.port,host:_config.host})
     // #FORKISSUE
     // var child = fork(__filename, ['server'], {env:process.env})
     // child.on('message',function(m){exit(m)})
@@ -195,14 +195,14 @@ function parseArgs() {
       break
     case 'restart':
       nexus.restart
-        ( argv._[0]
-        , function(err, proc){
-            if (err) return exit(err)
-            exit(proc)
-          })
+        ( process.argv[3]
+          , function(err, proc){
+              if (err) return exit(err)
+              exit(proc)
+            } )
       break
     case 'stop':
-      nexus.stop(argv._[0], function(err, data){
+      nexus.stop(process.argv[3], function(err, data){
         if (err) return exit(err)
         exit(data)
       })
