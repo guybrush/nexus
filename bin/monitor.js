@@ -170,16 +170,19 @@ function monitor(opts, cb) {
       self.child.once('exit',function(){
         self.stopFlag = false
         clearTimeout(timer)
-        cb && info(cb)
-        if (!self.restartFlag) process.exit(0)
+        info(function(err,data){
+          cb && cb(err,data)
+          if (!self.restartFlag) process.exit(0)
+        })
       })
       process.kill(self.child.pid, 'SIGKILL')
     }
     else {
       self.stopFlag = false
-      cb && info(cb)
-      if (!self.restartFlag)
-        setTimeout(function(){process.exit(0)},50)
+      info(function(err,data){
+        cb && cb(err,data)
+        if (!self.restartFlag) process.exit(0)
+      })
     }
   }
 
