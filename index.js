@@ -14,23 +14,24 @@ var fs      = require('fs')
   , fork    = require('child_process').fork
   , spawn   = require('child_process').spawn
   , dnode   = require('dnode')
-  , _       = require('underscore')      
+  , _       = require('underscore')
   , fstream = require('fstream')
   , AA      = require('async-array')
   , EE2     = require('eventemitter2').EventEmitter2
   , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners:20})
-  , rimraf  = require('rimraf') 
+  , rimraf  = require('rimraf')
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
   , _pkg    = require('./package.json')
   , _config = config()
   , procs   = {}
   , subscriptions = {}
-
+  , subscriptionListeners = {}
+  
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
-  
+
 function nexus(opts) {
   function server(remote, conn) {
     var self = this
@@ -48,12 +49,13 @@ function nexus(opts) {
     this.subscribe  = function(event, emit, cb) {
       if (!subscriptions[event]) {
         subscriptions[event] = {}
-        ee2.on(event,function(data){
+        subscriptionListeners[event] = function(data){
           var self = this
           _.each(subscriptions[event],function(x,i){
             x(self.event,data)
           })
-        })
+        }
+        ee2.on(event,subscriptionListeners[event])
       }
       subscriptions[event][conn.id] = emit
       cb && cb()
@@ -61,8 +63,10 @@ function nexus(opts) {
     this.unsubscribe = function(cb) {
       _.each(subscriptions,function(x,i){
         delete x[conn.id]
-        if (Object.keys(x).length == 0)
-          ee2.removeListener(x)
+        if (Object.keys(x).length == 0) {
+          ee2.removeListener(subscriptionListeners[i])
+          delete subscriptionListeners[i]
+        }
       })
       cb && cb()
     }
@@ -83,7 +87,7 @@ function nexus(opts) {
   }
   return server
 }
-  
+
 //------------------------------------------------------------------------------
 //                                               version
 //------------------------------------------------------------------------------
@@ -95,9 +99,9 @@ function version(cb) {cb && cb(null, _pkg.version); return _pkg.version}
 //------------------------------------------------------------------------------
 
 function config(key, value, cb) {
-  
+
   // #TODO get/set config
-  
+
   if (key && value && !cb) cb = value
   if (key && !value && !cb) cb = key
   var currConfig = {}
@@ -105,7 +109,7 @@ function config(key, value, cb) {
     , home = ( process.platform === "win32" // HAHA!
              ? process.env.USERPROFILE
              : process.env.HOME )
-  
+
   fileConfigPath = home+'/.nexus/config.json'
 
   try { fileConfig = require(fileConfigPath) }
@@ -120,7 +124,7 @@ function config(key, value, cb) {
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
   currConfig.host    = fileConfig.host    || '0.0.0.0'
   currConfig.port    = fileConfig.port    || 5000
-  currConfig.remotes = fileConfig.remotes || { localhost : 
+  currConfig.remotes = fileConfig.remotes || { localhost :
                                                { host : currConfig.host
                                                , port : currConfig.port } }
 
@@ -153,28 +157,28 @@ function install(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function() {}
-  
+
   opts = opts || {}
   if (!opts.package) return cb('no package given to install')
 
-  if (!(/:\/\//.test(opts.package))) 
-    return installPackage() 
-  // this code sucks in general .. 
+  if (!(/:\/\//.test(opts.package)))
+    return installPackage()
+  // this code sucks in general ..
   // but ye .. without this, npm will throw on non-valid domains
-  // install via authed http? not implemented yet :D 
+  // install via authed http? not implemented yet :D
   // (on the cli ssh-agent might help with ssh-transport)
   var dns = require('dns')
   var domain = opts.package.split('://')[1]
   domain = domain.split('/')[0]
   domain = domain.split(':')[0]
-  var split = domain.split('@')      
+  var split = domain.split('@')
   domain = split[split.length - 1]
   dns.lookup(domain,function(err,data,fam){
     if (err && domain!='localhost')
       return cb(err)
     installPackage()
   })
-  
+
   function installPackage() {
     npm.load( { prefix:_config.tmp
               , global:true
@@ -188,12 +192,12 @@ function install(opts, cb) {
         if (path.existsSync(_config.apps+'/'+name)) {
           var found = false, i = 0
           while (!found) {
-            if (!path.existsSync(_config.apps+'/'+name+'_'+(++i))) 
+            if (!path.existsSync(_config.apps+'/'+name+'_'+(++i)))
               found = true
           }
           name = name+'_'+i
         }
-        
+
         var r = fstream.Reader( res[0][1] )
           , w = fstream.Writer( { path:_config.apps+'/'+name
                                 , mode: 0755
@@ -218,19 +222,19 @@ function install(opts, cb) {
 function uninstall(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
-  
+
   if (typeof arguments[0] === 'string')
     opts = arguments[0]
   else
     return cb('not sure how to handle the parameter')
-  
+
   var path = _config.apps+'/'+opts
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
     rimraf(_config.apps+'/'+opts,function(){
       ee2.emit('nexus::uninstalled',name)
       cb()
-    })  
+    })
   })
 }
 
@@ -251,7 +255,7 @@ function link(opts, cb) {
 function ls(package, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
-  
+
   if (arguments[0] && typeof arguments[0] === 'string') {
     package = arguments[0]
     path.exists(_config.apps+'/'+package+'/package.json',function(err){
@@ -281,7 +285,7 @@ function ls(package, cb) {
     })
   }
 }
-                                          
+
 //------------------------------------------------------------------------------
 //                                               ps
 //------------------------------------------------------------------------------
@@ -291,7 +295,7 @@ function ps(proc, cb) {
     cb = arguments[arguments.length - 1]
   if (typeof arguments[0] === 'string' && procs[arguments[0]] && cb)
     return procs[x].info(cb)
-  
+
   var result = {}
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].info(function(err,data){
@@ -301,7 +305,7 @@ function ps(proc, cb) {
   }).done(function(err,data){
     cb && cb(err,result)
   }).exec()
-}                                            
+}
 
 //------------------------------------------------------------------------------
 //                                               start
@@ -312,14 +316,14 @@ function start(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
-  
-  if (arguments.length != 2) 
+
+  if (arguments.length != 2)
     return cb('start needs 2 arguments')
-  
+
   parseStart(opts, function(err, data){
     if (err) return cb(err)
-    
-    process.env.NEXUS_MONITOR_DATA = JSON.stringify(data) 
+
+    process.env.NEXUS_MONITOR_DATA = JSON.stringify(data)
 
     var child = spawn( 'node'
                      , [__dirname+'/bin/monitor.js']
@@ -328,15 +332,18 @@ function start(opts, cb) {
     child.stdout.on('data',function(d){cb(d+'')})
     child.on('error',function(e){cb(e+'')})
 
+    // child.stdout.on('data',function(d){console.log(d+'')})
+    // child.stderr.on('data',function(d){console.log(d+'')})
+    
     // #FORKISSUE
     // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
-    // 
+    //
     // child.on('message',function(m){
     //   if (m.error) return cb(m.error)
     //   cb(null, m.data)
-    // })                  
+    // })
     // child.send(data)
-  })                                         
+  })
 }
 
 //------------------------------------------------------------------------------
@@ -348,10 +355,10 @@ function restart(id, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
-  
-  if (!id || !procs[id]) 
+
+  if (!id || !procs[id])
     return cb('there is no process with id: '+id)
-  
+
   procs[id].restart(cb)
 }
 
@@ -364,10 +371,10 @@ function stop(id, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
-  
-  if (!id || !procs[id]) 
+
+  if (!id || !procs[id])
     return cb('there is no process with id: '+id)
-  
+
   procs[id].stop(cb)
 }
 
@@ -391,7 +398,7 @@ function remote(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
- 
+
   return cb('#TODO')
 }
 
@@ -402,16 +409,16 @@ function remote(opts, cb) {
 function parseStart(opts, cb) {
   var result = {}
   opts = opts || {}
-  //console.log('parseStart',opts)        
+  //console.log('parseStart',opts)
   if (!opts.script) return cb('no script defined')
-  
+
   result.script = null
   result.command = opts.command || 'node'
   result.options = opts.options || []
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
   result.max = opts.max || 10
-  
+
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
   if (path.existsSync(_config.apps+'/'+maybeApp)) {
@@ -421,10 +428,10 @@ function parseStart(opts, cb) {
       result.package = require(appPath+'/package.json')
     } catch(e) {}
   }
-  
+
   // nexus start /some/file
-  //   script = /some/file 
-  // nexus start ./some/file 
+  //   script = /some/file
+  // nexus start ./some/file
   //   script = CWD+'/some/file'
   // nexus start appName/path/to/script
   //   appName is an app
@@ -437,20 +444,20 @@ function parseStart(opts, cb) {
   //         ? fs.stat([0])
   //           ? script = [0], options = [>0]
   //           : command = [0], script = [1], options = [>1]
-  //         : script = _config.apps+'/appName/'+startScript 
+  //         : script = _config.apps+'/appName/'+startScript
   //       : fs.stat(appName+'/server.js') || fs.stat(appName+'/app.js')
   //         ? script = appName+'/server.js' || appName+'/server.js'
   //         : script = appName // this is most likely an error..
   //     : script CWD+'/'+appName // this is most likely an error..
-  
+
   // handle `nexus start /some/file` and `nexus start ./some/file`
-  result.script = 
-    /^\//.test(opts.script) 
-      ? opts.script 
+  result.script =
+    /^\//.test(opts.script)
+      ? opts.script
       : /^\.\//.test(opts.script)
         ? process.cwd()+'/'+opts.script.substring(1)
         : null
-  
+
   // handle `nexus start appName/path/to/script`
   if (!result.script && /\//.test(opts.script)) {
     var maybeApp = opts.script.split('/')[0]
@@ -461,8 +468,8 @@ function parseStart(opts, cb) {
 
   // handle `nexus start appName`
   if (!result.script) {
-    if (result.package 
-        && result.package.scripts 
+    if (result.package
+        && result.package.scripts
         && result.package.scripts.start) {
       //console.log('---- AA')
       var startScript = result.package.scripts.start
@@ -475,7 +482,7 @@ function parseStart(opts, cb) {
           result.script = appPath+'/'+split[0]
           result.options = result.options || split.splice(1)
         }
-        else {                      
+        else {
           //console.log('---- AAAB')
           result.command = split[0]
           result.script = appPath+'/'+split[1]
@@ -495,7 +502,7 @@ function parseStart(opts, cb) {
       else if (appJsExists) result.script = appPath+'/app.js'
       else result.script = appPath
     }
-    else 
+    else
       return cb('invalid script')
   }
 

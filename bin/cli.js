@@ -4,11 +4,8 @@ var nexus = require('../index')
   , _config = nexus.config()
   , opti  = require('optimist')
   , dnode = require('dnode')
-  , execFile = require('child_process').execFile
-  , exec = require('child_process').exec
   , fork = require('child_process').fork
   , spawn = require('child_process').spawn
-  , fs = require('fs')
   , argv  = opti.argv
   , _conn
   , usage =
@@ -37,13 +34,13 @@ var nexus = require('../index')
     , '    help       .. try `nexus help <command>` for more info'
     , ''
     ].join('\n')
-    
+
 var help = {}
 help.version   = 'nexus version .. will print the version of installed nexus'
 help.config    = [ 'nexus config               .. show all config'
                  , 'nexus config <key>         .. show value of config.<key>'
                  , 'nexus config <key> <value> .. set config.<key> to <value>'
-                 ].join('\n') 
+                 ].join('\n')
 help.install   = [ 'nexus install <tarball url> [<package-name>] [<option>]'
                  , 'nexus install <pkg> [<package-name>] [<option>]'
                  , 'nexus install <pkg>@<tag> [<package-name>] [<option>]'
@@ -65,7 +62,7 @@ help.install   = [ 'nexus install <tarball url> [<package-name>] [<option>]'
                  ].join('\n')
 help.uninstall = [ 'TBA (look at code for now)'
                  , ''
-                 , 'note: shortcuts for "uninstall" is "rm"'
+                 , 'note: shortcut for "uninstall" is "rm"'
                  ].join('\n')
 help.rm        = help.uninstall
 help.ls        = 'TBA (look at code for now)'
@@ -79,7 +76,7 @@ help.server    = 'TBA (look at code for now)'
 
 if (!argv._[0]) exit(usage)
 else if (argv._[0] == 'help') {
-  if (!argv._[1] || !help[argv._[1]]) 
+  if (!argv._[1] || !help[argv._[1]])
     return exit(usage)
   exit(help[argv._[1]])
 }
@@ -101,7 +98,7 @@ else if (argv._[0] == 'server') {
     // server.on('ready',function(){process.send({pid:process.pid})})
     // server.on('error',function(err){process.send({error:err})})
   }
-} 
+}
 else {
   var opts = {}
   opts.key  = argv.k
@@ -153,7 +150,7 @@ function parseArgs() {
       break
     case 'install':
       nexus.install( { package : argv._[0]
-                     , name    : argv._[1] 
+                     , name    : argv._[1]
                      , cwd     : process.cwd() }
                    , function(err, data){
         if (err) return exit(err)
@@ -186,8 +183,8 @@ function parseArgs() {
       // console.log('start argv',argv,options,process.argv)
       nexus.start
         ( { script  : argv._[0]
-          , options : options 
-          , env     : {FOO:'BAR'} } 
+          , options : options
+          , env     : {FOO:'BAR'} }
         , function(err,data){
             if (err) return exit(err)
             exit(data)
@@ -213,7 +210,7 @@ function parseArgs() {
         exit(data)
       })
       break
-    default: 
+    default:
       exit('unknown command: '+cmd)
   }
 }
