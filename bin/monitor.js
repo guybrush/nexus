@@ -71,9 +71,7 @@ function monitor(opts, cb) {
   ee2.onAny(function(data){
     var self = this
     _.each(self.subscriptions,function(x,i){
-      if (x.events.indexOf(self.event) != -1) {
-        x.emit && x.emit(self.event,data)
-      }
+      x(self.event,data)
     })
   })
   
@@ -115,12 +113,11 @@ function monitor(opts, cb) {
       this.start = start
       this.restart = restart
       this.stop = stop
-      this.subscribe = function(event, cb) {
-        self.subscriptions[conn.id] = 
-          self.subscriptions[conn.id] || {events:[],emit:null}
-        if (self.subscriptions[conn.id].events.indexOf(event) != -1)
-          self.subscriptions[conn.id].events.push(event)
-        self.subscriptions[conn.id].emit = cb
+      this.subscribe = function(emit, cb) {
+        if (typeof emit !== 'function')
+          cb('first argument must be a function')
+        self.subscriptions[conn.id] = emit
+        cb()
       }
       this.unsubscribe = function(cb) {
         delete self.subscriptions[conn.id]

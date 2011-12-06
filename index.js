@@ -27,35 +27,13 @@ var fs      = require('fs')
   , procs   = {}
   , subscriptions = {}
 
-ee2.onAny(function(data){
-  var self = this
-  console.log(this.event,data)
-  _.each(subscriptions,function(x,i){
-    if (x.events.indexOf(self.event) != -1) {
-      x.emit && x.emit(self.event,data)
-    }
-  })
-})
-  
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
   
 function nexus(opts) {
   function server(remote, conn) {
-    conn.on('remote',function(rem){
-      if (rem.type && rem.type == 'NEXUS_MONITOR') {
-        ee2.emit('monitor::'+conn.id+'::connected')
-        procs[conn.id] = rem
-        rem.subscribe('*',function(event,data){
-          ee2.emit('monitor::'+conn.id+'::'+event,data)
-        })
-        conn.on('end',function(){
-          ee2.emit('monitor::'+conn.id+'::disconnected')
-          delete procs[conn.id]
-        })
-      }
-    })
+    var self = this
     this.version    = version
     this.config     = config
     this.ls         = ls
@@ -67,16 +45,41 @@ function nexus(opts) {
     this.stop       = stop
     this.stopall    = stopall
     this.remote     = remote
-    this.subscribe  = function(event, cb) {
-      subscriptions[conn.id] = subscriptions[conn.id] || {events:[],emit:null}
-      if (subscriptions[conn.id].events.indexOf(event) != -1)
-        subscriptions[conn.id].events.push(event)
-      subscriptions[conn.id].emit = cb
+    this.subscribe  = function(event, emit, cb) {
+      if (!subscriptions[event]) {
+        subscriptions[event] = {}
+        ee2.on(event,function(data){
+          var self = this
+          _.each(subscriptions[event],function(x,i){
+            x(self.event,data)
+          })
+        })
+      }
+      subscriptions[event][conn.id] = emit
+      cb && cb()
     }
     this.unsubscribe = function(cb) {
-      delete subscriptions[conn.id]
-      cb()
+      _.each(subscriptions,function(x,i){
+        delete x[conn.id]
+        if (Object.keys(x).length == 0)
+          ee2.removeListener(x)
+      })
+      cb && cb()
     }
+    conn.on('remote',function(rem){
+      if (rem.type && rem.type == 'NEXUS_MONITOR') {
+        ee2.emit('monitor::'+conn.id+'::connected')
+        procs[conn.id] = rem
+        rem.subscribe(function(event,data){
+          ee2.emit('monitor::'+conn.id+'::'+event,data)
+        })
+        conn.on('end',function(){
+          ee2.emit('monitor::'+conn.id+'::disconnected')
+          delete procs[conn.id]
+        })
+      }
+    })
+    conn.on('end',function(){self.unsubscribe()})
   }
   return server
 }
@@ -288,12 +291,10 @@ function ps(proc, cb) {
     cb = arguments[arguments.length - 1]
   if (typeof arguments[0] === 'string' && procs[arguments[0]] && cb)
     return procs[x].info(cb)
-  console.log('PS',procs)
+  
   var result = {}
   new AA(Object.keys(procs)).map(function(x,i,next){
-    console.log('PS '+x)
     procs[x].info(function(err,data){
-      console.log('PS info '+x,data)
       result[x] = data
       next(err,data)
     })
@@ -323,15 +324,9 @@ function start(opts, cb) {
     var child = spawn( 'node'
                      , [__dirname+'/bin/monitor.js']
                      , {env:process.env} )
-    child.stdout.on('data',function(d){
-      console.log(d+'')
-      cb(null,d+'')})
-    child.stdout.on('data',function(d){
-      console.log(d+'')
-      cb(d+'')})
-    child.on('error',function(e){
-      console.log(d+'')
-      cb(e+'')})
+    child.stdout.on('data',function(d){cb(null,d+'')})
+    child.stdout.on('data',function(d){cb(d+'')})
+    child.on('error',function(e){cb(e+'')})
 
     // #FORKISSUE
     // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
