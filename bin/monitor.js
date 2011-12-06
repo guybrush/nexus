@@ -88,7 +88,7 @@ function monitor(opts, cb) {
   self.command = opts.command
   self.max = opts.max
   self.restartFlag = false
-  self.forceStop = false
+  self.stopFlag = false
   self.env = opts.env
 
   start(function(){
@@ -134,7 +134,7 @@ function monitor(opts, cb) {
     self.child.once('exit',function(code){
       ee2.emit('exit', code)
       self.child = null
-      if ((code != 0) && !self.restartFlag) {
+      if ((code != 0) && !self.stopFlag) {
         self.crashed++
         if (self.crashed < self.max) {
           start()
@@ -156,10 +156,12 @@ function monitor(opts, cb) {
   }
 
   function stop(cb) {
+    self.stopFlag = true
     if (self.child && self.child.pid) {
       var pid = self.child.pid
       var timer = setTimeout(function(){cb('the process is unkillable :D #TODO')},1000)
       self.child.once('exit',function(){
+        self.stopFlag = false
         clearTimeout(timer)
         cb && info(cb)
         if (!self.restartFlag) process.exit(0)
