@@ -310,7 +310,7 @@ function ps(proc, cb) {
     return procs[arguments[0]].info(cb)
 
   var result = {}
-  console.log('PS',procs,cb)
+  
   if (Object.keys(procs).length == 0) 
     return cb(null,result)
   
@@ -320,7 +320,6 @@ function ps(proc, cb) {
       next(err,data)
     })
   }).done(function(err,data){
-    console.log('PS DONE',result,cb)
     cb && cb(err,result)
   }).exec()
 }
@@ -350,8 +349,8 @@ function start(opts, cb) {
     child.stdout.on('data',function(d){cb(d+'')})
     child.on('error',function(e){cb(e+'')})
 
-    child.stdout.on('data',function(d){console.log(d+'')})
-    child.stderr.on('data',function(d){console.log(d+'')})
+    // child.stdout.on('data',function(d){console.log(d+'')})
+    // child.stderr.on('data',function(d){console.log(d+'')})
     
     // #FORKISSUE
     // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
