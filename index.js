@@ -503,14 +503,14 @@ function server(opts, cb) {
   
   if (opts.cmd && opts.cmd == 'stop') {
     if (serverProc) {
-      cb(null,'will try to stop the server, if no error shows up - it worked :D')
+      cb(null,'will try to stop the server, check with `nexus server`')
       return serverProc.stop(cb)
     }
     else return cb('server is not running')
   }
   
   if (opts.cmd && opts.cmd == 'restart') {
-    cb(null,'will try to restart the server, if no error shows up - it worked :D')
+    cb(null,'will try to restart the server, check with `nexus server`')
     return serverProc.restart(cb)
   }
   
