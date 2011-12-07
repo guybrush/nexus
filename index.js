@@ -9,11 +9,13 @@ nexus.ls = ls
 nexus.install = install
 nexus.uninstall = uninstall
 nexus.server = server
+nexus.log = log
 
 var fs      = require('fs')
   , path    = require('path')
   , fork    = require('child_process').fork
   , spawn   = require('child_process').spawn
+  , exec    = require('child_process').exec
   , dnode   = require('dnode')
   , _       = require('underscore')
   , fstream = require('fstream')
@@ -42,6 +44,7 @@ function nexus(configPath) {
     fileConfigPath = configPath
   function dnodeInterface(remote, conn) {
     var self = this
+      , currId = null
     this.version   = version
     this.config    = config
     this.ls        = ls
@@ -52,6 +55,7 @@ function nexus(configPath) {
     this.restart   = restart
     this.stop      = stop
     this.stopall   = stopall
+    this.log       = log
     this.remote    = remote
     this.server    = server
     this.subscribe = function(event, emit, cb) {
@@ -70,7 +74,7 @@ function nexus(configPath) {
     }
     this.unsubscribe = function(cb) {
       _.each(subscriptions,function(x,i){
-        delete x[conn.id]
+        delete x[currId]
         if (Object.keys(x).length == 0) {
           ee2.removeListener(subscriptionListeners[i])
           delete subscriptionListeners[i]
@@ -80,14 +84,15 @@ function nexus(configPath) {
     }
     conn.on('remote',function(rem){
       if (rem.type && rem.type == 'NEXUS_MONITOR') {
-        ee2.emit('monitor::'+conn.id+'::connected')
-        procs[conn.id] = rem
+        currId = rem.id
+        ee2.emit('monitor::'+currId+'::connected')
+        procs[currId] = rem
         rem.subscribe(function(event,data){
-          ee2.emit('monitor::'+conn.id+'::'+event,data)
+          ee2.emit('monitor::'+currId+'::'+event,data)
         })
         conn.on('end',function(){
-          ee2.emit('monitor::'+conn.id+'::disconnected')
-          delete procs[conn.id]
+          ee2.emit('monitor::'+currId+'::disconnected')
+          delete procs[currId]
         })
       }
       if (rem.type && rem.type == 'NEXUS_SERVER_MONITOR') {
@@ -301,15 +306,20 @@ function ps(proc, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   if (typeof arguments[0] === 'string' && procs[arguments[0]] && cb)
-    return procs[x].info(cb)
+    return procs[arguments[0]].info(cb)
 
   var result = {}
+  console.log('PS',procs,cb)
+  if (Object.keys(procs).length == 0) 
+    return cb(null,result)
+  
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].info(function(err,data){
       result[x] = data
       next(err,data)
     })
   }).done(function(err,data){
+    console.log('PS DONE',result,cb)
     cb && cb(err,result)
   }).exec()
 }
@@ -339,8 +349,8 @@ function start(opts, cb) {
     child.stdout.on('data',function(d){cb(d+'')})
     child.on('error',function(e){cb(e+'')})
 
-    // child.stdout.on('data',function(d){console.log(d+'')})
-    // child.stderr.on('data',function(d){console.log(d+'')})
+    child.stdout.on('data',function(d){console.log(d+'')})
+    child.stderr.on('data',function(d){console.log(d+'')})
     
     // #FORKISSUE
     // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
@@ -397,6 +407,36 @@ function stopall(cb) {
 }
 
 //------------------------------------------------------------------------------
+//                                               log
+//------------------------------------------------------------------------------
+
+function log(opts, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  else
+    cb = function(){}
+  
+  opts = opts || {}
+  
+  if (!opts.file) {
+    return fs.readdir(_config.logs,function(err,data){
+      cb(err, data)
+    })
+  }
+  
+  fs.readFile(_config.logs+'/'+opts.file,'utf8',function(err,data){
+    if (err) return cb(err)
+    var lines = data.split('\n')
+    if (!opts.lines)
+      return cb(null, lines.splice(lines.length-20).join('\n'))
+    if (opts.lines >= lines.length)
+      opts.lines = lines.length
+    cb(null, lines.splice(lines.length - opts.lines).join('\n'))
+  })
+}
+
+
+//------------------------------------------------------------------------------
 //                                               remote
 //------------------------------------------------------------------------------
 
@@ -406,6 +446,8 @@ function remote(rem, cb) {
   else
     cb = function(){}
 
+  return cb('#TODO')
+  
   if (typeof rem == 'string' && _config.remotes[rem]) {
     var opts = {}
     opts.key = fs.readFileSync(keyFile)
@@ -428,9 +470,6 @@ function remote(rem, cb) {
   }).on('error',function(err){cb(err)})
     
   return null
-  
-  
-  return cb('#TODO')
 }
 
 //------------------------------------------------------------------------------
@@ -450,7 +489,16 @@ function server(opts, cb) {
   
   if (opts.cmd && opts.cmd == 'start') {
     if (serverProc) return cb('server is already running')
-    return start({script:__dirname+'/bin/server.js'},cb)
+    var startOptions = 
+      { script:__dirname+'/bin/server.js'
+      , command: 'node'
+      , max: 100 
+      , package: _pkg }
+      
+    if (opts.config)
+      startOptions.options = [opts.config]
+
+    return start(startOptions, cb)
   }
   
   if (opts.cmd && opts.cmd == 'stop') {
@@ -498,27 +546,6 @@ function parseStart(opts, cb) {
       result.package = require(appPath+'/package.json')
     } catch(e) {}
   }
-
-  // nexus start /some/file
-  //   script = /some/file
-  // nexus start ./some/file
-  //   script = CWD+'/some/file'
-  // nexus start appName/path/to/script
-  //   appName is an app
-  //     ? script = _config.apps+'/appName/path/to/script'
-  //     : script = CWD+'/appName/path/to/script'
-  // nexus start appName
-  //   appName is an app
-  //     ? look for package.json-startScript
-  //       ? starScript.split(' ')
-  //         ? fs.stat([0])
-  //           ? script = [0], options = [>0]
-  //           : command = [0], script = [1], options = [>1]
-  //         : script = _config.apps+'/appName/'+startScript
-  //       : fs.stat(appName+'/server.js') || fs.stat(appName+'/app.js')
-  //         ? script = appName+'/server.js' || appName+'/server.js'
-  //         : script = appName // this is most likely an error..
-  //     : script CWD+'/'+appName // this is most likely an error..
 
   // handle `nexus start /some/file` and `nexus start ./some/file`
   result.script =
@@ -579,7 +606,6 @@ function parseStart(opts, cb) {
   var split = result.script.split('/')
   split.pop()
   result.cwd = split.join('/')
-  //console.log('parseStart',result)
   cb(null, result)
 }
 

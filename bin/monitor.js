@@ -7,9 +7,12 @@ var nexus = require('../')
   , fork = require('child_process').fork
   , spawn = require('child_process').spawn
   , execFile = require('child_process').execFile
+  , fstream = require('fstream')
   , psTree = require('ps-tree')
+  , uuid = require('node-uuid')
   , EE2 = require('eventemitter2').EventEmitter2
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
+  , fs = require('fs')
   , subscriptions = {}
 
 /****************************************************************************** /
@@ -42,13 +45,15 @@ else {
 }
 /******************************************************************************/
 
+/*****/
+
 if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
   var child = spawn('node',[__filename],{env:process.env})
   child.stdout.on('data',function(d){console.log('monitorP-stdout> '+d)})
   //child.stderr.on('data',function(d){console.log('monitorP-stderr> '+d)})
   console.log({monitorPid:child.pid})
-  // process.exit(0)
+  process.exit(0)
 }
 else {
   var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
@@ -67,6 +72,27 @@ else {
   })
 }
 
+/******* /
+
+var opts = 
+ { command : 'node'
+ , script : '/home/patrick/.nexus/apps/app-error@0.0.0/server.js'
+ , max : 100
+ }
+
+monitor(opts, function(s) {
+  var dnodeMonitor = dnode(s)
+  var opts = { port : _config.port
+             , host : _config.host
+             , reconnect : 500 }
+  dnodeMonitor.connect(opts)
+  dnodeMonitor.on('error',function(err){
+    if (err.code != 'ECONNREFUSED') console.log(err)
+  })
+})
+
+/*****/
+
 ee2.onAny(function(data){
   var self = this
   _.each(subscriptions,function(x,i){
@@ -77,7 +103,7 @@ ee2.onAny(function(data){
 function monitor(opts, cb) {
   
   var self = this
-
+  
   self.crashed = 0
   self.ctime = 0
   self.env = opts.env
@@ -91,26 +117,40 @@ function monitor(opts, cb) {
   self.stopFlag = false
   self.env = opts.env
 
-  start(function(){
-    function server(remote, conn) {
-      if (self.script == __dirname+'/server.js')
-        this.type = 'NEXUS_SERVER_MONITOR'
-      else
-        this.type = 'NEXUS_MONITOR'
-      this.info = info
-      this.start = start
-      this.restart = restart
-      this.stop = stop
-      this.subscribe = function(emit, cb) {
-        subscriptions[conn.id] = emit
-        cb && cb()
+  self.id = null
+  
+  fs.readdir(_config.logs, function(err,data){
+    var currIds = []
+    _.each(data,function(x,i){
+      var split = x.split('.')
+      currIds.push(split[split.length-2])
+    })
+    do {
+      self.id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)
+    } while(currIds.indexOf(self.id) != -1)
+    
+    start(function(){
+      function server(remote, conn) {
+        if (self.script == __dirname+'/server.js')
+          this.type = 'NEXUS_SERVER_MONITOR'
+        else
+          this.type = 'NEXUS_MONITOR'
+        this.info = info
+        this.id = self.id
+        this.start = start
+        this.restart = restart
+        this.stop = stop
+        this.subscribe = function(emit, cb) {
+          subscriptions[conn.id] = emit
+          cb && cb()
+        }
+        this.unsubscribe = function(cb) {
+          delete subscriptions[conn.id]
+          cb && cb()
+        }
       }
-      this.unsubscribe = function(cb) {
-        delete subscriptions[conn.id]
-        cb && cb()
-      }
-    }
-    cb(server)
+      cb(server)
+    })
   })
 
   function start(cb) {
@@ -129,7 +169,22 @@ function monitor(opts, cb) {
     ee2.emit('start', self.child.pid)
     
     self.ctime = Date.now()
-
+    
+    var logFile = opts.script
+    
+    if (logFile == __dirname+'/server.js')
+      logFile = 'nexus_server'
+    else 
+      logFile = logFile.slice(_config.apps.length+1).replace(/[\/\s]/g,'_')
+                       
+    logFile = logFile+'.'+self.id
+    
+    var fsStdout = fstream.Writer({path:_config.logs+'/'+logFile+'.stdout.log',flags:'a'})
+    var fsStderr = fstream.Writer({path:_config.logs+'/'+logFile+'.stderr.log',flags:'a'})
+    
+    self.child.stdout.pipe(fsStdout)
+    self.child.stderr.pipe(fsStderr)
+    
     self.child.stdout.on('data',function(data){
       ee2.emit('stdout', data.toString())
     })
@@ -166,7 +221,9 @@ function monitor(opts, cb) {
     self.stopFlag = true
     if (self.child && self.child.pid) {
       var pid = self.child.pid
-      var timer = setTimeout(function(){cb('the process is unkillable :D #TODO')},1000)
+      var timer = setTimeout(function(){
+        cb('the process is unkillable :D #TODO')
+      },1000)
       self.child.once('exit',function(){
         self.stopFlag = false
         clearTimeout(timer)

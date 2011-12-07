@@ -25,6 +25,7 @@ var nexus = require('../index')
     , '    restart   .. restart a running (or max crashed) program'
     , '    stop      .. stop a running program'
     , '    stopall   .. stop all running programs'
+    , '    log       .. access log-files'
     , '    subscribe .. subscribe to events'
     , '    server    .. start/stop/restart the nexus-server'
     , '    help      .. try `nexus help <command>` for more info'
@@ -50,10 +51,6 @@ help.install   = [ 'nexus install <tarball url> [<package-name>] [<option>]'
                  , ''
                  , 'nexus install <tarball file> [<package-name>] [<option>]'
                  , 'nexus install <folder> [<package-name>] [<option>]'
-                 , ''
-                 , 'options:'
-                 , ''
-                 , '    --package, -p .. set package.json-variables'
                  , ''
                  , 'example:'
                  , ''
@@ -106,12 +103,21 @@ help.start     = [ "nexus start /some/file                                      
 help.restart   = 'nexus restart <id>'
 help.stop      = 'nexus stop <id>'
 help.stopall   = 'nexus stopall .. there are no parameters'
-help.server    = ['nexus server .. (without any options) will print information'
-                 ,'                about the server - if it is running'
-                 ,''
-                 ,'nexus server start [-c <path to configFile>]'
-                 ,'nexus server stop'
-                 ,'nexus server restart'
+help.log       = [ 'nexus log .. list all logfiles'
+                 , 'nexus log <file> [-n <number of lines>] .. -n is 20 per default'
+                 , ''
+                 , 'note: the name of log-files is the path to the script without the'
+                 , '      nexus-apps-root-path appended by ".<id>.[stdout/stderr].log"'
+                 , '      where "/" and "\\s" are replaced with "_"'
+                 ].join('\n')
+help.server    = [ 'nexus server .. (without any options) will print information'
+                 , '                about the server - if it is running'
+                 , ''
+                 , 'nexus server start [-c <path to configFile>]'
+                 , 'nexus server stop'
+                 , 'nexus server restart'
+                 , ''
+                 , 'note: the default-configFile-path is ~/.nexus/config.js'
                  ].join('\n')
 
 if (!argv._[0]) exit(null, usage)
@@ -141,7 +147,7 @@ else {
   })
   client.on('error',function(err){
     if (err.code == 'ECONNREFUSED') {
-      if (['version','config','ls','install','uninstall','server'
+      if (['version','config','ls','install','uninstall','server','log'
           ].indexOf(argv._[0]) != -1) {
         // #TODO check if its the "localhost"-remote
         // no running server required
@@ -198,8 +204,11 @@ function parseArgs() {
     case 'stopall':
       nexus.stopall(exit)
       break
+    case 'log':
+      nexus.log({file:argv._[0],lines:argv.n},exit)
+      break
     case 'server':
-      nexus.server({cmd:argv._[0]}, exit)
+      nexus.server({cmd:argv._[0],config:argv.c}, exit)
       break
     default:
       exit('unknown command: '+cmd)

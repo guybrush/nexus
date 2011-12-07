@@ -6,6 +6,7 @@ var nexus = require('../')
   , dnode = require('dnode')
   , AA = require('async-array')
   , _config = nexus.config()
+  , confFile = process.argv[2]
   , opts = { port : _config.port
            , host : _config.host }
 
@@ -22,5 +23,5 @@ opts.ca = ca
 opts.requestCert = true
 opts.rejectUnauthorized = true
 */
-var server = dnode(nexus()).listen(opts)
+var server = dnode(nexus(confFile)).listen(opts)
   
