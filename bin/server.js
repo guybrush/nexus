@@ -8,16 +8,19 @@ var nexus = require('../')
   , _config = nexus.config()
   , opts = { port : _config.port
            , host : _config.host }
-           
+
+/*           
 var key = fs.readFileSync(_config.key)
 var cert = fs.readFileSync(_config.cert)
 var ca = [cert]
-
+var opts = {}
+opts.port = _config.port
+opts.host = _config.host
 opts.key = key
 opts.cert = cert
 opts.ca = ca
 opts.requestCert = true
 opts.rejectUnauthorized = true
-
+*/
 var server = dnode(nexus()).listen(opts)
   

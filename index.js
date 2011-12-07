@@ -38,7 +38,7 @@ process.title = 'nexus'
 //------------------------------------------------------------------------------
 
 function nexus(configPath) {
-  if (opts && typeof opts == 'string')
+  if (configPath && typeof configPath == 'string')
     fileConfigPath = configPath
   function dnodeInterface(remote, conn) {
     var self = this
