@@ -9,7 +9,7 @@ nexus.ls = ls
 nexus.install = install
 nexus.uninstall = uninstall
 nexus.server = server
-nexus.log = log
+nexus.logs = logs
 
 var fs      = require('fs')
   , path    = require('path')
@@ -55,7 +55,8 @@ function nexus(configPath) {
     this.restart   = restart
     this.stop      = stop
     this.stopall   = stopall
-    this.log       = log
+    this.logs      = logs
+    this.cleanlogs = cleanlogs
     this.remote    = remote
     this.server    = server
     this.subscribe = function(event, emit, cb) {
@@ -407,10 +408,10 @@ function stopall(cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               log
+//                                               logs
 //------------------------------------------------------------------------------
 
-function log(opts, cb) {
+function logs(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
@@ -435,6 +436,26 @@ function log(opts, cb) {
   })
 }
 
+//------------------------------------------------------------------------------
+//                                               cleanlogs
+//------------------------------------------------------------------------------
+
+function cleanlogs(cb) {
+  if (!cb) cb = function() {} 
+  fs.readdir(_config.logs,function(err,data){
+    if (err) return cb(err)
+    var toDel = []
+    _.each(data,function(x,i){
+      var split = x.split('.')
+        , id = split[split.length-3]
+      if (!procs[id] && (serverProc.id != id))
+        toDel.push(x)
+    })
+    new AA(toDel).map(function(x,i,next){
+      fs.unlink(_config.logs+'/'+x,next)
+    }).done(cb).exec()
+  })
+}
 
 //------------------------------------------------------------------------------
 //                                               remote

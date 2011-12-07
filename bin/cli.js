@@ -25,7 +25,8 @@ var nexus = require('../index')
     , '    restart   .. restart a running (or max crashed) program'
     , '    stop      .. stop a running program'
     , '    stopall   .. stop all running programs'
-    , '    log       .. access log-files'
+    , '    logs      .. access log-files'
+    , '    cleanlogs .. remove old log-files (of not-running programs)'
     , '    subscribe .. subscribe to events'
     , '    server    .. start/stop/restart the nexus-server'
     , '    help      .. try `nexus help <command>` for more info'
@@ -103,7 +104,7 @@ help.start     = [ "nexus start /some/file                                      
 help.restart   = 'nexus restart <id>'
 help.stop      = 'nexus stop <id>'
 help.stopall   = 'nexus stopall .. there are no parameters'
-help.log       = [ 'nexus log .. list all logfiles'
+help.logs      = [ 'nexus logs .. list all logfiles'
                  , 'nexus log <file> [-n <number of lines>] .. -n is 20 per default'
                  , ''
                  , 'note: the name of log-files is the path to the script without the'
@@ -147,7 +148,8 @@ else {
   })
   client.on('error',function(err){
     if (err.code == 'ECONNREFUSED') {
-      if (['version','config','ls','install','uninstall','server','log'
+      if (['version','config','ls','install','uninstall'
+          ,'server','logs'
           ].indexOf(argv._[0]) != -1) {
         // #TODO check if its the "localhost"-remote
         // no running server required
@@ -204,8 +206,11 @@ function parseArgs() {
     case 'stopall':
       nexus.stopall(exit)
       break
-    case 'log':
-      nexus.log({file:argv._[0],lines:argv.n},exit)
+    case 'logs':
+      nexus.logs({file:argv._[0],lines:argv.n},exit)
+      break
+    case 'cleanlogs':
+      nexus.cleanlogs(exit)
       break
     case 'server':
       nexus.server({cmd:argv._[0],config:argv.c}, exit)

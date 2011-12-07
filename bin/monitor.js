@@ -123,7 +123,7 @@ function monitor(opts, cb) {
     var currIds = []
     _.each(data,function(x,i){
       var split = x.split('.')
-      currIds.push(split[split.length-2])
+      currIds.push(split[split.length-3])
     })
     do {
       self.id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)
