@@ -217,7 +217,7 @@ function install(opts, cb) {
           if (err) return cb(err) 
           rimraf(_config.tmp+'/node_modules',function(err){
             if (serverProc)
-              ee2.emit('server::'+serverProc.id+'installed',name)
+              ee2.emit('server::'+serverProc.id+'::installed',name)
             cb(err, name)
           })
         })
