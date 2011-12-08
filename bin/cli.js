@@ -14,7 +14,7 @@ var opti = require('optimist')
     , '|   || -_||_\'_|| | ||_ -|'
     , '|_|_||___||_,_||___||___|v'+nexus.version()
     , ''
-    , 'nexus [-r <remote>] [<command> [<options>]]'
+    , 'nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]'
     , ''
     , 'commands:'
     , ''

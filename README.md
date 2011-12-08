@@ -26,7 +26,7 @@
 
 ## cli
 
-    nexus [-r <remote>] [<command> [<options>]]
+    nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
     
     commands:
     
@@ -45,6 +45,9 @@
         subscribe .. subscribe to events
         server    .. start/stop/restart the nexus-server
         help      .. try `nexus help <command>` for more info
+    
+    note: ps, start, restart, stop, stopall, cleanlogs and subscribe
+          only work with a local or remote running nexus-server
 
 ## api
 
