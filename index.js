@@ -60,6 +60,7 @@ function nexus(configPath) {
     this.remote    = remote
     this.server    = server
     this.subscribe = function(event, emit, cb) {
+      if (event == '*' || event == 'all') event = '*::*::*'
       if (!subscriptions[event]) {
         subscriptions[event] = {}
         subscriptionListeners[event] = function(data){
@@ -97,13 +98,13 @@ function nexus(configPath) {
         })
       }
       if (rem.type && rem.type == 'NEXUS_SERVER_MONITOR') {
-        ee2.emit('nexus::server::connected')
+        ee2.emit('server::'+rem.id+'::connected')
         serverProc = rem
         rem.subscribe(function(event,data){
-          ee2.emit('nexus::server::'+event,data)
+          ee2.emit('server::'+rem.id+'::'+event,data)
         })
         conn.on('end',function(){
-          ee2.emit('nexus::server::disconnected')
+          ee2.emit('server::'+rem.id+'::disconnected')
           serverProc = null
         })
       } 
@@ -229,7 +230,7 @@ function install(opts, cb) {
         r.on('error',function(err){cb(err)})
         r.once('end',function(){
           rimraf(res[0][1],function(err){
-            ee2.emit('nexus::installed',name)
+            ee2.emit('server::'+serverProc.id+'installed',name)
             cb(err, name)
           })
         })
@@ -255,7 +256,7 @@ function uninstall(opts, cb) {
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
     rimraf(_config.apps+'/'+opts,function(){
-      ee2.emit('nexus::uninstalled',name)
+      ee2.emit('server::'+serverProc.id+'::uninstalled',name)
       cb()
     })
   })
@@ -293,6 +294,7 @@ function ls(package, cb) {
         }
         next()
       }).done(function(err,data){
+        if (err) return error(err,cb)
         cb && cb(err,result)
       }).exec()
     })
@@ -320,6 +322,7 @@ function ps(proc, cb) {
       next(err,data)
     })
   }).done(function(err,data){
+    if (err) return error(err,cb)
     cb && cb(err,result)
   }).exec()
 }
@@ -420,12 +423,13 @@ function logs(opts, cb) {
   
   if (!opts.file) {
     return fs.readdir(_config.logs,function(err,data){
+      if (err) return error(err,cb)
       cb(err, data)
     })
   }
   
   fs.readFile(_config.logs+'/'+opts.file,'utf8',function(err,data){
-    if (err) return cb(err)
+    if (err) return error(err,cb)
     var lines = data.split('\n')
     if (!opts.lines)
       return cb(null, lines.splice(lines.length-20).join('\n'))
@@ -442,7 +446,7 @@ function logs(opts, cb) {
 function cleanlogs(cb) {
   if (!cb) cb = function() {} 
   fs.readdir(_config.logs,function(err,data){
-    if (err) return cb(err)
+    if (err) return error(err,cb)
     var toDel = []
     _.each(data,function(x,i){
       var split = x.split('.')
@@ -452,7 +456,11 @@ function cleanlogs(cb) {
     })
     new AA(toDel).map(function(x,i,next){
       fs.unlink(_config.logs+'/'+x,next)
-    }).done(cb).exec()
+    }).done(function(err,data){
+      if (err) return error(err,cb)
+      ee2.emit('server::'+serverProc.id+'::cleanedlogs',data)
+      cb(null, data.length)
+    }).exec()
   })
 }
 
@@ -627,5 +635,11 @@ function parseStart(opts, cb) {
   split.pop()
   result.cwd = split.join('/')
   cb(null, result)
+}
+
+function error(err,cb) {
+  console.log('error:',err)
+  ee2.emit('server::'+serverProc.id+'::error',err)
+  cb(err)
 }
 

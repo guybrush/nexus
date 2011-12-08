@@ -69,15 +69,19 @@ help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , ''
                  , 'examples:'
                  , ''
-                 , 'nexus subscribe *                      .. subscribe to all events'
+                 , 'nexus subscribe "*"                    .. subscribe to all events'
+                 , 'nexus subscribe all                    .. subscribe to all events'
                  , 'nexus subscribe monitor::<id>::*       .. only events from that monitor'
                  , 'nexus subscribe monitor::<id>::stdout  .. '
                  , 'nexus subscribe monitor::<id>::stderr  .. '
                  , 'nexus subscribe monitor::<id>::start   .. the program has been restarted'
                  , 'nexus subscribe monitor::<id>::exit    .. '
                  , 'nexus subscribe monitor::*::exit       .. '
-                 , 'nexus subscribe nexus::installed       .. when packages get installed'
-                 , 'nexus subscribe nexus::error           .. listen for nexus errors'
+                 , 'nexus subscribe server::*::installed   .. when packages get installed'
+                 , 'nexus subscribe server::*::error       .. listen for nexus errors'
+                 , ''
+                 , 'note: in bash you may want to wrap the event with "",' 
+                 , '      since "*" is a wildcard in bash too..'
                  ].join('\n')
 help.ps        = 'nexus ps [<id>]'
 help.start     = [ "nexus start /some/file                                             "
@@ -129,8 +133,9 @@ else if (argv._[0] == 'help') {
 }
 else {
   var opts = {}
-  opts.key  = argv.k
-  opts.cert = argv.c
+  if (argv.r && _config.remotes[argv.r]) {
+    opts = _config.remotes[argv.r]
+  }
   opts.host = argv.h || _config.host
   opts.port = argv.p || _config.port
 
@@ -145,6 +150,7 @@ else {
       parseArgs()
     })
     parseArgs()
+    conn.on('end',function(){exit('disconnected from server')})
   })
   client.on('error',function(err){
     if (err.code == 'ECONNREFUSED') {
@@ -214,6 +220,12 @@ function parseArgs() {
       break
     case 'server':
       nexus.server({cmd:argv._[0],config:argv.c}, exit)
+      break
+    case 'subscribe':
+      var emit = function(event,data) {
+        console.log(event,'→',data)
+      }
+      nexus.subscribe(argv._[0],emit)
       break
     default:
       exit('unknown command: '+cmd)
