@@ -348,12 +348,13 @@ function start(opts, cb) {
     if (err) return cb(err)
 
     process.env.NEXUS_MONITOR_DATA = JSON.stringify(data)
+    process.env.NEXUS_CONFIG = JSON.stringify(config())
 
     var child = spawn( 'node'
                      , [__dirname+'/bin/monitor.js']
                      , {env:process.env} )
     child.stdout.on('data',function(d){cb(null,d+'')})
-    child.stdout.on('data',function(d){cb(d+'')})
+    child.stderr.on('data',function(d){cb(d+'')})
     child.on('error',function(e){cb(e+'')})
 
     // child.stdout.on('data',function(d){console.log(d+'')})
@@ -512,7 +513,7 @@ function server(opts, cb) {
   else
     cb = function(){}
   
-  if (arguments.length != 2)
+  if (arguments.length == 1 && serverProc)
     serverProc.info(cb)
   
   opts = opts || {}
@@ -523,10 +524,9 @@ function server(opts, cb) {
       { script: __dirname+'/bin/server.js'
       , command: 'node'
       , max: 100 
-      , package: _pkg }
-      
-    if (opts.config)
-      startOptions.options = [opts.config]
+      , package: _pkg 
+      , env: {NEXUS_CONFIG:JSON.stringify(config())}
+      }
 
     return start(startOptions, cb)
   }

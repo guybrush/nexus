@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var nexus = require('../')
-  , _config = nexus.config()
+  , _config
   , dnode = require('dnode')
   , _ = require('underscore')
   , fork = require('child_process').fork
@@ -56,8 +56,10 @@ if (!process.env.NEXUS_MONITOR) {
 }
 else {
   var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
+  _config = JSON.parse(process.env.NEXUS_CONFIG)
   delete process.env.NEXUS_MONITOR
   delete process.env.NEXUS_MONITOR_DATA
+  delete process.env.NEXUS_CONFIG
   process.title = 'nexus-monitor'
   monitor(opts, function(s) {
     var dnodeMonitor = dnode(s)

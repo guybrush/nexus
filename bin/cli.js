@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
-var nexus = require('../index')
+var opti = require('optimist')
+  , argv  = opti.argv
+  , confFile = Array.isArray(argv.c) ? argv.c[0] : argv.c
+  , nexus = require('../index')(confFile)
   , _config = nexus.config()
-  , opti  = require('optimist')
+  , opti = require('optimist')
   , dnode = require('dnode')
   , fs = require('fs')
-  , argv  = opti.argv
   , _conn
   , usage =
     [ ' ___  ___  _ _  _ _  ___'
@@ -241,7 +243,7 @@ function parseArgs() {
       nexus.cleanlogs(function(err,data){exit(err,'deleted '+data+' logfiles')})
       break
     case 'server':
-      nexus.server({cmd:argv._[0],config:argv.c}, exit)
+      nexus.server({cmd:argv._[0]}, exit)
       break
     case 'subscribe':
       var emit = function(event, data) {

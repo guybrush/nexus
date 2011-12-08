@@ -5,12 +5,11 @@ process.title = 'nexus-server'
 var fs = require('fs')
   , dnode = require('dnode')
   , AA = require('async-array')
-  , confFile = process.argv[2]
+  , _config = JSON.parse(process.env.NEXUS_CONFIG)
   , nexus = require('../')
-  , _config = nexus(confFile).config()
   , opts = { port : _config.port
            , host : _config.host }
-
+           
 if (_config.key) {
   try {
     console.log('using key',_config.key)
@@ -43,8 +42,8 @@ fs.readdir(_config.ca,function(err,data){
 })
 
 function start() {
-  console.log('starting server',opts)
-  var server = dnode(nexus(confFile)).listen(opts)
+  console.log('starting server',opts,_config)
+  var server = dnode(nexus(_config)).listen(opts)
   server.on('error',function(err){console.log(err)})
   server.on('ready',function(){
     console.log('started server')
