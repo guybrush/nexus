@@ -1,5 +1,5 @@
 { "name" : "nexus"
-, "version" : "0.0.0"
+, "version" : "0.0.1"
 , "description" : "remote program installation and control"
 , "repository" :
   { "type" : "git"
@@ -12,6 +12,7 @@
   , "fstream"       : "0.1.6"
   , "dnode"         : "https://github.com/guybrush/dnode/tree/handlingRefused"
   , "eventemitter2" : "0.4.1"
+  , "mkdirp"        : "0.2.1"
   , "ncp"           : "0.2.3"
   , "npm"           : "1.0.106"
   , "optimist"      : "0.2.8"
