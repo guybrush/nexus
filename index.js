@@ -462,30 +462,24 @@ function remote(rem, cb) {
   else
     cb = function(){}
 
-  return cb('#TODO')
+  if (!_config.remotes[rem]) 
+    return cb('dont know about the remote "'+rem+'"')
   
-  if (typeof rem == 'string' && _config.remotes[rem]) {
-    var opts = {}
-    opts.key = fs.readFileSync(keyFile)
-  }
-  
-  var opt = opt || {}
-    , remote = (opt.remote && config.remotes[opt.remote]) 
-               ? config.remotes[opt.remote] : false
-    , port = opt.port || (remote && remote.port) ? remote.port : config.defaults.tlsPort                  
-    , host = opt.host || (remote && remote.host) ? remote.host : 'localhost'
-    , keyFile  = opt.key  || config.defaults.key
-    , certFile = opt.cert || config.defaults.cert
-    , key = fs.readFileSync(keyFile)
-    , cert = fs.readFileSync(certFile)                                            
-    , options = {key:key,cert:cert}
+  var opts = {}  
+  opts.host = _config.remotes[rem].host
+  opts.port = _config.remotes[rem].port
+  try {
+    if (_config.remotes[rem].key)
+      opts.key = fs.readFileSync(_config.remotes[rem].key)
+    if (_config.remotes[argv.r].cert)
+      opts.cert = fs.readFileSync(_config.remotes[rem].cert)
+  } catch(e) { return cb(e) }
 
-  console.log('connecting to '+host+':'+port)
-  dnode.connect(host, port, options, function(remote,con) { 
-    cb(null,remote)
-  }).on('error',function(err){cb(err)})
-    
-  return null
+  var client = dnode({type:'NEXUS_REMOTE'})
+  client.connect(opts, function(remote, conn) {
+    cb(null, remote)
+  })
+  client.on('error',function(err){cb(err)})
 }
 
 //------------------------------------------------------------------------------
