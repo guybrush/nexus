@@ -26,12 +26,11 @@ var fs      = require('fs')
   , mkdirp  = require('mkdirp')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
-  , _config = config()
   , procs   = {}
   , serverProc = null
   , subscriptions = {}
   , subscriptionListeners = {}
-  , fileConfigPath = null
+  , userConfig = null
   
 process.title = 'nexus'
   
@@ -39,9 +38,8 @@ process.title = 'nexus'
 //                                               constructor
 //------------------------------------------------------------------------------
 
-function nexus(configPath) {
-  if (configPath && typeof configPath == 'string')
-    fileConfigPath = configPath
+function nexus(configParam) {
+  userConfig = configParam
   function dnodeInterface(remote, conn) {
     var self = this
       , currId = null
@@ -111,6 +109,13 @@ function nexus(configPath) {
     })
     conn.on('end',function(){self.unsubscribe()})
   }
+  dnodeInterface.version = version
+  dnodeInterface.config = config
+  dnodeInterface.ls = ls
+  dnodeInterface.install = install
+  dnodeInterface.uninstall = uninstall
+  dnodeInterface.server = server
+  dnodeInterface.logs = logs
   return dnodeInterface
 }
 
@@ -130,27 +135,32 @@ function config(key, value, cb) {
 
   if (key && value && !cb) cb = value
   if (key && !value && !cb) cb = key
+  
   var currConfig = {}
     , fileConfig = {}
     , home = ( process.platform === "win32" // HAHA!
              ? process.env.USERPROFILE
              : process.env.HOME )
+    , configPath = home+'/.nexus/config.js'
 
-  fileConfigPath = fileConfigPath || home+'/.nexus/config.js'
+  if (userConfig && _.isString(userConfig))
+    configPath = userConfig
+  if (userConfig && _.isObject(userConfig))
+    currConfig = userConfig
 
-  try { fileConfig = require(fileConfigPath) }
-  catch (e) {} // no config.json, so we use hardcoded defaults
+  try { fileConfig = require(configPath) }
+  catch (e) {} // no config-file, so we use currConfig or hardcoded defaults
 
-  currConfig.prefix  = fileConfig.prefix  || home+'/.nexus'
-  currConfig.key     = fileConfig.key     || null
-  currConfig.cert    = fileConfig.cert    || null
-  currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
-  currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
-  currConfig.ca      = fileConfig.ca      || currConfig.prefix+'/ca'
-  currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
-  currConfig.host    = fileConfig.host    || '0.0.0.0'
-  currConfig.port    = fileConfig.port    || 0xf00
-  currConfig.remotes = fileConfig.remotes || {}
+  currConfig.prefix  = currConfig.prefix  || fileConfig.prefix  || home+'/.nexus'
+  currConfig.key     = currConfig.key     || fileConfig.key     || null
+  currConfig.cert    = currConfig.cert    || fileConfig.cert    || null
+  currConfig.tmp     = currConfig.tmp     || fileConfig.tmp     || currConfig.prefix+'/tmp'
+  currConfig.apps    = currConfig.apps    || fileConfig.apps    || currConfig.prefix+'/apps'
+  currConfig.ca      = currConfig.ca      || fileConfig.ca      || currConfig.prefix+'/ca'
+  currConfig.logs    = currConfig.logs    || fileConfig.logs    || currConfig.prefix+'/logs'
+  currConfig.host    = currConfig.host    || fileConfig.host    || '0.0.0.0'
+  currConfig.port    = currConfig.port    || fileConfig.port    || 0xf00
+  currConfig.remotes = currConfig.remotes || fileConfig.remotes || {}
 
   new AA( [ currConfig.ca
           , currConfig.logs
@@ -198,7 +208,9 @@ function install(opts, cb) {
       return cb(err)
     installPackage()
   })
-
+  
+  var _config = config()
+  
   function installPackage() {  
     npm.load({loglevel:'silent',exit:false}, function(err){
       if (err) return cb(err)
@@ -239,6 +251,7 @@ function uninstall(opts, cb) {
   else
     return cb('not sure how to handle the parameter')
 
+  var _config = config()
   var path = _config.apps+'/'+opts
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
@@ -258,6 +271,7 @@ function ls(package, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
 
+  var _config = config()
   if (arguments[0] && typeof arguments[0] === 'string') {
     package = arguments[0]
     path.exists(_config.apps+'/'+package+'/package.json',function(err){
@@ -409,6 +423,8 @@ function logs(opts, cb) {
   
   opts = opts || {}
   
+  var _config = config()
+  
   if (!opts.file) {
     return fs.readdir(_config.logs,function(err,data){
       if (err) return error(err,cb)
@@ -433,6 +449,7 @@ function logs(opts, cb) {
 
 function cleanlogs(cb) {
   if (!cb) cb = function() {} 
+  var _config = config()
   fs.readdir(_config.logs,function(err,data){
     if (err) return error(err,cb)
     var toDel = []
@@ -465,6 +482,7 @@ function remote(rem, cb) {
   if (!_config.remotes[rem]) 
     return cb('dont know about the remote "'+rem+'"')
   
+  var _config = config()
   var opts = {}  
   opts.host = _config.remotes[rem].host
   opts.port = _config.remotes[rem].port
@@ -547,6 +565,7 @@ function parseStart(opts, cb) {
   result.cwd = opts.cwd || process.cwd()
   result.max = opts.max || 100
 
+  var _config = config()
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
   if (path.existsSync(_config.apps+'/'+maybeApp)) {

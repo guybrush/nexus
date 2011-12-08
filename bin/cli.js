@@ -32,15 +32,18 @@ var nexus = require('../index')
     , '    server    .. start/stop/restart the nexus-server'
     , '    help      .. try `nexus help <command>` for more info'
     , ''
+    , 'note: ps, start, restart, stop, stopall, cleanlogs and subscribe'
+    , '      only work with a local or remote running nexus-server'
+    , ''
     ].join('\n')
 
 var help = {}
 help.version   = 'nexus version .. will print the version of installed nexus'
-help.config    = [ 'nexus config               .. show all config'
+help.config    = [ 'nexus config .. show all config'
                  , ''
                  , 'not implemented yet .. :'
                  , ''
-                 , 'nexus config <key>         .. show value of config.<key>'
+                 , 'nexus config <key> .. show value of config.<key>'
                  , 'nexus config <key> <value> .. set config.<key> to <value>'
                  ].join('\n')
 help.install   = [ 'nexus install <tarball url> [<package-name>] [<option>]'
@@ -70,16 +73,19 @@ help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , ''
                  , 'examples:'
                  , ''
-                 , 'nexus subscribe "*"                    .. subscribe to all events'
-                 , 'nexus subscribe all                    .. subscribe to all events'
-                 , 'nexus subscribe monitor::<id>::*       .. only events from that monitor'
-                 , 'nexus subscribe monitor::<id>::stdout  .. '
-                 , 'nexus subscribe monitor::<id>::stderr  .. '
-                 , 'nexus subscribe monitor::<id>::start   .. the program has been restarted'
-                 , 'nexus subscribe monitor::<id>::exit    .. '
-                 , 'nexus subscribe monitor::*::exit       .. '
-                 , 'nexus subscribe server::*::installed   .. when packages get installed'
-                 , 'nexus subscribe server::*::error       .. listen for nexus errors'
+                 , 'nexus subscribe "*"                   .. subscribe to all events'
+                 , 'nexus subscribe all                   .. subscribe to all events'
+                 , 'nexus subscribe "*::*::*"             .. subscribe to all events'
+                 , 'nexus subscribe monitor::<id>::*      .. only events from that monitor'
+                 , 'nexus subscribe monitor::<id>::stdout .. listen for a programm stdout'
+                 , 'nexus subscribe monitor::<id>::stderr .. listen for a programm stderr'
+                 , 'nexus subscribe monitor::<id>::start  .. the program has been restarted'
+                 , 'nexus subscribe monitor::<id>::exit   .. a program exited'
+                 , 'nexus subscribe monitor::*::connected .. a program has been started and'
+                 , '                                         the monitor-server has connected'
+                 , 'nexus subscribe monitor::*::exit      .. a program has exited'
+                 , 'nexus subscribe server::*::installed  .. when packages get installed'
+                 , 'nexus subscribe server::*::error      .. listen for nexus-server errors'
                  , ''
                  , 'note: in bash you may want to wrap the event with "",' 
                  , '      since "*" is a wildcard in bash too..'
@@ -106,9 +112,11 @@ help.start     = [ "nexus start /some/file                                      
                  , "        : script = appName // this is most likely an error..       "
                  , "    : script CWD+'/'+appName // this is most likely an error..     "
                  ].join('\n')
-help.restart   = 'nexus restart <id>'
-help.stop      = 'nexus stop <id>'
-help.stopall   = 'nexus stopall .. there are no parameters'
+help.restart   = 'nexus restart <id> .. restarts the program (not the monitor)'
+help.stop      = 'nexus stop <id> .. stops the program (and the monitor)'
+help.stopall   = ['nexus stopall .. there are no parameters, stops all programs'
+                 ,'                 and their monitors'
+                 ].join('\n')
 help.logs      = [ 'nexus logs .. list all logfiles'
                  , 'nexus log <file> [-n <number of lines>] .. -n is 20 per default'
                  , ''
@@ -137,17 +145,25 @@ else {
   if (argv.r && _config.remotes[argv.r]) {
     opts.host = _config.remotes[argv.r].host
     opts.port = _config.remotes[argv.r].port
-    if (_config.remotes[argv.r].key)
-      opts.key = fs.readFileSync(_config.remotes[argv.r].key)
-    if (_config.remotes[argv.r].cert)
-      opts.cert = fs.readFileSync(_config.remotes[argv.r].cert)
+    try {
+      if (_config.remotes[argv.r].key)
+        opts.key = fs.readFileSync(_config.remotes[argv.r].key)
+    } catch(e) { exit('can not read key-file: '+_config.remotes[argv.r].key) }
+    try {
+      if (_config.remotes[argv.r].cert)
+        opts.cert = fs.readFileSync(_config.remotes[argv.r].cert)
+    } catch(e) { exit('can not read cert-file: '+_config.remotes[argv.r].cert) }
   } else {
     opts.host = _config.host
     opts.port = _config.port
-    if (_config.key)
-      opts.key = fs.readFileSync(_config.key)
-    if (_config.cert)
-      opts.cert = fs.readFileSync(_config.cert)
+    try {
+      if (_config.key)
+        opts.key = fs.readFileSync(_config.key)
+    } catch(e) { exit('can not read key-file: '+_config.key) }
+    try {
+      if (_config.cert)
+        opts.cert = fs.readFileSync(_config.cert)
+    } catch(e) { exit('can not read cert-file: '+_config.cert) }
   }
   var client = dnode({type:'NEXUS_CLI'})
   client.connect(opts, function(remote, conn){
@@ -199,15 +215,14 @@ function parseArgs() {
       nexus.uninstall(argv._[0], exit)
       break
     case 'ps':
-      if (argv._[0]) nexus.ps(argv._[0],exit)
+      if (argv._[0]) nexus.ps(argv._[0], exit)
       else nexus.ps(exit)
       break
     case 'start':
       var options = process.argv.splice(process.argv.indexOf(argv._[0])+1)
       nexus.start
         ( { script  : argv._[0]
-          , options : options
-          , env     : {FOO:'BAR'} }
+          , options : options }
         , exit )
       break
     case 'restart':
@@ -220,7 +235,7 @@ function parseArgs() {
       nexus.stopall(exit)
       break
     case 'logs':
-      nexus.logs({file:argv._[0],lines:argv.n},exit)
+      nexus.logs({file:argv._[0],lines:argv.n}, exit)
       break
     case 'cleanlogs':
       nexus.cleanlogs(exit)
@@ -229,10 +244,10 @@ function parseArgs() {
       nexus.server({cmd:argv._[0],config:argv.c}, exit)
       break
     case 'subscribe':
-      var emit = function(event,data) {
+      var emit = function(event, data) {
         console.log(event,'→',data)
       }
-      nexus.subscribe(argv._[0],emit)
+      nexus.subscribe(argv._[0], emit)
       break
     default:
       exit('unknown command: '+cmd)
