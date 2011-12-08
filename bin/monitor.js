@@ -65,6 +65,12 @@ else {
     var opts = { port : _config.port
                , host : _config.host
                , reconnect : 500 }
+    try {
+      if (_config.key)
+        opts.key = fs.readFileSync(_config.key)
+      if (_config.cert)
+        opts.cert = fs.readFileSync(_config.cert)
+    } catch(e) {}
     dnodeMonitor.connect(opts)
     dnodeMonitor.on('error',function(err){
       if (err.code != 'ECONNREFUSED') console.log(err)

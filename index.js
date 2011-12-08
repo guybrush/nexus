@@ -16,6 +16,7 @@ var fs      = require('fs')
   , fork    = require('child_process').fork
   , spawn   = require('child_process').spawn
   , exec    = require('child_process').exec
+  , execFile = require('child_process').execFile
   , dnode   = require('dnode')
   , _       = require('underscore')
   , fstream = require('fstream')
@@ -25,6 +26,7 @@ var fs      = require('fs')
   , rimraf  = require('rimraf')
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
+  , ncp     = require('ncp')
   , _pkg    = require('./package.json')
   , _config = config()
   , procs   = {}
@@ -142,28 +144,24 @@ function config(key, value, cb) {
   catch (e) {} // no config.json, so we use hardcoded defaults
 
   currConfig.prefix  = fileConfig.prefix  || home+'/.nexus'
-  currConfig.key     = fileConfig.key     || currConfig.prefix+'/nexus.key'
-  currConfig.cert    = fileConfig.cert    || currConfig.prefix+'/nexus.cert'
+  currConfig.key     = fileConfig.key     || null
+  currConfig.cert    = fileConfig.cert    || null
   currConfig.tmp     = fileConfig.tmp     || currConfig.prefix+'/tmp'
   currConfig.apps    = fileConfig.apps    || currConfig.prefix+'/apps'
-  currConfig.keys    = fileConfig.keys    || currConfig.prefix+'/keys'
+  currConfig.ca      = fileConfig.ca      || currConfig.prefix+'/ca'
   currConfig.logs    = fileConfig.logs    || currConfig.prefix+'/logs'
   currConfig.host    = fileConfig.host    || '0.0.0.0'
   currConfig.port    = fileConfig.port    || 0xf00
   currConfig.remotes = fileConfig.remotes || {}
 
-  new AA( [ currConfig.keys
+  new AA( [ currConfig.ca
           , currConfig.logs
           , currConfig.apps
           , currConfig.tmp
           ] ).map(function(x, i, next){
-    fs.lstat(x, function(err){
-      if (!err) return next()
-      mkdirp(x,0755,function(err){next(err)})
-      // var w = fstream.Writer({path:x,type:'Directory'})
-      // // w.on('error',function(err){next(err)})
-      // w.once('end',function(){next()})
-      // w.end()
+    path.exists(x, function(exists){
+      if (!exists) mkdirp(x,0755,function(err){next(err)})
+      else next()
     })
   }).done(function(err, data){
     cb && cb(err, currConfig)
@@ -184,8 +182,8 @@ function install(opts, cb) {
 
   opts = opts || {}
   if (!opts.package) return cb('no package given to install')
-
-  if (!(/:\/\//.test(opts.package)))
+  
+  if (!(/:\/\//.test(opts.package)))             
     return installPackage()
   // this code sucks in general ..
   // but ye .. without this, npm will throw on non-valid domains
@@ -203,16 +201,12 @@ function install(opts, cb) {
     installPackage()
   })
 
-  function installPackage() {
-    npm.load( { prefix:_config.tmp
-              , global:true
-              , loglevel:'silent'
-              , exit:false }
-            , function(err){
+  function installPackage() {  
+    npm.load({loglevel:'silent',exit:false}, function(err){
       if (err) return cb(err)
-      npm.commands.install(opts.package, function(err, res) {
-        if (err) return cb(err)
-        var name = opts.name || res[0][0]
+      npm.commands.install(_config.tmp, opts.package, function(err, res) {
+        var name = opts.name || res[res.length-1][0]
+        var tmpPath = res[res.length-1][1]
         if (path.existsSync(_config.apps+'/'+name)) {
           var found = false, i = 0
           while (!found) {
@@ -221,16 +215,11 @@ function install(opts, cb) {
           }
           name = name+'_'+i
         }
-
-        var r = fstream.Reader( res[0][1] )
-          , w = fstream.Writer( { path:_config.apps+'/'+name
-                                , mode: 0755
-                                , type:'Directory' } )
-        r.pipe(w)
-        r.on('error',function(err){cb(err)})
-        r.once('end',function(){
-          rimraf(res[0][1],function(err){
-            ee2.emit('server::'+serverProc.id+'installed',name)
+        ncp.ncp(tmpPath,_config.apps+'/'+name,function(err){
+          if (err) return cb(err) 
+          rimraf(_config.tmp+'/node_modules',function(err){
+            if (serverProc)
+              ee2.emit('server::'+serverProc.id+'installed',name)
             cb(err, name)
           })
         })
@@ -256,8 +245,9 @@ function uninstall(opts, cb) {
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
     rimraf(_config.apps+'/'+opts,function(){
-      ee2.emit('server::'+serverProc.id+'::uninstalled',name)
-      cb()
+      if (serverProc)
+        ee2.emit('server::'+serverProc.id+'::uninstalled',name)
+      cb(null,'uninstalled '+opts)
     })
   })
 }
@@ -518,7 +508,7 @@ function server(opts, cb) {
   if (opts.cmd && opts.cmd == 'start') {
     if (serverProc) return cb('server is already running')
     var startOptions = 
-      { script:__dirname+'/bin/server.js'
+      { script: __dirname+'/bin/server.js'
       , command: 'node'
       , max: 100 
       , package: _pkg }
@@ -534,7 +524,7 @@ function server(opts, cb) {
       cb(null,'will try to stop the server, check with `nexus server`')
       return serverProc.stop(cb)
     }
-    else return cb('server is not running')
+    else return cb('cant stop, server is not running')
   }
   
   if (opts.cmd && opts.cmd == 'restart') {
@@ -639,7 +629,8 @@ function parseStart(opts, cb) {
 
 function error(err,cb) {
   console.log('error:',err)
-  ee2.emit('server::'+serverProc.id+'::error',err)
+  if (serverProc)
+    ee2.emit('server::'+serverProc.id+'::error',err)
   cb(err)
 }
 

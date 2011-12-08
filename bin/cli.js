@@ -4,6 +4,7 @@ var nexus = require('../index')
   , _config = nexus.config()
   , opti  = require('optimist')
   , dnode = require('dnode')
+  , fs = require('fs')
   , argv  = opti.argv
   , _conn
   , usage =
@@ -134,11 +135,20 @@ else if (argv._[0] == 'help') {
 else {
   var opts = {}
   if (argv.r && _config.remotes[argv.r]) {
-    opts = _config.remotes[argv.r]
+    opts.host = _config.remotes[argv.r].host
+    opts.port = _config.remotes[argv.r].port
+    if (_config.remotes[argv.r].key)
+      opts.key = fs.readFileSync(_config.remotes[argv.r].key)
+    if (_config.remotes[argv.r].cert)
+      opts.cert = fs.readFileSync(_config.remotes[argv.r].cert)
+  } else {
+    opts.host = _config.host
+    opts.port = _config.port
+    if (_config.key)
+      opts.key = fs.readFileSync(_config.key)
+    if (_config.cert)
+      opts.cert = fs.readFileSync(_config.cert)
   }
-  opts.host = argv.h || _config.host
-  opts.port = argv.p || _config.port
-
   var client = dnode({type:'NEXUS_CLI'})
   client.connect(opts, function(remote, conn){
     _conn = conn
@@ -153,15 +163,14 @@ else {
     conn.on('end',function(){exit('disconnected from server')})
   })
   client.on('error',function(err){
-    if (err.code == 'ECONNREFUSED') {
+    if (err.code == 'ECONNREFUSED' && !argv.r) {
       if (['version','config','ls','install','uninstall'
           ,'server','logs'
           ].indexOf(argv._[0]) != -1) {
-        // #TODO check if its the "localhost"-remote
         // no running server required
         parseArgs()
       }
-      else return exit('server is not running')
+      else return exit('server is not running, can not connect')
     }
     else exit(err)
   })
@@ -190,7 +199,8 @@ function parseArgs() {
       nexus.uninstall(argv._[0], exit)
       break
     case 'ps':
-      nexus.ps(exit)
+      if (argv._[0]) nexus.ps(argv._[0],exit)
+      else nexus.ps(exit)
       break
     case 'start':
       // #TODO check for nexus-start-options besides scripts-options
