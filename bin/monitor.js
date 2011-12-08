@@ -9,7 +9,6 @@ var nexus = require('../')
   , execFile = require('child_process').execFile
   , fstream = require('fstream')
   , psTree = require('ps-tree')
-  , uuid = require('node-uuid')
   , EE2 = require('eventemitter2').EventEmitter2
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
   , fs = require('fs')

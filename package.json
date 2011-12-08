@@ -12,7 +12,7 @@
   , "fstream"       : "0.1.6"
   , "dnode"         : "https://github.com/guybrush/dnode/tree/handlingRefused"
   , "eventemitter2" : "0.4.1"
-  , "node-uuid"     : "1.2.0"
+  , "ncp"           : "0.2.3"
   , "npm"           : "1.0.106"
   , "optimist"      : "0.2.8"
   , "ps-tree"       : "0.0.2"
