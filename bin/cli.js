@@ -203,10 +203,7 @@ function parseArgs() {
       else nexus.ps(exit)
       break
     case 'start':
-      // #TODO check for nexus-start-options besides scripts-options
-      var options = argv._.splice(process.argv.indexOf(argv._[0]))
-      var options = []
-      // console.log('start argv',argv,options,process.argv)
+      var options = process.argv.splice(process.argv.indexOf(argv._[0])+1)
       nexus.start
         ( { script  : argv._[0]
           , options : options
