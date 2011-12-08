@@ -238,7 +238,7 @@ function parseArgs() {
       nexus.logs({file:argv._[0],lines:argv.n}, exit)
       break
     case 'cleanlogs':
-      nexus.cleanlogs(exit)
+      nexus.cleanlogs(function(err,data){exit(err,'deleted '+data+' logfiles')})
       break
     case 'server':
       nexus.server({cmd:argv._[0],config:argv.c}, exit)

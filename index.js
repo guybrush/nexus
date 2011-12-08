@@ -147,7 +147,7 @@ function config(key, value, cb) {
     configPath = userConfig
   if (userConfig && _.isObject(userConfig))
     currConfig = userConfig
-
+  
   try { fileConfig = require(configPath) }
   catch (e) {} // no config-file, so we use currConfig or hardcoded defaults
 
@@ -174,7 +174,7 @@ function config(key, value, cb) {
   }).done(function(err, data){
     cb && cb(err, currConfig)
   }).exec()
-
+  
   return currConfig
 }
 
@@ -191,6 +191,8 @@ function install(opts, cb) {
   opts = opts || {}
   if (!opts.package) return cb('no package given to install')
   
+  var _config = config()
+    
   if (!(/:\/\//.test(opts.package)))             
     return installPackage()
   // this code sucks in general ..
@@ -206,12 +208,12 @@ function install(opts, cb) {
   dns.lookup(domain,function(err,data,fam){
     if (err && domain!='localhost')
       return cb(err)
-    installPackage()
+    rimraf(_config.tmp+'/node_modules',function(err){
+      installPackage()
+    })
   })
   
-  var _config = config()
-  
-  function installPackage() {  
+  function installPackage() {
     npm.load({loglevel:'silent',exit:false}, function(err){
       if (err) return cb(err)
       npm.commands.install(_config.tmp, opts.package, function(err, res) {
@@ -257,7 +259,7 @@ function uninstall(opts, cb) {
     if (err) return cb(opts+' not installed')
     rimraf(_config.apps+'/'+opts,function(){
       if (serverProc)
-        ee2.emit('server::'+serverProc.id+'::uninstalled',name)
+        ee2.emit('server::'+serverProc.id+'::uninstalled',opts)
       cb(null,'uninstalled '+opts)
     })
   })
@@ -274,8 +276,8 @@ function ls(package, cb) {
   var _config = config()
   if (arguments[0] && typeof arguments[0] === 'string') {
     package = arguments[0]
-    path.exists(_config.apps+'/'+package+'/package.json',function(err){
-      if (err) return cb('package is not installed: '+package)
+    path.exists(_config.apps+'/'+package+'/package.json',function(exists){
+      if (!exists) return cb('package is not installed: '+package)
       var pkg
       try {
         pkg = require(_config.apps+'/'+package+'/package.json')

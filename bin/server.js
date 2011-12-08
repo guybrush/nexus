@@ -2,12 +2,12 @@
 
 process.title = 'nexus-server'
 
-var nexus = require('../')
-  , fs = require('fs')
+var fs = require('fs')
   , dnode = require('dnode')
   , AA = require('async-array')
-  , _config = nexus.config()
   , confFile = process.argv[2]
+  , nexus = require('../')
+  , _config = nexus(confFile).config()
   , opts = { port : _config.port
            , host : _config.host }
 
