@@ -10,7 +10,7 @@
 , "dependencies" :
   { "async-array"   : "0.1.7"
   , "fstream"       : "0.1.6"
-  , "dnode"         : "https://github.com/guybrush/dnode/tree/handlingRefused"
+  , "dnode"         : "*"
   , "eventemitter2" : "0.4.1"
   , "mkdirp"        : "0.2.1"
   , "ncp"           : "0.2.3"
@@ -20,6 +20,7 @@
   , "rimraf"        : "1.0.9"
   , "underscore"    : "1.2.2"
   }
+, "bundledDependencies" : ["dnode"]
 , "devDependencies" : { "tap" : "0.0.x" }
 , "author" : "Patrick Pfeiffer <patrick@buzzle.at>"
 }
