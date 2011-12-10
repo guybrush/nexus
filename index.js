@@ -217,6 +217,7 @@ function install(opts, cb) {
     npm.load({loglevel:'silent',exit:false}, function(err){
       if (err) return cb(err)
       npm.commands.install(_config.tmp, opts.package, function(err, res) {
+        if (err) return cb(err)
         var name = opts.name || res[res.length-1][0]
         var tmpPath = res[res.length-1][1]
         if (path.existsSync(_config.apps+'/'+name)) {
