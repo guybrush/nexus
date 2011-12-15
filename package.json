@@ -10,7 +10,7 @@
 , "dependencies" :
   { "async-array"   : "0.1.7"
   , "fstream"       : "0.1.6"
-  , "dnode"         : "*"
+  , "dnode"         : "https://github.com/guybrush/dnode/tarball/handlingRefused"
   , "eventemitter2" : "0.4.1"
   , "mkdirp"        : "0.2.1"
   , "ncp"           : "0.2.3"
@@ -20,7 +20,6 @@
   , "rimraf"        : "1.0.9"
   , "underscore"    : "1.2.2"
   }
-, "bundledDependencies" : ["dnode"]
 , "engines" : { "node" : ">=0.6.6" }
 , "devDependencies" : { "tap" : "0.1.3" }
 , "author" : "Patrick Pfeiffer <patrick@buzzle.at>"
