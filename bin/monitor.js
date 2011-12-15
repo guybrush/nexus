@@ -15,71 +15,6 @@ var nexus = require('../')
   , subscriptions = {}
 
 /****************************************************************************** /
-// #FORKISSUE
-// https://groups.google.com/forum/#!topic/nodejs-dev/SS3CCcODKgI
-// https://github.com/joyent/node/issues/2254
-if (!process.env.NEXUS_MONITOR) {
-  process.on('message',function(data){
-    process.env.NEXUS_MONITOR = true
-    var child = fork(__filename,[],{env:process.env})
-    child.send(data)
-    child.on('message',function(m){
-      process.send(m)
-      process.exit()
-    })
-  })
-}
-else {
-  delete process.env.NEXUS_MONITOR
-  process.on('message',function(m){
-    monitor(m,function(s){
-      process.send({data:{pid:process.pid}})
-      var dnodeMonitor = dnode(s)
-      dnodeMonitor.connect(5000,{reconnect:100})
-      dnodeMonitor.on('error',function(err){
-        if (err.code != 'ECONNREFUSED') console.log(err)
-      })
-    })
-  })
-}
-/******************************************************************************/
-
-/*****/
-
-if (!process.env.NEXUS_MONITOR) {
-  process.env.NEXUS_MONITOR = true
-  var child = spawn('node',[__filename],{env:process.env})
-  child.stdout.on('data',function(d){console.log('monitorP-stdout> '+d)})
-  //child.stderr.on('data',function(d){console.log('monitorP-stderr> '+d)})
-  console.log({monitorPid:child.pid})
-  process.exit(0)
-}
-else {
-  var opts = JSON.parse(process.env.NEXUS_MONITOR_DATA)
-  _config = JSON.parse(process.env.NEXUS_CONFIG)
-  delete process.env.NEXUS_MONITOR
-  delete process.env.NEXUS_MONITOR_DATA
-  delete process.env.NEXUS_CONFIG
-  process.title = 'nexus-monitor'
-  monitor(opts, function(s) {
-    var dnodeMonitor = dnode(s)
-    var opts = { port : _config.port
-               , host : _config.host
-               , reconnect : 500 }
-    try {
-      if (_config.key)
-        opts.key = fs.readFileSync(_config.key)
-      if (_config.cert)
-        opts.cert = fs.readFileSync(_config.cert)
-    } catch(e) {}
-    dnodeMonitor.connect(opts)
-    dnodeMonitor.on('error',function(err){
-      if (err.code != 'ECONNREFUSED') console.log(err)
-    })
-  })
-}
-
-/******* /
 
 var opts = 
  { command : 'node'
@@ -98,7 +33,45 @@ monitor(opts, function(s) {
   })
 })
 
-/*****/
+/******************************************************************************/
+
+if (!process.env.NEXUS_MONITOR) {
+  process.on('message',function(data){
+    process.env.NEXUS_MONITOR = true
+    var child = fork(__filename,[],{env:process.env})
+    child.send(data)
+    child.on('message',function(m){
+      process.send(m)
+      process.exit(0)
+    })
+  })
+}
+else {
+  delete process.env.NEXUS_MONITOR
+  process.on('message',function(m){
+    _config = m.config
+    monitor(m.start,function(err,data){
+      process.send({error:err,data:data})
+      var opts = { port : _config.port
+                 , host : _config.host
+                 , reconnect : 500 }
+      try {
+        if (_config.key)
+          opts.key = fs.readFileSync(_config.key)
+        if (_config.cert)
+          opts.cert = fs.readFileSync(_config.cert)
+      } catch(e) {}
+      var dnodeMonitor = dnode(data.dnodeInterface)
+      dnodeMonitor.connect(opts)
+      dnodeMonitor.on('error',function(err){
+        if (err.code != 'ECONNREFUSED') 
+          console.log(err)
+      })
+    })
+  })
+}
+
+/******************************************************************************/
 
 ee2.onAny(function(data){
   var self = this
@@ -156,7 +129,9 @@ function monitor(opts, cb) {
           cb && cb()
         }
       }
-      cb(server)
+      info(function(err,data){
+        cb(err,{dnodeInterface:server,info:data})
+      })
     })
   })
 
@@ -167,6 +142,7 @@ function monitor(opts, cb) {
         env[x] = self.env[x]
     }
 
+    // use require('npm').runScript()
     self.child = spawn( opts.command
                      , [opts.script].concat(opts.options)
                      , { cwd : opts.cwd

@@ -8,8 +8,10 @@ nexus.config = config
 nexus.ls = ls
 nexus.install = install
 nexus.uninstall = uninstall
-nexus.server = server
+nexus.start = start
+nexus.scripts = scripts
 nexus.logs = logs
+nexus.server = server
 
 var fs      = require('fs')
   , path    = require('path')
@@ -53,6 +55,7 @@ function nexus(configParam) {
     this.restart   = restart
     this.stop      = stop
     this.stopall   = stopall
+    this.scripts   = scripts
     this.logs      = logs
     this.cleanlogs = cleanlogs
     this.remote    = remote
@@ -114,8 +117,10 @@ function nexus(configParam) {
   dnodeInterface.ls = ls
   dnodeInterface.install = install
   dnodeInterface.uninstall = uninstall
-  dnodeInterface.server = server
+  dnodeInterface.start = start
+  dnodeInterface.scripts = scripts
   dnodeInterface.logs = logs
+  dnodeInterface.server = server
   return dnodeInterface
 }
 
@@ -241,6 +246,7 @@ function install(opts, cb) {
   }
 }
 
+
 //------------------------------------------------------------------------------
 //                                               uninstall
 //------------------------------------------------------------------------------
@@ -347,28 +353,15 @@ function start(opts, cb) {
 
   parseStart(opts, function(err, data){
     if (err) return cb(err)
-
-    process.env.NEXUS_MONITOR_DATA = JSON.stringify(data)
-    process.env.NEXUS_CONFIG = JSON.stringify(config())
-
-    var child = spawn( 'node'
-                     , [__dirname+'/bin/monitor.js']
-                     , {env:process.env} )
-    child.stdout.on('data',function(d){cb(null,d+'')})
-    child.stderr.on('data',function(d){cb(d+'')})
-    child.on('error',function(e){cb(e+'')})
-
-    // child.stdout.on('data',function(d){console.log(d+'')})
-    // child.stderr.on('data',function(d){console.log(d+'')})
     
-    // #FORKISSUE
-    // var child = fork(__dirname+'/bin/monitor.js',[],{env:process.env})
-    //
-    // child.on('message',function(m){
-    //   if (m.error) return cb(m.error)
-    //   cb(null, m.data)
-    // })
-    // child.send(data)
+    var child = fork( __dirname+'/bin/monitor.js'
+                    , []
+                    , {env:process.env} )
+    
+    child.on('message',function(m){
+      cb(m.error, m.data)
+    })
+    child.send({start:data,config:config()})
   })
 }
 
@@ -413,6 +406,14 @@ function stopall(cb) {
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].stop(next)
   }).done(cb).exec()
+}
+
+//------------------------------------------------------------------------------
+//                                               stopall
+//------------------------------------------------------------------------------
+
+function scripts(cb) {
+  cb('#TODO')
 }
 
 //------------------------------------------------------------------------------
@@ -640,6 +641,11 @@ function parseStart(opts, cb) {
   result.cwd = split.join('/')
   cb(null, result)
 }
+
+//------------------------------------------------------------------------------
+//                                               error
+//------------------------------------------------------------------------------
+
 
 function error(err,cb) {
   console.log('error:',err)
