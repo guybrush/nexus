@@ -4,18 +4,27 @@
         /    ___  ___  _ _  _ _  ___    \
         |   |   || -_||_'_|| | ||_ -|   |
         |   |_|_||___||_,_||___||___|   |
+        |   turtles all the way down!   |
         \_____________________________  / ____       ___
                                       \| / .  \  .-´/   \`-.
                                          \____ \/   \___/   \__
                                               \_`---´___`---´-´
                                                /../..\ /..\..\
 
-* nexus is basically built upon [npm] and [dnode] and inspired by [forever].
+* nexus is basically built upon [npm] and [dnode] and is inspired by [forever].
 * nexus provides a cli and a dnode-interface to install, uninstall, start, stop 
   and observe local and remote programs (npm packages).
 * running programs are `require('child_process').spawn`'ed child-processes of
-  monitor-servers (dnode-clients).
+  monitor-servers (dnode-clients). the monitor-servers will try to reconnect to 
+  the nexus-server (dnode-server) all the time. the nexus-server is also a 
+  `require('child_process').spawn`'ed child-process of a monitor-server - 
+  which itself will try to reconnect to its own child-process.
 * all the config, logs and programs live in `~/.nexus` by default.
+* note: deploying with npm is super fun, it gives you all sort of options.
+  you can install by just pulling stuff from the npm-registry. though the
+  [better option] is to pull from git-repositories (or generated tarballs of 
+  git-repos) which contain all the `node_modules` - so you can be sure
+  what you are installing.
 * nexus is still *super-alpha*.
 
 ## install
@@ -43,7 +52,7 @@
         logs      .. access log-files
         cleanlogs .. remove old log-files (of not-running programs)
         subscribe .. subscribe to events
-        server    .. start/stop/restart the nexus-server
+        server    .. start/stop/restart/get-info-about the nexus-server
         help      .. try `nexus help <command>` for more info
     
     note: ps, start, restart, stop, stopall, cleanlogs and subscribe
@@ -76,4 +85,5 @@
 [forever]: https://github.com/nodejitsu/forever
 [node]: http://nodejs.org
 [npm]: https://npmjs.org
+[better option]: http://www.mikealrogers.com/posts/nodemodules-in-git.html
 
