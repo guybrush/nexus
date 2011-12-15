@@ -16,7 +16,7 @@ var nexus = require('../')
 
 /****************************************************************************** /
 
-var opts = 
+var opts =
  { command : 'node'
  , script : '/home/patrick/.nexus/apps/app-error@0.0.0/server.js'
  , max : 100
@@ -64,7 +64,7 @@ else {
       var dnodeMonitor = dnode(data.dnodeInterface)
       dnodeMonitor.connect(opts)
       dnodeMonitor.on('error',function(err){
-        if (err.code != 'ECONNREFUSED') 
+        if (err.code != 'ECONNREFUSED')
           console.log(err)
       })
     })
@@ -81,9 +81,9 @@ ee2.onAny(function(data){
 })
 
 function monitor(opts, cb) {
-  
+
   var self = this
-  
+
   self.crashed = 0
   self.ctime = 0
   self.env = opts.env
@@ -98,7 +98,7 @@ function monitor(opts, cb) {
   self.env = opts.env
 
   self.id = null
-  
+
   fs.readdir(_config.logs, function(err,data){
     var currIds = []
     _.each(data,function(x,i){
@@ -108,7 +108,7 @@ function monitor(opts, cb) {
     do {
       self.id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)
     } while(currIds.indexOf(self.id) != -1)
-    
+
     start(function(){
       function server(remote, conn) {
         if (self.script == __dirname+'/server.js')
@@ -150,24 +150,26 @@ function monitor(opts, cb) {
                        } )
 
     ee2.emit('start', self.child.pid)
-    
+
     self.ctime = Date.now()
-    
+
     var logFile = opts.script
-    
-    if (logFile == __dirname+'/server.js')
+
+    if (logFile == __dirname+'/server.js') {
       logFile = 'nexus_server'
-    else 
-      logFile = logFile.slice(_config.apps.length+1).replace(/[\/\s]/g,'_')
-                       
-    logFile = logFile+'.'+self.id
-    
+    }
+    else if (logFile.slice(0,_config.apps.length) == _config.apps) {
+      logFile = logFile.slice(_config.apps.length+1)
+    }
+
+    logFile = logFile.replace(/[\/\s]/g,'_')+'.'+self.id
+
     var fsStdout = fstream.Writer({path:_config.logs+'/'+logFile+'.stdout.log',flags:'a'})
     var fsStderr = fstream.Writer({path:_config.logs+'/'+logFile+'.stderr.log',flags:'a'})
-    
+
     self.child.stdout.pipe(fsStdout)
     self.child.stderr.pipe(fsStderr)
-    
+
     self.child.stdout.on('data',function(data){
       ee2.emit('stdout', data.toString())
     })
@@ -241,6 +243,6 @@ function monitor(opts, cb) {
         , running : self.child ? true : false
         } )
   }
-  
+
 }
 

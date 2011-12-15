@@ -33,9 +33,9 @@ var fs      = require('fs')
   , subscriptions = {}
   , subscriptionListeners = {}
   , userConfig = null
-  
+
 process.title = 'nexus'
-  
+
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ function nexus(configParam) {
           ee2.emit('server::'+rem.id+'::disconnected')
           serverProc = null
         })
-      } 
+      }
     })
     conn.on('end',function(){self.unsubscribe()})
   }
@@ -140,7 +140,7 @@ function config(key, value, cb) {
 
   if (key && value && !cb) cb = value
   if (key && !value && !cb) cb = key
-  
+
   var currConfig = {}
     , fileConfig = {}
     , home = ( process.platform === "win32" // HAHA!
@@ -152,7 +152,7 @@ function config(key, value, cb) {
     configPath = userConfig
   if (userConfig && _.isObject(userConfig))
     currConfig = userConfig
-  
+
   try { fileConfig = require(configPath) }
   catch (e) {} // no config-file, so we use currConfig or hardcoded defaults
 
@@ -179,7 +179,7 @@ function config(key, value, cb) {
   }).done(function(err, data){
     cb && cb(err, currConfig)
   }).exec()
-  
+
   return currConfig
 }
 
@@ -195,10 +195,10 @@ function install(opts, cb) {
 
   opts = opts || {}
   if (!opts.package) return cb('no package given to install')
-  
+
   var _config = config()
-    
-  if (!(/:\/\//.test(opts.package)))             
+
+  if (!(/:\/\//.test(opts.package)))
     return installPackage()
   // this code sucks in general ..
   // but ye .. without this, npm will throw on non-valid domains
@@ -217,7 +217,7 @@ function install(opts, cb) {
       installPackage()
     })
   })
-  
+
   function installPackage() {
     npm.load({loglevel:'silent',exit:false}, function(err){
       if (err) return cb(err)
@@ -234,7 +234,7 @@ function install(opts, cb) {
           name = name+'_'+i
         }
         ncp.ncp(tmpPath,_config.apps+'/'+name,function(err){
-          if (err) return cb(err) 
+          if (err) return cb(err)
           rimraf(_config.tmp+'/node_modules',function(err){
             if (serverProc)
               ee2.emit('server::'+serverProc.id+'::installed',name)
@@ -323,10 +323,10 @@ function ps(proc, cb) {
     return procs[arguments[0]].info(cb)
 
   var result = {}
-  
-  if (Object.keys(procs).length == 0) 
+
+  if (Object.keys(procs).length == 0)
     return cb(null,result)
-  
+
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].info(function(err,data){
       result[x] = data
@@ -353,11 +353,11 @@ function start(opts, cb) {
 
   parseStart(opts, function(err, data){
     if (err) return cb(err)
-    
+
     var child = fork( __dirname+'/bin/monitor.js'
                     , []
                     , {env:process.env} )
-    
+
     child.on('message',function(m){
       cb(m.error, m.data)
     })
@@ -425,18 +425,18 @@ function logs(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
-  
+
   opts = opts || {}
-  
+
   var _config = config()
-  
+
   if (!opts.file) {
     return fs.readdir(_config.logs,function(err,data){
       if (err) return error(err,cb)
       cb(err, data)
     })
   }
-  
+
   fs.readFile(_config.logs+'/'+opts.file,'utf8',function(err,data){
     if (err) return error(err,cb)
     var lines = data.split('\n')
@@ -453,7 +453,7 @@ function logs(opts, cb) {
 //------------------------------------------------------------------------------
 
 function cleanlogs(cb) {
-  if (!cb) cb = function() {} 
+  if (!cb) cb = function() {}
   var _config = config()
   fs.readdir(_config.logs,function(err,data){
     if (err) return error(err,cb)
@@ -484,11 +484,11 @@ function remote(rem, cb) {
   else
     cb = function(){}
 
-  if (!_config.remotes[rem]) 
+  if (!_config.remotes[rem])
     return cb('dont know about the remote "'+rem+'"')
-  
+
   var _config = config()
-  var opts = {}  
+  var opts = {}
   opts.host = _config.remotes[rem].host
   opts.port = _config.remotes[rem].port
   try {
@@ -514,25 +514,25 @@ function server(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
-  
+
   if (arguments.length == 1 && serverProc)
     serverProc.info(cb)
-  
+
   opts = opts || {}
-  
+
   if (opts.cmd && opts.cmd == 'start') {
     if (serverProc) return cb('server is already running')
-    var startOptions = 
+    var startOptions =
       { script: __dirname+'/bin/server.js'
       , command: 'node'
-      , max: 100 
-      , package: _pkg 
+      , max: 100
+      , package: _pkg
       , env: {NEXUS_CONFIG:JSON.stringify(config())}
       }
 
     return start(startOptions, cb)
   }
-  
+
   if (opts.cmd && opts.cmd == 'stop') {
     if (serverProc) {
       cb(null,'will try to stop the server, check with `nexus server`')
@@ -540,15 +540,15 @@ function server(opts, cb) {
     }
     else return cb('cant stop, server is not running')
   }
-  
+
   if (opts.cmd && opts.cmd == 'restart') {
     cb(null,'will try to restart the server, check with `nexus server`')
     return serverProc.restart(cb)
   }
-  
+
   if (serverProc)
     return serverProc.info(cb)
-  
+
   cb(null,'server is not running')
 }
 
@@ -580,20 +580,14 @@ function parseStart(opts, cb) {
     } catch(e) {}
   }
 
-  // handle `nexus start /some/file` and `nexus start ./some/file`
-  result.script =
-    /^\//.test(opts.script)
-      ? opts.script
-      : /^\.\//.test(opts.script)
-        ? process.cwd()+'/'+opts.script.substring(1)
-        : null
+  // handle `nexus start /some/file`
+  result.script = /^\//.test(opts.script) ? opts.script : null
 
   // handle `nexus start appName/path/to/script`
   if (!result.script && /\//.test(opts.script)) {
-    var maybeApp = opts.script.split('/')[0]
-      , isApp = path.existsSync(_config.apps+'/'+maybeApp)
-    if (isApp) result.script = _config.apps+'/'+opts.script
-    else result.script = process.cwd()+'/'+opts.script
+    if (path.existsSync(_config.apps+'/'+opts.script)) {
+      result.script = _config.apps+'/'+opts.script
+    }
   }
 
   // handle `nexus start appName`

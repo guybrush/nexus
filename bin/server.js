@@ -9,19 +9,23 @@ var fs = require('fs')
   , nexus = require('../')
   , opts = { port : _config.port
            , host : _config.host }
+
+console.log('starting server',_config)
            
 if (_config.key) {
   try {
-    console.log('using key',_config.key)
     opts.key = fs.readFileSync(_config.key)
-  } catch(e) {}
-}  
+  } catch(e) {
+    console.error('could not use key-file '+_config.key)
+  }
+}
 
 if (_config.cert) {
   try {
-    console.log('using cert',_config.cert)
     opts.cert = fs.readFileSync(_config.cert)
-  } catch(e) {}
+  } catch(e) {
+    console.error('could not use cert-file '+_config.cert)
+  }
 }
 
 fs.readdir(_config.ca,function(err,data){
@@ -29,10 +33,10 @@ fs.readdir(_config.ca,function(err,data){
     opts.requestCert = true
     opts.rejectUnauthorized = true
     new AA(data).map(function(x,i,next){
-      console.log('adding cert to ca',_config.ca+'/'+x)
       fs.readFile(_config.ca+'/'+x,'utf8',next)
     }).done(function(err, data){
-      if (err) return exit(err)
+      if (err)
+        console.error('could not add cert-files to ca',err)
       opts.ca = data
       start()
     }).exec()
@@ -42,16 +46,11 @@ fs.readdir(_config.ca,function(err,data){
 })
 
 function start() {
-  console.log('starting server',opts,_config)
   var server = dnode(nexus(_config)).listen(opts)
-  server.on('error',function(err){console.log(err)})
+  server.on('error',function(err){
+    console.error(err)
+  })
   server.on('ready',function(){
     console.log('started server')
   })
 }
-
-function exit(msg) {
-  console.log(msg)
-  process.exit(0)
-}
-  
