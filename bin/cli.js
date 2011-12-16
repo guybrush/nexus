@@ -9,6 +9,7 @@ var opti = require('optimist')
   , dnode = require('dnode')
   , fs = require('fs')
   , path = require('path')
+  , _ = require('underscore')
   , _conn
   , usage =
     [ ' ___  ___  _ _  _ _  ___'
@@ -100,7 +101,22 @@ help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , 'note: in bash you may want to wrap the event with "",'
                  , '      since "*" is a wildcard in bash too..'
                  ].join('\n')
-help.ps        =   'nexus ps [<id>]'
+help.ps        = [ 'nexus ps [<id>] [<filter>]'
+                 , ''
+                 , 'examples:'
+                 , ''
+                 , 'nexus ps --uptime'
+                 , 'nexus ps 20a00a0d --package.name --options'
+                 , ''
+                 , 'available filters:'
+                 , ''
+                 , 'id, monitorPid, pid, crashed, ctime, uptime, uptimeH, package.name,'
+                 , 'package.version, package.<any-package.json-value>, script,'
+                 , 'options, command, env, max, running'
+                 , ''
+                 , 'note: if no <id> is passed, it will list all running programs'
+                 , '      if no <filter> is passed, it will print all information'                 
+                 ].join('\n')
 help.start     = [ 'nexus start <appName> [<options>]'
                  , ''
                  , 'examples:'
@@ -241,8 +257,10 @@ function parseArgs() {
       nexus.uninstall(argv._[0], exit)
       break
     case 'ps':
-      if (argv._[0]) nexus.ps(argv._[0], exit)
-      else nexus.ps(exit)
+      var opts = {}
+      opts.id = argv._[0]
+      opts.filter = _.without(Object.keys(argv),'_','$0')
+      nexus.ps(opts, exit)
       break
     case 'start':
       var options = process.argv.splice(process.argv.indexOf(argv._[0])+1)

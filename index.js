@@ -316,20 +316,43 @@ function ls(package, cb) {
 //                                               ps
 //------------------------------------------------------------------------------
 
-function ps(proc, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  if (typeof arguments[0] === 'string' && procs[arguments[0]] && cb)
-    return procs[arguments[0]].info(cb)
+function ps(opts, cb) {
+  opts = opts || {}
+  if (!opts.filter || !Array.isArray(opts.filter) || opts.filter.length==0)
+    opts.filter = null
 
   var result = {}
-
+  
   if (Object.keys(procs).length == 0)
     return cb(null,result)
-
+  
+  if (opts.id && procs[opts.id]) {
+    if (!opts.filter) {
+      return procs[opts.id].info(cb)
+    }
+    procs[opts.id].info(function(err,data){
+      _.each(opts.filter,function(x,i){
+        var info = objPath(data,x)
+        if (info !== undefined) result[x] = info
+        else result[x] = 'UNKNOWN'
+      })
+      cb(err,result)
+    })
+    return
+  }
+  
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].info(function(err,data){
-      result[x] = data
+      if (!opts.filter)
+        result[x] = data
+      else {
+        result[x] = {}
+        _.each(opts.filter,function(y,j){
+          var info = objPath(data,y)
+          if (info) result[x][y] = info
+          else result[x][y] = 'UNKNOWN'
+        })
+      }
       next(err,data)
     })
   }).done(function(err,data){
@@ -433,7 +456,7 @@ function logs(opts, cb) {
   if (!opts.file) {
     return fs.readdir(_config.logs,function(err,data){
       if (err) return error(err,cb)
-      cb(err, data)
+      cb(err, data.sort())
     })
   }
 
@@ -568,12 +591,14 @@ function parseStart(opts, cb) {
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
   result.max = opts.max || 100
+  result.name = 'unnamed'
 
   var _config = config()
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
   if (path.existsSync(_config.apps+'/'+maybeApp)) {
     //console.log('---- A')
+    result.name = maybeApp.split('/')[0]
     appPath = _config.apps+'/'+maybeApp
     try {
       result.package = require(appPath+'/package.json')
@@ -586,6 +611,7 @@ function parseStart(opts, cb) {
   // handle `nexus start appName/path/to/script`
   if (!result.script && /\//.test(opts.script)) {
     if (path.existsSync(_config.apps+'/'+opts.script)) {
+      result.name = opts.script.split('/')[0]
       result.script = _config.apps+'/'+opts.script
     }
   }
@@ -637,9 +663,44 @@ function parseStart(opts, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               error
+//                                               objPath
 //------------------------------------------------------------------------------
 
+function objPath(obj, keyString, value) {
+  var keys = keyString.split('.')
+  if (obj[keys[0]] === undefined) obj[keys[0]] = {}
+  var data = obj[keys[0]]
+    , keys = keys.slice(1)
+    
+  if (!value) { // get data
+    var value = data
+    for (var i=0, len=keys.length; i<len; i++) {
+      if (value === undefined) return false
+      value = value[keys[i]]
+    }
+    return value
+  } else { // set data
+    var temp = data
+    if (keys.length==0) {
+      obj[keyString] = value
+      return obj
+    }
+    
+    for (var i=0, len=keys.length; i<len; i++) {
+      if (i==(len-1)) {
+        temp[keys[i]] = value
+      } else {
+        temp[keys[i]] = temp[keys[i]] || {}
+        temp = temp[keys[i]]
+      }
+    }
+    return data
+  }
+}
+
+//------------------------------------------------------------------------------
+//                                               error
+//------------------------------------------------------------------------------
 
 function error(err,cb) {
   console.log('error:',err)

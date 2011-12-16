@@ -87,6 +87,7 @@ function monitor(opts, cb) {
   self.crashed = 0
   self.ctime = 0
   self.env = opts.env
+  self.name = opts.name
   self.package = opts.package
   self.script = opts.script
   self.options = opts.options
@@ -229,18 +230,25 @@ function monitor(opts, cb) {
   }
 
   function info(cb) {
+    var now = Date.now()
+      , uptime = now-self.ctime
+      , uptimeH = ~~((uptime/3600000)*1000)/1000
     cb( null
-      , { monitorPid : process.pid
-        , pid : self.child ? self.child.pid : null
+      , { id : self.id
+        , running : self.child ? true : false
         , crashed : self.crashed
-        , ctime : self.ctime
-        , package : self.package
+        , name : self.name
         , script : self.script
-        , options : self.options
+        , package : self.package
+        , monitorPid : process.pid
+        , pid : self.child ? self.child.pid : null        
+        , ctime : self.ctime
+        , uptime : uptime
+        , uptimeH : uptimeH
         , command : self.command
+        , options : self.options
         , env : self.env
         , max : self.max
-        , running : self.child ? true : false
         } )
   }
 
