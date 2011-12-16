@@ -14,27 +14,6 @@ var nexus = require('../')
   , fs = require('fs')
   , subscriptions = {}
 
-/****************************************************************************** /
-
-var opts =
- { command : 'node'
- , script : '/home/patrick/.nexus/apps/app-error@0.0.0/server.js'
- , max : 100
- }
-
-monitor(opts, function(s) {
-  var dnodeMonitor = dnode(s)
-  var opts = { port : _config.port
-             , host : _config.host
-             , reconnect : 500 }
-  dnodeMonitor.connect(opts)
-  dnodeMonitor.on('error',function(err){
-    if (err.code != 'ECONNREFUSED') console.log(err)
-  })
-})
-
-/******************************************************************************/
-
 if (!process.env.NEXUS_MONITOR) {
   process.on('message',function(data){
     process.env.NEXUS_MONITOR = true
@@ -51,7 +30,7 @@ else {
   process.on('message',function(m){
     _config = m.config
     monitor(m.start,function(err,data){
-      process.send({error:err,data:data})
+      process.send({error:err,data:data.info})
       var opts = { port : _config.port
                  , host : _config.host
                  , reconnect : 500 }
@@ -70,8 +49,6 @@ else {
     })
   })
 }
-
-/******************************************************************************/
 
 ee2.onAny(function(data){
   var self = this

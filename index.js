@@ -100,14 +100,15 @@ function nexus(configParam) {
       }
       if (rem.type && rem.type == 'NEXUS_SERVER_MONITOR') {
         ee2.emit('server::'+rem.id+'::connected')
-        serverProc = rem
         rem.subscribe(function(event,data){
           ee2.emit('server::'+rem.id+'::'+event,data)
         })
         conn.on('end',function(){
           ee2.emit('server::'+rem.id+'::disconnected')
-          serverProc = null
         })
+        if (serverProc) 
+          return rem.stop()
+        serverProc = rem
       }
     })
     conn.on('end',function(){self.unsubscribe()})
@@ -349,7 +350,7 @@ function ps(opts, cb) {
         result[x] = {}
         _.each(opts.filter,function(y,j){
           var info = objPath(data,y)
-          if (info) result[x][y] = info
+          if (info !== undefined) result[x][y] = info
           else result[x][y] = 'UNKNOWN'
         })
       }
