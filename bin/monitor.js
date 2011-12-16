@@ -218,7 +218,7 @@ function monitor(opts, cb) {
         , script : self.script
         , package : self.package
         , monitorPid : process.pid
-        , pid : self.child ? self.child.pid : null        
+        , pid : self.child ? self.child.pid : null
         , ctime : self.ctime
         , uptime : uptime
         , uptimeH : uptimeH

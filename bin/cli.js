@@ -115,7 +115,7 @@ help.ps        = [ 'nexus ps [<id>] [<filter>]'
                  , 'options, command, env, max, running'
                  , ''
                  , 'note: if no <id> is passed, it will list all running programs'
-                 , '      if no <filter> is passed, it will print all information'                 
+                 , '      if no <filter> is passed, it will print all information'
                  ].join('\n')
 help.start     = [ 'nexus start <appName> [<options>]'
                  , ''

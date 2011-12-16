@@ -106,7 +106,7 @@ function nexus(configParam) {
         conn.on('end',function(){
           ee2.emit('server::'+rem.id+'::disconnected')
         })
-        if (serverProc) 
+        if (serverProc)
           return rem.stop()
         serverProc = rem
       }
@@ -323,10 +323,10 @@ function ps(opts, cb) {
     opts.filter = null
 
   var result = {}
-  
+
   if (Object.keys(procs).length == 0)
     return cb(null,result)
-  
+
   if (opts.id && procs[opts.id]) {
     if (!opts.filter) {
       return procs[opts.id].info(cb)
@@ -341,7 +341,7 @@ function ps(opts, cb) {
     })
     return
   }
-  
+
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].info(function(err,data){
       if (!opts.filter)
@@ -672,7 +672,7 @@ function objPath(obj, keyString, value) {
   if (obj[keys[0]] === undefined) obj[keys[0]] = {}
   var data = obj[keys[0]]
     , keys = keys.slice(1)
-    
+
   if (!value) { // get data
     var value = data
     for (var i=0, len=keys.length; i<len; i++) {
@@ -686,7 +686,7 @@ function objPath(obj, keyString, value) {
       obj[keyString] = value
       return obj
     }
-    
+
     for (var i=0, len=keys.length; i<len; i++) {
       if (i==(len-1)) {
         temp[keys[i]] = value
