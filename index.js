@@ -17,6 +17,7 @@ var fs      = require('fs')
   , path    = require('path')
   , fork    = require('child_process').fork
   , spawn   = require('child_process').spawn
+  , execFile = require('child_process').execFile
   , dnode   = require('dnode')
   , _       = require('underscore')
   , fstream = require('fstream')
@@ -378,14 +379,28 @@ function start(opts, cb) {
   parseStart(opts, function(err, data){
     if (err) return cb(err)
 
+    /****/
+    var child = execFile( __dirname+'/bin/monitor.js' 
+                        , ['-c',JSON.stringify(config())
+                          ,'-s',JSON.stringify(data)] 
+                        , {env:process.env} 
+                        , childCb )
+    function childCb(err, stdout, stderr) {
+      if (err) return cb(err)
+      // console.log(stdout)
+      var out = JSON.parse(stdout)
+      cb(null, out)
+    }
+    /**** /
     var child = fork( __dirname+'/bin/monitor.js'
                     , []
                     , {env:process.env} )
-
+    
     child.on('message',function(m){
       cb(m.error, m.data)
     })
     child.send({start:data,config:config()})
+    /****/
   })
 }
 

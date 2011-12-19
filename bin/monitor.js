@@ -4,6 +4,7 @@ var nexus = require('../')
   , _config
   , dnode = require('dnode')
   , _ = require('underscore')
+  , opti = require('optimist')
   , fork = require('child_process').fork
   , spawn = require('child_process').spawn
   , execFile = require('child_process').execFile
@@ -14,27 +15,30 @@ var nexus = require('../')
   , fs = require('fs')
   , subscriptions = {}
 
+                                               
+/****************************************************************************** /
+
 if (!process.env.NEXUS_MONITOR) {
   process.on('message',function(data){
     process.env.NEXUS_MONITOR = true
     var child = fork(__filename,[],{env:process.env})
-    child.send(data)
+    child.send(data)                                  
     child.on('message',function(m){
       process.send(m)
       process.exit(0)
     })
   })
-}
+}                             
 else {
   delete process.env.NEXUS_MONITOR
-  process.on('message',function(m){
+  process.on('message',function(m){                       
     _config = m.config
     monitor(m.start,function(err,data){
       process.send({error:err,data:data.info})
       var opts = { port : _config.port
                  , host : _config.host
                  , reconnect : 500 }
-      try {
+      try {                      
         if (_config.key)
           opts.key = fs.readFileSync(_config.key)
         if (_config.cert)
@@ -43,12 +47,67 @@ else {
       var dnodeMonitor = dnode(data.dnodeInterface)
       dnodeMonitor.connect(opts)
       dnodeMonitor.on('error',function(err){
-        if (err.code != 'ECONNREFUSED')
+        if (err.code != 'ECONNREFUSED')             
           console.log(err)
       })
     })
   })
+}      
+
+/******************************************************************************/
+
+if (!process.env.NEXUS_MONITOR) {
+  
+  // _config = JSON.parse(opti.argv.c)
+  // console.log(opti.argv)
+  var _start = JSON.parse(opti.argv.s)
+  process.env.NEXUS_MONITOR = true
+  var child = spawn( 'node'
+                   , [__filename
+                     ,'-c',opti.argv.c
+                     ,'-s',opti.argv.s] )
+  var childStdoutBuff = ''
+  var childStderrBuff = ''
+  child.stdout.setEncoding('utf8')
+  child.stderr.setEncoding('utf8')
+  child.stdout.on('data',function(d){
+    if (/^==DONE/.test(d)) {
+      console.log(childStdoutBuff)
+      process.exit(0)
+    } else {
+      childStdoutBuff += d
+    }
+  })
 }
+else {
+  delete process.env.NEXUS_MONITOR                               
+  _config = JSON.parse(opti.argv.c)
+  var startOpts = JSON.parse(opti.argv.s)   
+  // console.log('MONITORCHILD-STARTING',{c:_config,s:startOpts})
+  monitor(startOpts,function(err,data){
+    if (err) console.error(err)
+    else console.log(JSON.stringify(data.info))
+    // process.send({error:err,data:data.info})
+    console.log('==DONE')
+    var opts = { port : _config.port
+               , host : _config.host
+               , reconnect : 500 }
+    try {
+      if (_config.key)
+        opts.key = fs.readFileSync(_config.key)                   
+      if (_config.cert)
+        opts.cert = fs.readFileSync(_config.cert)
+    } catch(e) {}
+    var dnodeMonitor = dnode(data.dnodeInterface)
+    dnodeMonitor.connect(opts)
+    dnodeMonitor.on('error',function(err){
+      if (err.code != 'ECONNREFUSED')
+        console.log(err)
+    })
+  })
+}
+
+/******************************************************************************/
 
 ee2.onAny(function(data){
   var self = this
@@ -76,7 +135,21 @@ function monitor(opts, cb) {
   self.env = opts.env
 
   self.id = null
-
+  
+  var logFile = opts.script
+  
+  if (logFile == __dirname+'/server.js') {
+    logFile = 'nexus_server'
+  }
+  else if (logFile.slice(0,_config.apps.length) == _config.apps) {
+    logFile = logFile.slice(_config.apps.length+1)
+  }
+  
+  logFile = logFile.replace(/[\/\s]/g,'_')+'.'+self.id
+  
+  self.logFileStdout = _config.logs+'/'+logFile+'.stdout.log'
+  self.logFileStderr = _config.logs+'/'+logFile+'.stderr.log'
+  
   fs.readdir(_config.logs, function(err,data){
     var currIds = []
     _.each(data,function(x,i){
@@ -122,29 +195,16 @@ function monitor(opts, cb) {
 
     // use require('npm').runScript()
     self.child = spawn( opts.command
-                     , [opts.script].concat(opts.options)
-                     , { cwd : opts.cwd
-                       , env : env
-                       } )
+                      , [opts.script].concat(opts.options)
+                      , { cwd : opts.cwd
+                        //, env : env
+                        } )
 
     ee2.emit('start', self.child.pid)
 
     self.ctime = Date.now()
-
-    var logFile = opts.script
-
-    if (logFile == __dirname+'/server.js') {
-      logFile = 'nexus_server'
-    }
-    else if (logFile.slice(0,_config.apps.length) == _config.apps) {
-      logFile = logFile.slice(_config.apps.length+1)
-    }
-
-    logFile = logFile.replace(/[\/\s]/g,'_')+'.'+self.id
-
-    var fsStdout = fstream.Writer({path:_config.logs+'/'+logFile+'.stdout.log',flags:'a'})
-    var fsStderr = fstream.Writer({path:_config.logs+'/'+logFile+'.stderr.log',flags:'a'})
-
+    var fsStdout = fstream.Writer({path:self.logFileStdout,flags:'a'})
+    var fsStderr = fstream.Writer({path:self.logFileStderr,flags:'a'})
     self.child.stdout.pipe(fsStdout)
     self.child.stderr.pipe(fsStderr)
 
@@ -195,7 +255,7 @@ function monitor(opts, cb) {
           if (!self.restartFlag) process.exit(0)
         })
       })
-      process.kill(self.child.pid, 'SIGKILL')
+      process.kill(self.child.pid)
     }
     else {
       self.stopFlag = false
