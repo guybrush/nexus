@@ -57,9 +57,6 @@ else {
 /******************************************************************************/
 
 if (!process.env.NEXUS_MONITOR) {
-  
-  // _config = JSON.parse(opti.argv.c)
-  // console.log(opti.argv)
   var _start = JSON.parse(opti.argv.s)
   process.env.NEXUS_MONITOR = true
   var child = spawn( 'node'
@@ -82,12 +79,10 @@ if (!process.env.NEXUS_MONITOR) {
 else {
   delete process.env.NEXUS_MONITOR                               
   _config = JSON.parse(opti.argv.c)
-  var startOpts = JSON.parse(opti.argv.s)   
-  // console.log('MONITORCHILD-STARTING',{c:_config,s:startOpts})
+  var startOpts = JSON.parse(opti.argv.s)
   monitor(startOpts,function(err,data){
     if (err) console.error(err)
     else console.log(JSON.stringify(data.info))
-    // process.send({error:err,data:data.info})
     console.log('==DONE')
     var opts = { port : _config.port
                , host : _config.host
@@ -197,7 +192,7 @@ function monitor(opts, cb) {
     self.child = spawn( opts.command
                       , [opts.script].concat(opts.options)
                       , { cwd : opts.cwd
-                        //, env : env
+                        , env : env
                         } )
 
     ee2.emit('start', self.child.pid)
@@ -275,6 +270,7 @@ function monitor(opts, cb) {
         , running : self.child ? true : false
         , crashed : self.crashed
         , name : self.name
+        , command : self.command
         , script : self.script
         , package : self.package
         , monitorPid : process.pid
@@ -282,7 +278,6 @@ function monitor(opts, cb) {
         , ctime : self.ctime
         , uptime : uptime
         , uptimeH : uptimeH
-        , command : self.command
         , options : self.options
         , env : self.env
         , max : self.max

@@ -26,11 +26,11 @@ test('start error', function(t) {
             if (done) return
             done = true
             var id = event.split('::')[1]
-            remote.ps(id,function(err,data){
+            remote.ps({id:id},function(err,data){
               http.get({host:'localhost',port:port,path:'/'},function(res){
                 t.equal(res.statusCode,200,'the first request is ok, but will crash the app')
                 setTimeout(function(){
-                  remote.ps(id,function(err,proc){
+                  remote.ps({id:id},function(err,proc){
                     t.equal(proc.crashed,1,'nexus.ps says the proc has crashed 1 time')
                     remote.stopall()
                     remote.server({cmd:'stop'})
