@@ -606,7 +606,7 @@ function parseStart(opts, cb) {
   result.options = opts.options || []
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
-  result.max = opts.max || 100
+  result.max = opts.max || 10
   result.name = 'unnamed'
 
   var _config = config()
