@@ -241,7 +241,7 @@ function monitor(opts, cb) {
       var pid = self.child.pid
       var timer = setTimeout(function(){
         cb('the process is unkillable :D #TODO')
-      },1000)
+      },4000)
       self.child.once('exit',function(){
         self.stopFlag = false
         clearTimeout(timer)
