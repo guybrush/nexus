@@ -157,20 +157,19 @@ function config(key, value, cb) {
 
   try { fileConfig = require(configPath) }
   catch (e) {} // no config-file, so we use currConfig or hardcoded defaults
-
+  
   currConfig.prefix  = currConfig.prefix  || fileConfig.prefix  || home+'/.nexus'
   currConfig.key     = currConfig.key     || fileConfig.key     || null
   currConfig.cert    = currConfig.cert    || fileConfig.cert    || null
+  currConfig.ca      = currConfig.ca      || fileConfig.ca      || null
   currConfig.tmp     = currConfig.tmp     || fileConfig.tmp     || currConfig.prefix+'/tmp'
   currConfig.apps    = currConfig.apps    || fileConfig.apps    || currConfig.prefix+'/apps'
-  currConfig.ca      = currConfig.ca      || fileConfig.ca      || currConfig.prefix+'/ca'
   currConfig.logs    = currConfig.logs    || fileConfig.logs    || currConfig.prefix+'/logs'
   currConfig.host    = currConfig.host    || fileConfig.host    || '0.0.0.0'
   currConfig.port    = currConfig.port    || fileConfig.port    || 0xf00
   currConfig.remotes = currConfig.remotes || fileConfig.remotes || {}
 
-  new AA( [ currConfig.ca
-          , currConfig.logs
+  new AA( [ currConfig.logs
           , currConfig.apps
           , currConfig.tmp
           ] ).map(function(x, i, next){

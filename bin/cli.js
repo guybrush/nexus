@@ -202,6 +202,7 @@ else {
     } catch(e) { exit('can not read cert-file: '+_config.cert) }
   }
   var client = dnode({type:'NEXUS_CLI'})
+  
   client.connect(opts, function(remote, conn){
     _conn = conn
     nexus = remote

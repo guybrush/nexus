@@ -28,22 +28,27 @@ if (_config.cert) {
   }
 }
 
-fs.readdir(_config.ca,function(err,data){
-  if (data.length > 0) {
-    opts.requestCert = true
-    opts.rejectUnauthorized = true
-    new AA(data).map(function(x,i,next){
-      fs.readFile(_config.ca+'/'+x,'utf8',next)
-    }).done(function(err, data){
-      if (err)
-        console.error('could not add cert-files to ca',err)
-      opts.ca = data
+if (_config.ca) {
+  fs.readdir(_config.ca,function(err,data){
+    if (data.length > 0) {
+      opts.requestCert = true
+      opts.rejectUnauthorized = true
+      new AA(data).map(function(x,i,next){
+        fs.readFile(_config.ca+'/'+x,'utf8',next)
+      }).done(function(err, data){
+        if (err)
+          console.error('could not add cert-files to ca',err)
+        opts.ca = data
+        start()
+      }).exec()
+    } else {
       start()
-    }).exec()
-  } else {
-    start()
-  }
-})
+    }
+  })
+}
+else 
+  start()
+  
 
 function start() {
   var server = dnode(nexus(_config)).listen(opts)
