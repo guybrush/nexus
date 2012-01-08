@@ -381,7 +381,6 @@ function start(opts, cb) {
   parseStart(opts, function(err, data){
     portfinder.basePort = 33333
     portfinder.getPort(function(err,port){
-      console.log('starting server on '+port)
       var tempServer = dnode({done:function(err, data){
         cb(err, data)
         tempServer.close()
