@@ -206,28 +206,29 @@ function monitor(opts, cb) {
 
   function stop(cb) {
     self.stopFlag = true
-    if (self.child && self.child.pid) {
-      var pid = self.child.pid
-      var timer = setTimeout(function(){
-        cb('the process is unkillable :D #TODO')
-      },4000)
-      self.child.once('exit',function(){
-        self.stopFlag = false
-        clearTimeout(timer)
-        info(function(err,data){
-          cb && cb(err,data)
-          if (!self.restartFlag) process.exit(0)
+    info(function(err,data){
+      if (err) return cb(err)
+      if (data.running) {
+        var timer = setTimeout(function(){
+          cb('tried to kill process (pid:'+data.pid+') but it did not exit yet')
+        },4000)
+        psTree(data.pid, function(err, children){
+          var pids = children.map(function (p) {return p.PID})
+          pids.unshift(data.pid)
+          spawn('kill', ['-9'].concat(pids)).on('exit',function(){
+            self.stopFlag = false
+            clearTimeout(timer)
+            cb(err,data)
+            if (!self.restartFlag) process.exit(0)
+          })
         })
-      })
-      process.kill(self.child.pid)
-    }
-    else {
-      self.stopFlag = false
-      info(function(err,data){
-        cb && cb(err,data)
+      }
+      else {
+        self.stopFlag = false
+        cb(err,data)
         if (!self.restartFlag) process.exit(0)
-      })
-    }
+      }
+    })
   }
 
   function info(cb) {
