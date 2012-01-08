@@ -131,19 +131,6 @@ function monitor(opts, cb) {
 
   self.id = null
   
-  var logFile = opts.script
-  
-  if (logFile == __dirname+'/server.js') {
-    logFile = 'nexus_server'
-  }
-  else if (logFile.slice(0,_config.apps.length) == _config.apps) {
-    logFile = logFile.slice(_config.apps.length+1)
-  }
-  
-  logFile = logFile.replace(/[\/\s]/g,'_')+'.'+self.id
-  
-  self.logFileStdout = _config.logs+'/'+logFile+'.stdout.log'
-  self.logFileStderr = _config.logs+'/'+logFile+'.stderr.log'
   
   fs.readdir(_config.logs, function(err,data){
     var currIds = []
@@ -187,7 +174,21 @@ function monitor(opts, cb) {
       for (var x in opts.env)
         env[x] = self.env[x]
     }
-
+    
+    var logFile = opts.script
+  
+    if (logFile == __dirname+'/server.js') {
+      logFile = 'nexus_server'
+    }
+    else if (logFile.slice(0,_config.apps.length) == _config.apps) {
+      logFile = logFile.slice(_config.apps.length+1)
+    }
+    
+    logFile = logFile.replace(/[\/\s]/g,'_')+'.'+self.id
+    
+    self.logFileStdout = _config.logs+'/'+logFile+'.stdout.log'
+    self.logFileStderr = _config.logs+'/'+logFile+'.stderr.log'
+    
     // use require('npm').runScript()
     self.child = spawn( opts.command
                       , [opts.script].concat(opts.options)

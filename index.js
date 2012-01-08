@@ -226,20 +226,22 @@ function install(opts, cb) {
         if (err) return cb(err)
         var name = opts.name || res[res.length-1][0]
         var tmpPath = res[res.length-1][1]
-        if (path.existsSync(_config.apps+'/'+name)) {
-          var found = false, i = 0
-          while (!found) {
-            if (!path.existsSync(_config.apps+'/'+name+'_'+(++i)))
-              found = true
+        path.exists(_config.apps+'/'+name,function(exists){
+          if (exists) {
+            var found = false, i = 0
+            while (!found) {
+              if (!path.existsSync(_config.apps+'/'+name+'_'+(++i)))
+                found = true
+            }
+            name = name+'_'+i
           }
-          name = name+'_'+i
-        }
-        ncp.ncp(tmpPath,_config.apps+'/'+name,function(err){
-          if (err) return cb(err)
-          rimraf(_config.tmp+'/node_modules',function(err){
-            if (serverProc)
-              ee2.emit('server::'+serverProc.id+'::installed',name)
-            cb(err, name)
+          ncp.ncp(tmpPath,_config.apps+'/'+name,function(err){
+            if (err) return cb(err)
+            rimraf(_config.tmp+'/node_modules',function(err){
+              if (serverProc)
+                ee2.emit('server::'+serverProc.id+'::installed',name)
+              cb(err, name)
+            })
           })
         })
       })
