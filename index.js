@@ -27,6 +27,7 @@ var fs      = require('fs')
   , rimraf  = require('rimraf')
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
+  , portfinder = require('portfinder')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
   , procs   = {}
@@ -378,15 +379,19 @@ function start(opts, cb) {
     return cb('start needs 2 arguments')
 
   parseStart(opts, function(err, data){
-    if (err) return cb(err)
-
-    var child = fork( __dirname+'/bin/monitor.js'
-                    , ['-c',JSON.stringify(config())
-                      ,'-s',JSON.stringify(data)]
-                    , { env : process.env } )
-    
-    child.on('message',function(m){
-      cb(m.error, m.data)
+    portfinder.basePort = 33333
+    portfinder.getPort(function(err,port){
+      console.log('starting server on '+port)
+      var tempServer = dnode({done:function(err, data){
+        cb(err, data)
+        tempServer.close()
+      }}).listen(port)
+      tempServer.on('ready',function(remote, conn){
+        var child = execFile( __dirname+'/bin/monitor.js'
+                            , [ '-c', JSON.stringify(config())
+                              , '-s', JSON.stringify(data)
+                              , '-P', port ] )
+      })
     })
   })
 }

@@ -18,24 +18,21 @@ if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
   portfinder.basePort = 33333
   portfinder.getPort(function(err,port){
-    var tempServer = dnode({done:function(err, data){
-      if (process.send) {
-        process.send({error:err, data:data})
-      }
-      else {
-        if (err) console.error(err)
-        else console.log(data)
-      }
-      tempServer.close()
-      process.exit(0)
-    }}).listen(port)
-    tempServer.on('ready',function(remote, conn){
-      var child = spawn( 'node'
-                       , [ __filename
-                         , '-c', opti.argv.c
-                         , '-s', opti.argv.s
-                         , '-p', port ] 
-                       , { env : process.env } )
+    var nexusTempPort = opti.argv.P
+    dnode.connect(nexusTempPort,function(remoteNexus){
+      var tempServer = dnode({done:function(err, data){
+        remoteNexus.done(err,data)
+        tempServer.close()
+        process.exit(0)
+      }}).listen(port)
+      tempServer.on('ready',function(remote, conn){
+        var child = spawn( 'node'
+                         , [ __filename
+                           , '-c', opti.argv.c
+                           , '-s', opti.argv.s
+                           , '-p', port ] 
+                         , { env : process.env } )
+      })
     })
   })
 }                                         
