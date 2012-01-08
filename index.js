@@ -380,28 +380,14 @@ function start(opts, cb) {
   parseStart(opts, function(err, data){
     if (err) return cb(err)
 
-    /****/
-    var child = execFile( __dirname+'/bin/monitor.js' 
-                        , ['-c',JSON.stringify(config())
-                          ,'-s',JSON.stringify(data)] 
-                        , {env:process.env} 
-                        , childCb )
-    function childCb(err, stdout, stderr) {
-      if (err) return cb(err)
-      // console.log(stdout)
-      var out = JSON.parse(stdout)
-      cb(null, out)
-    }
-    /**** /
     var child = fork( __dirname+'/bin/monitor.js'
-                    , []
-                    , {env:process.env} )
+                    , ['-c',JSON.stringify(config())
+                      ,'-s',JSON.stringify(data)]
+                    , { env : process.env } )
     
     child.on('message',function(m){
       cb(m.error, m.data)
     })
-    child.send({start:data,config:config()})
-    /****/
   })
 }
 

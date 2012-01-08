@@ -16,6 +16,7 @@
   , "ncp"           : "0.2.3"
   , "npm"           : "1.0.106"
   , "optimist"      : "0.2.8"
+  , "portfinder"    : "0.2.1"
   , "ps-tree"       : "0.0.2"
   , "rimraf"        : "1.0.9"
   , "underscore"    : "1.2.2"
