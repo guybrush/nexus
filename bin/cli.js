@@ -72,12 +72,22 @@ help.install   = [ 'nexus install <tarball url> [<package-name>]'
                  , '      its package.json will be taken appended by "@<version>"'
                  , 'note: upon name-collision the package-name will be appended with "_$i"'
                  ].join('\n')
-help.uninstall = [ 'nexus uninstall <name>'
+help.uninstall = [ 'nexus uninstall <appName>'
                  , ''
                  , 'note: shortcut for "uninstall" is "rm"'
                  ].join('\n')
 help.rm        = help.uninstall
-help.ls        =   'nexus ls .. there are no parameters'
+help.ls        = [ 'nexus ls [<appName>] [<filter>]'
+                 , ''
+                 , 'examples:'
+                 , ''
+                 , 'nexus ls                       .. list all installed apps with all infos'
+                 , 'neuxs ls foo                   .. show all infos about the app "foo"'
+                 , 'nexus ls --name --version      .. list all installed apps and'
+                 , '                                  filter `package.name` and `package.version`'
+                 , 'nexus ls foo --name --version  .. show `package.name` and `package.version` of' 
+                 , '                                  of the installed app "foo"'
+                 ].join('\n')
 help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , ''
                  , '<event> is a wildcarded eventemitter2-event'
@@ -88,14 +98,14 @@ help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , 'nexus subscribe all                   .. subscribe to all events'
                  , 'nexus subscribe "*::*::*"             .. subscribe to all events'
                  , 'nexus subscribe monitor::<id>::*      .. only events from that monitor'
-                 , 'nexus subscribe monitor::<id>::stdout .. listen for a programm stdout'
-                 , 'nexus subscribe monitor::<id>::stderr .. listen for a programm stderr'
+                 , 'nexus subscribe monitor::<id>::stdout .. listen for an app stdout'
+                 , 'nexus subscribe monitor::<id>::stderr .. listen for an app stderr'
                  , 'nexus subscribe monitor::<id>::start  .. the program has been restarted'
-                 , 'nexus subscribe monitor::<id>::exit   .. a program exited'
-                 , 'nexus subscribe monitor::*::connected .. a program has been started and'
+                 , 'nexus subscribe monitor::<id>::exit   .. a app exited'
+                 , 'nexus subscribe monitor::*::connected .. a app has been started and'
                  , '                                         the monitor-server has connected'
-                 , 'nexus subscribe monitor::*::exit      .. a program has exited'
-                 , 'nexus subscribe server::*::installed  .. when packages get installed'
+                 , 'nexus subscribe monitor::*::exit      .. a app has exited'
+                 , 'nexus subscribe server::*::installed  .. when an app get installed'
                  , 'nexus subscribe server::*::error      .. listen for nexus-server errors'
                  , ''
                  , 'note: in bash you may want to wrap the event with "",'
@@ -130,8 +140,8 @@ help.start     = [ 'nexus start <appName> [<options>]'
                  , 'the algorithm looks like this:'
                  , ''
                  , '/^\\//.test(<appName>)'
-                 , '  : script = <appName>'
-                 , '  ? CWD+"/<appName>" exists'
+                 , '  ? script = <appName>'
+                 , '  : CWD+"/<appName>" exists'
                  , '    ? start CWD+"/<appName>"'
                  , '    : /\\//.test(<appName>)'
                  , '      ? <appName>.split("/")[0] is an installed app'
@@ -239,7 +249,10 @@ function parseArgs() {
       nexus.config(exit)
       break
     case 'ls':
-      nexus.ls(argv._[0], exit)
+      var opts = {}
+      opts.package = argv._[0]
+      opts.filter = _.without(Object.keys(argv),'_','$0')
+      nexus.ls(opts, exit)
       break
     case 'install':
       var pkg = argv._[0]

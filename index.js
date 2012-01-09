@@ -280,20 +280,27 @@ function uninstall(opts, cb) {
 //                                               ls
 //------------------------------------------------------------------------------
 
-function ls(package, cb) {
+function ls(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
 
   var _config = config()
-  if (arguments[0] && typeof arguments[0] === 'string') {
-    package = arguments[0]
-    path.exists(_config.apps+'/'+package+'/package.json',function(exists){
-      if (!exists) return cb('package is not installed: '+package)
+  if (opts && opts.package) {
+    path.exists(_config.apps+'/'+opts.package+'/package.json',function(exists){
+      if (!exists) return cb('package is not installed: '+opts.package)
       var pkg
       try {
-        pkg = require(_config.apps+'/'+package+'/package.json')
+        pkg = require(_config.apps+'/'+opts.package+'/package.json')
       } catch(e) { return cb(e) }
-      cb(null, pkg)
+      if (!opts.filter || opts.filter.length == 0)
+        return cb(null, pkg)
+      var result = {}
+      _.each(opts.filter, function(x,i){
+        var info = objPath(pkg,x)
+        if (info !== undefined) result[x] = info
+        else result[x] = 'UNKNOWN'
+      })
+      cb(null,result)
     })
   }
   else {
@@ -303,7 +310,17 @@ function ls(package, cb) {
       new AA(data).map(function(x,i,next){
         try {
           var pkg = require(_config.apps+'/'+x+'/package.json')
-          result[x] = pkg
+          if (!opts.filter || opts.filter.length == 0) {
+            result[x] = pkg
+          }
+          else {
+            result[x] = {}
+            _.each(opts.filter, function(y,j){
+              var info = objPath(pkg,y)
+              if (info !== undefined) result[x][y] = info
+              else result[x][y] = 'UNKNOWN'
+            })
+          }
         } catch(e) {
           return next(e)
         }
@@ -335,7 +352,7 @@ function ps(opts, cb) {
       return procs[opts.id].info(cb)
     }
     procs[opts.id].info(function(err,data){
-      _.each(opts.filter,function(x,i){
+      _.each(opts.filter, function(x,i){
         var info = objPath(data,x)
         if (info !== undefined) result[x] = info
         else result[x] = 'UNKNOWN'
