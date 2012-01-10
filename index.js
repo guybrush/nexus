@@ -285,12 +285,12 @@ function ls(opts, cb) {
     cb = arguments[arguments.length - 1]
 
   var _config = config()
-  if (opts && opts.package) {
-    path.exists(_config.apps+'/'+opts.package+'/package.json',function(exists){
+  if (opts && opts.name) {
+    path.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
       if (!exists) return cb('package is not installed: '+opts.package)
       var pkg
       try {
-        pkg = require(_config.apps+'/'+opts.package+'/package.json')
+        pkg = require(_config.apps+'/'+opts.name+'/package.json')
       } catch(e) { return cb(e) }
       if (!opts.filter || opts.filter.length == 0)
         return cb(null, pkg)

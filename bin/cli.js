@@ -250,7 +250,7 @@ function parseArgs() {
       break
     case 'ls':
       var opts = {}
-      opts.package = argv._[0]
+      opts.name = argv._[0]
       opts.filter = _.without(Object.keys(argv),'_','$0')
       nexus.ls(opts, exit)
       break

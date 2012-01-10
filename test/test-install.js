@@ -17,13 +17,14 @@ test('install tarball url', function(t) {
     nexus.install(opts, function(err, data){
       t.notOk(err,'install without error')
       t.equal(data,'gnag','the name of installed package is correct')
-      nexus.ls('gnag', function(err, data){
+      nexus.ls({name:'gnag'}, function(err, data){
         t.notOk(err,'ls without error')
+        console.log(data)
         t.equal(data.name,'app-simple','ls displays the right package')
         nexus.install(opts, function(err, data) {
           t.notOk(err,'install with name-collision without error')
           t.equal(data,'gnag_1','the name of name-collision-package is altered')
-          nexus.ls('gnag_1', function(err, data){
+          nexus.ls({name:'gnag_1'}, function(err, data){
             t.notOk(err,'ls name-collision-package without error')
             t.equal(data.name,'app-simple','ls name-collision-package displays right package')
             cleanup(function(){
