@@ -180,7 +180,7 @@ function monitor(opts, cb) {
       self.child = null
       if ((code != 0) && !self.stopFlag) {
         self.crashed++
-        if (self.crashed < self.max) {
+        if (!self.max || self.crashed < self.max) {
           setTimeout(function(){
             start()
           },200)

@@ -30,6 +30,7 @@ var opti = require('optimist')
     , '    restart   .. restart a running (or max crashed) program'
     , '    stop      .. stop a running program'
     , '    stopall   .. stop all running programs'
+    , '    runscript .. execute a script, defined in the package.json'
     , '    logs      .. access log-files'
     , '    cleanlogs .. remove old log-files (of not-running programs)'
     , '    subscribe .. subscribe to events'
@@ -38,7 +39,6 @@ var opti = require('optimist')
     , ''
     , 'note: ps, restart, stop, stopall, cleanlogs and subscribe'
     , '      only work with a local or remote running nexus-server.'
-    , ''
     ].join('\n')
 
 var help = {}
@@ -81,12 +81,12 @@ help.ls        = [ 'nexus ls [<appName>] [<filter>]'
                  , ''
                  , 'examples:'
                  , ''
-                 , 'nexus ls                       .. list all installed apps with all infos'
-                 , 'neuxs ls foo                   .. show all infos about the app "foo"'
-                 , 'nexus ls --name --version      .. list all installed apps and'
-                 , '                                  filter `package.name` and `package.version`'
-                 , 'nexus ls foo --name --version  .. show `package.name` and `package.version` of' 
-                 , '                                  of the installed app "foo"'
+                 , 'nexus ls                      .. list all installed apps with all infos'
+                 , 'neuxs ls foo                  .. show all infos about the app "foo"'
+                 , 'nexus ls --name --version     .. list all installed apps and'
+                 , '                                 filter `package.name` and `package.version`'
+                 , 'nexus ls foo --name --version .. show `package.name` and `package.version` of' 
+                 , '                                 of the installed app "foo"'
                  ].join('\n')
 help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , ''
@@ -127,7 +127,7 @@ help.ps        = [ 'nexus ps [<id>] [<filter>]'
                  , 'note: if no <id> is passed, it will list all running programs'
                  , '      if no <filter> is passed, it will print all information'
                  ].join('\n')
-help.start     = [ 'nexus start <appName> [<options>]'
+help.start     = [ 'nexus start [<nexusOptions>] <appName> [<appOptions>]'
                  , ''
                  , 'examples:'
                  , ''
@@ -136,6 +136,12 @@ help.start     = [ 'nexus start <appName> [<options>]'
                  , 'nexus start /home/me/foo.js -p 3003'
                  , 'nexus start ./foo.js -p 3004'
                  , 'nexus start foo.js -p 3005'
+                 , 'nexus start -m 0 installedApp .. start the app "installedApp" without restart'
+                 , ''
+                 , 'nexusOptions:'
+                 , ''
+                 , '-m, --max     .. restart script upon crash only <max> times'
+                 , '-c, --command .. start script with <command>'
                  , ''
                  , 'the algorithm looks like this:'
                  , ''
@@ -157,9 +163,21 @@ help.start     = [ 'nexus start <appName> [<options>]'
                  , '        : invalid startScript'
                  ].join('\n')
 help.restart   =   'nexus restart <id> .. restarts the program (not the monitor)'
-help.stop      =   'nexus stop <id> .. stops the program (and the monitor)'
-help.stopall   = [ 'nexus stopall .. there are no parameters, stops all programs'
-                 , '                 and their monitors'
+help.stop      =   'nexus stop <id>    .. stops a running app (and the monitor)'
+help.stopall   = [ 'nexus stopall      .. there are no parameters, stops all apps'
+                 , '                      and their monitors'
+                 ].join('\n')
+help.runscript = [ 'nexus runscript [<appName> <scriptName>]'
+                 , ''
+                 , '* `nexus runscript <appName>` will list available scripts for that app'
+                 , '* the script is started with require("child_process").exec()'
+                 , '* the script will not be restarted upon crash'
+                 , '* `nexus runscript foo start` is not like `nexus start foo`!'
+                 , '* do `nexus ls --scripts` to list available scripts'
+                 , ''
+                 , 'example:'
+                 , ''
+                 , 'nexus runscript foo test .. will run the package.scripts.test-script'
                  ].join('\n')
 help.logs      = [ 'nexus logs .. list all logfiles'
                  , 'nexus log <file> [-n <number of lines>] .. -n is 20 per default'
@@ -298,8 +316,20 @@ function parseArgs() {
     case 'stopall':
       nexus.stopall(exit)
       break
+    case 'runscript':
+      var opts = {}
+      opts.name = argv._[0]
+      opts.script = argv._[1]
+      nexus.runscript(opts, function(err,stdout,stderr){
+        if (err) return exit(err)
+        var result = '// running script "'+opts.script+'" from the app "'+opts.name+'"'
+        if (stdout) result += '\n// STDOUT:\n'+stdout
+        if (stderr) result += '\n// STDERR:\n'+stderr
+        exit(null, result)  
+      })
+      break
     case 'logs':
-      nexus.logs({file:argv._[0],lines:argv.n}, exit)
+      nexus.logs({file:argv._[0], lines:argv.n}, exit)
       break
     case 'cleanlogs':
       nexus.cleanlogs(function(err,data){exit(err,'deleted '+data+' logfiles')})

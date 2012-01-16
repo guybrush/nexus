@@ -9,15 +9,13 @@ nexus.ls = ls
 nexus.install = install
 nexus.uninstall = uninstall
 nexus.start = start
-nexus.scripts = scripts
+nexus.runscript = runscript
 nexus.logs = logs
 nexus.server = server
 
 var fs      = require('fs')
   , path    = require('path')
-  , fork    = require('child_process').fork
-  , spawn   = require('child_process').spawn
-  , execFile = require('child_process').execFile
+  , cp      = require('child_process')
   , dnode   = require('dnode')
   , _       = require('underscore')
   , fstream = require('fstream')
@@ -57,7 +55,7 @@ function nexus(configParam) {
     this.restart   = restart
     this.stop      = stop
     this.stopall   = stopall
-    this.scripts   = scripts
+    this.runscript = runscript
     this.logs      = logs
     this.cleanlogs = cleanlogs
     this.remote    = remote
@@ -121,7 +119,7 @@ function nexus(configParam) {
   dnodeInterface.install = install
   dnodeInterface.uninstall = uninstall
   dnodeInterface.start = start
-  dnodeInterface.scripts = scripts
+  dnodeInterface.runscript = runscript
   dnodeInterface.logs = logs
   dnodeInterface.server = server
   return dnodeInterface
@@ -298,7 +296,7 @@ function ls(opts, cb) {
       _.each(opts.filter, function(x,i){
         var info = objPath(pkg,x)
         if (info !== undefined) result[x] = info
-        else result[x] = 'UNKNOWN'
+        else result[x] = 'UNDEFINED'
       })
       cb(null,result)
     })
@@ -318,7 +316,7 @@ function ls(opts, cb) {
             _.each(opts.filter, function(y,j){
               var info = objPath(pkg,y)
               if (info !== undefined) result[x][y] = info
-              else result[x][y] = 'UNKNOWN'
+              else result[x][y] = 'UNDEFINED'
             })
           }
         } catch(e) {
@@ -355,7 +353,7 @@ function ps(opts, cb) {
       _.each(opts.filter, function(x,i){
         var info = objPath(data,x)
         if (info !== undefined) result[x] = info
-        else result[x] = 'UNKNOWN'
+        else result[x] = 'UNDEFINED'
       })
       cb(err,result)
     })
@@ -371,7 +369,7 @@ function ps(opts, cb) {
         _.each(opts.filter,function(y,j){
           var info = objPath(data,y)
           if (info !== undefined) result[x][y] = info
-          else result[x][y] = 'UNKNOWN'
+          else result[x][y] = 'UNDEFINED'
         })
       }
       next(err,data)
@@ -403,10 +401,10 @@ function start(opts, cb) {
         tempServer.close()
       }}).listen(port)
       tempServer.on('ready',function(remote, conn){
-        var child = execFile( __dirname+'/bin/monitor.js'
-                            , [ '-c', JSON.stringify(config())
-                              , '-s', JSON.stringify(data)
-                              , '-P', port ] )
+        var child = cp.execFile( __dirname+'/bin/monitor.js'
+                               , [ '-c', JSON.stringify(config())
+                                 , '-s', JSON.stringify(data)
+                                 , '-P', port ] )
       })
     })
   })
@@ -456,11 +454,22 @@ function stopall(cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               scripts
+//                                               runscript
 //------------------------------------------------------------------------------
 
-function scripts(cb) {
-  cb('#TODO')
+function runscript(opts, cb) {
+  if (!opts || !opts.name || !opts.script)
+    return cb('name or script not defined')
+  ls({name:opts.name},function(err,data){
+    
+    if (err) 
+      return cb(err)
+    if (!data.scripts[opts.script])
+      return cb('the app "'+opts.name+'" has no script called "'+opts.script+'"')
+    
+    var _config = config()
+    cp.exec(data.scripts[opts.script],{cwd:_config.apps+'/'+opts.name},cb)
+  })
 }
 
 //------------------------------------------------------------------------------
@@ -572,7 +581,7 @@ function server(opts, cb) {
     var startOptions =
       { script: __dirname+'/bin/server.js'
       , command: 'node'
-      , max: 100
+      // , max: 100
       , package: _pkg
       , env: {NEXUS_CONFIG:JSON.stringify(config())}
       }
@@ -614,7 +623,7 @@ function parseStart(opts, cb) {
   result.options = opts.options || []
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
-  result.max = opts.max || 10
+  result.max = opts.max
   result.name = 'unnamed'
 
   var _config = config()
