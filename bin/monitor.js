@@ -107,7 +107,7 @@ function monitor(opts, cb) {
       self.id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)
     } while(currIds.indexOf(self.id) != -1)
 
-    start(function(){
+    start(function(err, data){
       function server(remote, conn) {
         if (self.script == __dirname+'/server.js')
           this.type = 'NEXUS_SERVER_MONITOR'
@@ -127,9 +127,7 @@ function monitor(opts, cb) {
           cb && cb()
         }
       }
-      info(function(err,data){
-        cb(err,{dnodeInterface:server,info:data})
-      })
+      cb(err,{dnodeInterface:server,info:data})
     })
   })
 
@@ -154,7 +152,6 @@ function monitor(opts, cb) {
     self.logFileStdout = _config.logs+'/'+logFile+'.stdout.log'
     self.logFileStderr = _config.logs+'/'+logFile+'.stderr.log'
     
-    // use require('npm').runScript()
     self.child = spawn( opts.command
                       , [opts.script].concat(opts.options)
                       , { cwd : opts.cwd
@@ -243,6 +240,8 @@ function monitor(opts, cb) {
         , name : self.name
         , command : self.command
         , script : self.script
+        , logFileStdout : self.logFileStdout
+        , logFileStderr : self.logFileStderr
         , package : self.package
         , monitorPid : process.pid
         , pid : self.child ? self.child.pid : null

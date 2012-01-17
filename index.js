@@ -402,6 +402,8 @@ function start(opts, cb) {
   parseStart(opts, function(err, data){
     portfinder.basePort = 33333
     portfinder.getPort(function(err,port){
+      // a tempServer to make starting apps without a
+      // running nexus-server possible
       var tempServer = dnode({done:function(err, data){
         cb(err, data)
         tempServer.close()
