@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// cli-options:
+//
+// -c <JSON.stringified-nexusConfig> 
+// -s <JSON.stringified-startOptions>
+// -p <localTempServerPort>
+// -P <remoteTempServerPort>
+
 var nexus = require('../')
   , _config
   , dnode = require('dnode')
@@ -18,10 +25,10 @@ if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
   portfinder.basePort = 33333
   portfinder.getPort(function(err,port){
-    var nexusTempPort = opti.argv.P
-    dnode.connect(nexusTempPort,function(remoteNexus){
+    var remoteTempPort = opti.argv.P
+    dnode.connect(remoteTempPort,function(remoteTempServer){
       var tempServer = dnode({done:function(err, data){
-        remoteNexus.done(err,data)
+        remoteTempServer.done(err,data)
         tempServer.close()
         process.exit(0)
       }}).listen(port)
@@ -96,6 +103,7 @@ function monitor(opts, cb) {
   self.restartFlag = false
   self.stopFlag = false
   self.env = opts.env
+  self.restartTimeout = 200
 
   fs.readdir(_config.logs, function(err,data){
     var currIds = []
@@ -178,9 +186,13 @@ function monitor(opts, cb) {
       if ((code != 0) && !self.stopFlag) {
         self.crashed++
         if (!self.max || self.crashed < self.max) {
+          if ((Date.now()-self.ctime) > 5000)
+            self.restartTimeout = 200
+          else if (self.restartTimeout < 4000)
+            self.restartTimeout += 100
           setTimeout(function(){
             start()
-          },200)
+          },self.restartTimeout)
         }
       }
     })
