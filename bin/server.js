@@ -34,7 +34,7 @@ if (_config.ca) {
       opts.requestCert = true
       opts.rejectUnauthorized = true
       new AA(data).map(function(x,i,next){
-        fs.readFile(_config.ca+'/'+x,'utf8',next)
+        fs.readFile(_config.ca+'/'+x,next)
       }).done(function(err, data){
         if (err)
           console.error('could not add cert-files to ca',err)
@@ -46,9 +46,9 @@ if (_config.ca) {
     }
   })
 }
-else 
+else {
   start()
-  
+}
 
 function start() {
   var server = dnode(nexus(_config)).listen(opts)

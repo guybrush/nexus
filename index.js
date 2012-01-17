@@ -285,10 +285,10 @@ function ls(opts, cb) {
   var _config = config()
   if (opts && opts.name) {
     path.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
-      if (!exists) return cb('package is not installed: '+opts.package)
+      if (!exists) return cb('package is not installed: '+opts.name)
       var pkg
       try {
-        pkg = require(_config.apps+'/'+opts.name+'/package.json')
+        pkg = JSON.parse(fs.readFileSync(_config.apps+'/'+opts.name+'/package.json','utf-8'))
       } catch(e) { return cb(e) }
       if (!opts.filter || opts.filter.length == 0)
         return cb(null, pkg)
@@ -307,7 +307,7 @@ function ls(opts, cb) {
       var result = {}
       new AA(data).map(function(x,i,next){
         try {
-          var pkg = require(_config.apps+'/'+x+'/package.json')
+          var pkg = JSON.parse(fs.readFileSync(_config.apps+'/'+x+'/package.json','utf-8'))
           if (!opts.filter || opts.filter.length == 0) {
             result[x] = pkg
           }
@@ -336,6 +336,12 @@ function ls(opts, cb) {
 //------------------------------------------------------------------------------
 
 function ps(opts, cb) {
+  if (typeof arguments[arguments.length - 1] === 'function')
+    cb = arguments[arguments.length - 1]
+  
+  if (arguments.length < 2)
+    opts = {}
+    
   opts = opts || {}
   if (!opts.filter || !Array.isArray(opts.filter) || opts.filter.length==0)
     opts.filter = null
@@ -634,7 +640,7 @@ function parseStart(opts, cb) {
     result.name = maybeApp.split('/')[0]
     appPath = _config.apps+'/'+maybeApp
     try {
-      result.package = require(appPath+'/package.json')
+      result.package = JSON.parse(fs.readFileSync(appPath+'/package.json','utf-8'))
     } catch(e) {}
   }
 
