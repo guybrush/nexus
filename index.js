@@ -400,6 +400,7 @@ function start(opts, cb) {
     return cb('start needs 2 arguments')
 
   parseStart(opts, function(err, data){
+    if (err) return cb(err)
     portfinder.basePort = 33333
     portfinder.getPort(function(err,port){
       // a tempServer to make starting apps without a
