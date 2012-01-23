@@ -129,19 +129,20 @@ function monitor(startOpts, startCb) {
       }
     }
     
-    var err
     var opts = { port : _config.port
                , host : _config.host
                , reconnect : 500 }
-    try {                      
+    
+    try {
       if (_config.key)
         opts.key = fs.readFileSync(_config.key)
       if (_config.cert)
         opts.cert = fs.readFileSync(_config.cert)
-    } catch(e) {
-      err = e
     }
-    if (err) return cb(err)
+    catch (e) {
+      startCb(e)
+      throw e
+    }
     var monitorServer = dnode(server)
     monitorServer.connect(opts)
     monitorServer.on('error',function(err){
