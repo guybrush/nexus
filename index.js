@@ -398,7 +398,7 @@ function start(opts, cb) {
 
   if (arguments.length != 2)
     return cb('start needs 2 arguments')
-
+  
   parseStart(opts, function(err, data){
     if (err) return cb(err)
     portfinder.basePort = 33333
@@ -414,6 +414,12 @@ function start(opts, cb) {
                                , [ '-c', JSON.stringify(config())
                                  , '-s', JSON.stringify(data)
                                  , '-P', port ] )
+        // child.stdout.on('data',function(d){
+        //   console.log('monitorScript-stdout',d.toString())
+        // })
+        // child.stderr.on('data',function(d){
+        //   console.log('monitorScript-stderr',d.toString())
+        // })
       })
     })
   })

@@ -39,6 +39,12 @@ if (!process.env.NEXUS_MONITOR) {
                            , '-s', opti.argv.s
                            , '-p', port ] 
                          , { env : process.env } )
+        // child.stdout.on('data',function(d){
+        //   console.log('monitorChild-stdout',d.toString())
+        // })
+        // child.stderr.on('data',function(d){
+        //   console.log('monitorChild-stderr',d.toString())
+        // })
       })
     })
   })
@@ -48,33 +54,9 @@ else {
   _config = JSON.parse(opti.argv.c)
   var startOpts = JSON.parse(opti.argv.s)
   var tempPort = opti.argv.p
-  dnode.connect(tempPort, function(remote, conn){
-    monitor(startOpts, function(err, data){
-      if (err) 
-        return remote.done(err)
-      var error
-      var opts = { port : _config.port
-                 , host : _config.host
-                 , reconnect : 500 }
-      try {                      
-        if (_config.key)
-          opts.key = fs.readFileSync(_config.key)
-        if (_config.cert)
-          opts.cert = fs.readFileSync(_config.cert)
-      } catch(e) {
-        error = e
-      }
-      if (error)
-        return remote.done(error)
-      remote.done(null, data.info)
-      conn.end()
-      var dnodeMonitor = dnode(data.dnodeInterface)
-      dnodeMonitor.connect(opts)
-      dnodeMonitor.on('error',function(err){
-        if (err.code != 'ECONNREFUSED')             
-          console.log(err)
-      })
-    })
+  
+  dnode.connect(tempPort, function(tempRemote, tempConn){
+    monitor(startOpts, tempRemote.done)
   })
 }  
 
@@ -85,27 +67,28 @@ ee2.onAny(function(data){
   })
 })
 
-function monitor(opts, cb) {
+function monitor(startOpts, startCb) {
 
   var self = this
 
   self.id = null
   self.crashed = 0
   self.ctime = 0
-  self.env = opts.env
-  self.name = opts.name
-  self.package = opts.package
-  self.script = opts.script
-  self.options = opts.options
+  self.env = startOpts.env
+  self.name = startOpts.name
+  self.package = startOpts.package
+  self.script = startOpts.script
+  self.options = startOpts.options
   self.child = null
-  self.command = opts.command
-  self.max = opts.max
+  self.command = startOpts.command
+  self.max = startOpts.max
   self.restartFlag = false
   self.stopFlag = false
-  self.env = opts.env
+  self.env = startOpts.env
   self.restartTimeout = 200
-
+  
   fs.readdir(_config.logs, function(err,data){
+    if (err) return cb(err)
     var currIds = []
     _.each(data,function(x,i){
       var split = x.split('.')
@@ -115,38 +98,65 @@ function monitor(opts, cb) {
       self.id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)
     } while(currIds.indexOf(self.id) != -1)
 
-    start(function(err, data){
-      function server(remote, conn) {
-        if (self.script == __dirname+'/server.js')
-          this.type = 'NEXUS_SERVER_MONITOR'
-        else
-          this.type = 'NEXUS_MONITOR'
-        this.info = info
-        this.id = self.id
-        this.start = start
-        this.restart = restart
-        this.stop = stop
-        this.subscribe = function(emit, cb) {
-          subscriptions[conn.id] = emit
-          cb && cb()
-        }
-        this.unsubscribe = function(cb) {
-          delete subscriptions[conn.id]
-          cb && cb()
+    var startedOnce = false
+    var startedOnceTimeout = setTimeout(function(){
+      startedOnce = true
+      start(startCb)
+    },500)
+    
+    function server(remote, conn) {
+      if (self.script == __dirname+'/server.js')
+        this.type = 'NEXUS_SERVER_MONITOR'
+      else
+        this.type = 'NEXUS_MONITOR'
+      this.info = info
+      this.id = self.id
+      this.start = start
+      this.restart = restart
+      this.stop = stop
+      this.subscribe = function(emit, cb) {
+        subscriptions[conn.id] = emit
+        cb && cb()
+        if (!startedOnce) {
+          clearTimeout(startedOnceTimeout)
+          startedOnce = true
+          start(startCb)
         }
       }
-      cb(err,{dnodeInterface:server,info:data})
+      this.unsubscribe = function(cb) {
+        delete subscriptions[conn.id]
+        cb && cb()
+      }
+    }
+    
+    var err
+    var opts = { port : _config.port
+               , host : _config.host
+               , reconnect : 500 }
+    try {                      
+      if (_config.key)
+        opts.key = fs.readFileSync(_config.key)
+      if (_config.cert)
+        opts.cert = fs.readFileSync(_config.cert)
+    } catch(e) {
+      err = e
+    }
+    if (err) return cb(err)
+    var monitorServer = dnode(server)
+    monitorServer.connect(opts)
+    monitorServer.on('error',function(err){
+      if (err.code != 'ECONNREFUSED') console.log(err)
     })
   })
 
   function start(cb) {
     var env = process.env
-    if (opts.env) {
-      for (var x in opts.env)
+    if (self.env) {
+      for (var x in self.env)
         env[x] = self.env[x]
     }
     
-    var logFile = opts.script
+    var logFile = self.script
   
     if (logFile == __dirname+'/server.js') {
       logFile = 'nexus_server'
@@ -160,9 +170,9 @@ function monitor(opts, cb) {
     self.logFileStdout = _config.logs+'/'+logFile+'.stdout.log'
     self.logFileStderr = _config.logs+'/'+logFile+'.stderr.log'
     
-    self.child = spawn( opts.command
-                      , [opts.script].concat(opts.options)
-                      , { cwd : opts.cwd
+    self.child = spawn( self.command
+                      , [self.script].concat(self.options)
+                      , { cwd : self.cwd
                         , env : env
                         } )
 

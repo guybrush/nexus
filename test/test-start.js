@@ -43,6 +43,7 @@ test('start error', function(t) {
               })
             })
           })
+
           remote.ls(function(err,data){
             t.equal(data['errorapp'].name,'app-error')
             remote.start({script:'errorapp',options:[port]},function(){})
