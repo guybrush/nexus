@@ -472,18 +472,28 @@ function stopall(cb) {
 //                                               runscript
 //------------------------------------------------------------------------------
 
-function runscript(opts, cb) {
+function runscript(opts, stdout, stderr, cb) {
   if (!opts || !opts.name || !opts.script)
     return cb('name or script not defined')
   ls({name:opts.name},function(err,data){
-    
     if (err) 
       return cb(err)
     if (!data.scripts[opts.script])
       return cb('the app "'+opts.name+'" has no script called "'+opts.script+'"')
     
     var _config = config()
-    cp.exec(data.scripts[opts.script],{cwd:_config.apps+'/'+opts.name},cb)
+    var child = cp.exec
+      ( data.scripts[opts.script]
+      , {cwd:_config.apps+'/'+opts.name}
+      , function(err,stdout,stderr){
+          cb(err)
+        } )
+    cb(null,function(cb){
+      process.kill(child.pid,'SIGHUP')
+      cb && cb()
+    })
+    stdout && child.stdout.on('data',function(d){stdout(d)})
+    stderr && child.stderr.on('data',function(d){stderr(d)})
   })
 }
 

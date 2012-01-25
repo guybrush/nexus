@@ -320,12 +320,17 @@ function parseArgs() {
       var opts = {}
       opts.name = argv._[0]
       opts.script = argv._[1]
-      nexus.runscript(opts, function(err,stdout,stderr){
+      var stdout = function(data) {console.log('stdout →',data)}
+      var stderr = function(data) {console.log('stderr →',data)}
+      nexus.runscript(opts, stdout, stderr, function(err, kill){
         if (err) return exit(err)
-        var result = '// running script "'+opts.script+'" from the app "'+opts.name+'"'
-        if (stdout) result += '\n// STDOUT:\n'+stdout
-        if (stderr) result += '\n// STDERR:\n'+stderr
-        exit(null, result)  
+        require('tty').setRawMode(true);   
+        var stdin = process.openStdin()
+        stdin.on('keypress', function (chunk, key) {
+          if (key && key.ctrl && key.name == 'c') {
+            kill(exit())
+          }
+        })
       })
       break
     case 'logs':
