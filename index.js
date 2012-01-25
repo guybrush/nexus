@@ -601,6 +601,14 @@ function server(opts, cb) {
 
   opts = opts || {}
 
+  if (opts.cmd && opts.cmd == 'version') {
+    if (!serverProc) return cb('server is not running')
+    serverProc.info(function(err,data){
+      cb(err,data.package.version)
+    })
+    return
+  }
+  
   if (opts.cmd && opts.cmd == 'start') {
     if (serverProc) return cb('server is already running')
     var startOptions =
@@ -650,6 +658,7 @@ function parseStart(opts, cb) {
   result.cwd = opts.cwd || process.cwd()
   result.max = opts.max
   result.name = 'unnamed'
+  result.package = opts.package || null
 
   var _config = config()
   var maybeApp = opts.script.split('/')[0]

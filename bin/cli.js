@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 var opti = require('optimist')
-  , argv  = opti.argv
+  , argv = opti.argv
   , confFile = Array.isArray(argv.c) ? argv.c[0] : argv.c
   , nexus = require('../index')(confFile)
   , _config = nexus.config()
+  , _pkg = require('../package.json')
   , opti = require('optimist')
   , dnode = require('dnode')
   , fs = require('fs')
@@ -191,6 +192,7 @@ help.server    = [ 'nexus server .. (without any options) will print information
                  , 'nexus server start [-c <path to configFile>]'
                  , 'nexus server stop'
                  , 'nexus server restart'
+                 , 'nexus server version  .. print version of the current running nexus-server'
                  , ''
                  , 'note: the default-configFile-path is ~/.nexus/config.js'
                  ].join('\n')
@@ -258,7 +260,7 @@ function parseArgs() {
   var cmd = argv._.shift()
   switch (cmd) {
     case 'version':
-      exit(null,'v'+nexus.version())
+      exit(null,_pkg.version)
       break
     case 'config':
       nexus.config(exit)
