@@ -3,7 +3,7 @@ var common = require('./common')
   , fs = require('fs')
   , http = require('http')
   , assert = require('assert')
-
+  
 describe('nexus.install',function(){
     
   var port = Math.floor(Math.random() * 40000 + 10000)
@@ -82,8 +82,7 @@ describe('nexus.install',function(){
   describe('invalid url', function() {
     it('should not throw, but passes the error along', function(done){
       nexus.install({package:'http://321-foo-bar-123.com/package.tar.gz'},function(err,data){
-        assert.equal(err.code,'ENOTFOUND')
-        assert.equal(err.syscall,'getaddrinfo')
+        assert.equal(err.code,1)
         done()
       })
     })

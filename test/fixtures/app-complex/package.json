@@ -5,7 +5,7 @@
 , "scripts" :
   { "install"       : "echo install && pwd"
   , "preinstall"    : "echo preinstall && pwd"
-  , "postinstall"   : "echo postinstall && jade < echo 'foo' > foo.html"
+  , "postinstall"   : "echo postinstall"
   , "preupdate"     : "echo preupdate && pwd"
   , "update"        : "echo update && pwd"
   , "postupdate"    : "echo postupdate && pwd"

@@ -28,13 +28,13 @@ describe('nexus.server()',function(){
           remote.subscribe('server::*::connected',function(e,d){
             if (_did) return
             remote.server(function(err,dataB){
-              //assert.equal(dataA.id,dataB.id)
+              assert.equal(dataA.id,dataB.id)
               _do()
             })
           })
           remote.server(function(err,dataB){
             if (err) return
-            assert.equal(dataA.id,dataB.id)
+            //assert.equal(dataA.id,dataB.id)
             _do()
           })
         })

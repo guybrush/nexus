@@ -25,7 +25,7 @@ var fs      = require('fs')
   , rimraf  = require('rimraf')
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
-  , portfinder = require('portfinder')
+  , pf      = require('portfinder')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
   , procs   = {}
@@ -196,7 +196,54 @@ function install(opts, cb) {
   if (!opts.package) return cb('no package given to install')
 
   var _config = config()
+  var tmpPath = _config.tmp+'/'+Math.floor(Math.random()*Math.pow(2,32)).toString(16)
+  mkdirp(tmpPath,0755,function(err){
+    if (err) return cb(err)
+    var env = process.env
+    env.npm_config_prefix = tmpPath 
+    cp.execFile( __dirname+'/node_modules/npm/cli.js'
+               , [ 'install', '-p', '-g', opts.package ] 
+               , { cwd: tmpPath, env:env } 
+               , installPackage )
+  })
 
+  function installPackage(err, stdout, stderr) {
+    if (err) return cb(err)    
+    var stdoutLines = stdout.split('\n')
+    var tmpPathPkg = stdoutLines[stdoutLines.length-2]
+    var package
+    try { 
+      package = require(tmpPathPkg+'/package.json')
+    } catch(e) {
+      console.error(new Error(e))
+      return cb(new Error(e))
+    }
+    
+    var name = opts.name || package.name+'@'+package.version
+    path.exists(_config.apps+'/'+name,function(exists){
+      if (exists) {
+        var found = false, i = 0
+        while (!found) {
+          if (!path.existsSync(_config.apps+'/'+name+'_'+(++i)))
+            found = true
+        }
+        name = name+'_'+i
+      }
+      ncp.ncp(tmpPathPkg,_config.apps+'/'+name,function(err){
+        if (err) return cb(err)
+        //cb(null,name)
+        /* */
+        rimraf(tmpPath,function(err){
+          if (err) return cb(err)
+          if (serverProc)
+            ee2.emit('server::'+serverProc.id+'::installed',name)
+          cb(null, name)
+        })
+        /* */
+      })
+    })
+  }
+  /* * /
   if (!(/:\/\//.test(opts.package)))
     return installPackage()
   // this code sucks in general ..
@@ -216,6 +263,7 @@ function install(opts, cb) {
       installPackage()
     })
   })
+  
 
   function installPackage() {
     npm.load({loglevel:'silent',exit:false}, function(err){
@@ -245,6 +293,7 @@ function install(opts, cb) {
       })
     })
   }
+  /* */
 }
 
 
@@ -400,8 +449,8 @@ function start(opts, cb) {
   
   parseStart(opts, function(err, data){
     if (err) return cb(err)
-    portfinder.basePort = 33333
-    portfinder.getPort(function(err,port){
+    pf.basePort = 33333
+    pf.getPort(function(err,port){
       // a tempServer to make starting apps without a
       // running nexus-server possible
       var tempServer = dnode({done:function(err, data){
@@ -415,12 +464,12 @@ function start(opts, cb) {
                                  , '-s', JSON.stringify(data)
                                  , '-P', port ]
                                , {title:'foo'} )
-        child.stdout.on('data',function(d){
-          console.log('monitorScript-stdout',d.toString())
-        })
-        child.stderr.on('data',function(d){
-          console.log('monitorScript-stderr',d.toString())
-        })
+        // child.stdout.on('data',function(d){
+        //   console.log('monitorScript-stdout',d.toString())
+        // })
+        // child.stderr.on('data',function(d){
+        //   console.log('monitorScript-stderr',d.toString())
+        // })
       })
     })
   })
