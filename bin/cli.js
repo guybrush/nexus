@@ -42,6 +42,8 @@ var opti = require('optimist')
     , '      only work with a local or remote running nexus-server.'
     ].join('\n')
 
+process.title = 'nexus-v'+nexus.version()
+    
 var help = {}
 help.version   =   'nexus version .. will print the version of installed nexus'
 help.config    = [ 'nexus config .. show all config'

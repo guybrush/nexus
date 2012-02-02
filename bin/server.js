@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-process.title = 'nexus-server'
-
 var fs = require('fs')
   , dnode = require('dnode')
   , AA = require('async-array')
@@ -10,6 +8,8 @@ var fs = require('fs')
   , opts = { port : _config.port
            , host : _config.host }
 
+process.title = 'nexus-server:'+_config.port
+           
 console.log('starting server',_config)
            
 if (_config.key) {

@@ -20,6 +20,8 @@ var nexus = require('../')
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
   , fs = require('fs')
   , subscriptions = {} 
+
+process.title = 'nexus-monitor:'+JSON.parse(opti.argv.c).port
   
 if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
@@ -54,9 +56,11 @@ else {
   _config = JSON.parse(opti.argv.c)
   var startOpts = JSON.parse(opti.argv.s)
   var tempPort = opti.argv.p
-  
   dnode.connect(tempPort, function(tempRemote, tempConn){
-    monitor(startOpts, tempRemote.done)
+    monitor(startOpts, function(err,data){
+      process.title = 'nexus-monitor('+data.id+'):'+_config.port
+      tempRemote.done(err,data)
+    })
   })
 }  
 

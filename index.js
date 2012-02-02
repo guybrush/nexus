@@ -34,8 +34,6 @@ var fs      = require('fs')
   , subscriptionListeners = {}
   , userConfig = null
 
-process.title = 'nexus'
-
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
@@ -108,6 +106,7 @@ function nexus(configParam) {
         })
         if (serverProc)
           return rem.stop()
+        
         serverProc = rem
       }
     })
@@ -409,17 +408,19 @@ function start(opts, cb) {
         cb(err, data)
         tempServer.close()
       }}).listen(port)
+      
       tempServer.on('ready',function(remote, conn){
         var child = cp.execFile( __dirname+'/bin/monitor.js'
                                , [ '-c', JSON.stringify(config())
                                  , '-s', JSON.stringify(data)
-                                 , '-P', port ] )
-        // child.stdout.on('data',function(d){
-        //   console.log('monitorScript-stdout',d.toString())
-        // })
-        // child.stderr.on('data',function(d){
-        //   console.log('monitorScript-stderr',d.toString())
-        // })
+                                 , '-P', port ]
+                               , {title:'foo'} )
+        child.stdout.on('data',function(d){
+          console.log('monitorScript-stdout',d.toString())
+        })
+        child.stderr.on('data',function(d){
+          console.log('monitorScript-stderr',d.toString())
+        })
       })
     })
   })
@@ -638,7 +639,7 @@ function server(opts, cb) {
   if (serverProc)
     return serverProc.info(cb)
 
-  cb(null,'server is not running')
+  cb('server is not running')
 }
 
 //------------------------------------------------------------------------------
