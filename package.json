@@ -1,5 +1,5 @@
 { "name" : "nexus"
-, "version" : "0.0.10"
+, "version" : "0.0.11"
 , "description" : "remote program installation and control"
 , "repository" :
   { "type" : "git"

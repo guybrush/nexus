@@ -231,69 +231,15 @@ function install(opts, cb) {
       }
       ncp.ncp(tmpPathPkg,_config.apps+'/'+name,function(err){
         if (err) return cb(err)
-        //cb(null,name)
-        /* */
         rimraf(tmpPath,function(err){
           if (err) return cb(err)
           if (serverProc)
             ee2.emit('server::'+serverProc.id+'::installed',name)
           cb(null, name)
         })
-        /* */
       })
     })
   }
-  /* * /
-  if (!(/:\/\//.test(opts.package)))
-    return installPackage()
-  // this code sucks in general ..
-  // but ye .. without this, npm will throw on non-valid domains
-  // install via authed http? not implemented yet :D
-  // (on the cli ssh-agent might help with ssh-transport)
-  var dns = require('dns')
-  var domain = opts.package.split('://')[1]
-  domain = domain.split('/')[0]
-  domain = domain.split(':')[0]
-  var split = domain.split('@')
-  domain = split[split.length - 1]
-  dns.lookup(domain,function(err,data,fam){
-    if (err && domain!='localhost')
-      return cb(err)
-    rimraf(_config.tmp+'/node_modules',function(err){
-      installPackage()
-    })
-  })
-  
-
-  function installPackage() {
-    npm.load({loglevel:'silent',exit:false}, function(err){
-      if (err) return cb(err)
-      npm.commands.install(_config.tmp, opts.package, function(err, res) {
-        if (err) return cb(err)
-        var name = opts.name || res[res.length-1][0]
-        var tmpPath = res[res.length-1][1]
-        path.exists(_config.apps+'/'+name,function(exists){
-          if (exists) {
-            var found = false, i = 0
-            while (!found) {
-              if (!path.existsSync(_config.apps+'/'+name+'_'+(++i)))
-                found = true
-            }
-            name = name+'_'+i
-          }
-          ncp.ncp(tmpPath,_config.apps+'/'+name,function(err){
-            if (err) return cb(err)
-            rimraf(_config.tmp+'/node_modules',function(err){
-              if (serverProc)
-                ee2.emit('server::'+serverProc.id+'::installed',name)
-              cb(err, name)
-            })
-          })
-        })
-      })
-    })
-  }
-  /* */
 }
 
 
