@@ -73,15 +73,23 @@ function nexus(configParam) {
       subscriptions[event][conn.id] = emit
       cb && cb()
     }
-    this.unsubscribe = function(cb) {
-      _.each(subscriptions,function(x,i){
+    this.unsubscribe = function(event, cb) {
+      if (arguments.length<2) {
+        cb = arguments.length-1 || function() {}
+        _.each(subscriptions,function(x,i){unsubscribe(x)})
+        return cb()
+      }
+      if (!subscriptions[event])
+        return cb(new Error('not subscribed to event "'+event+'"'))
+      unsubscribe(subscriptions[event])
+      cb()
+      function unsubscribe(x) {
         delete x[currId]
         if (Object.keys(x).length == 0) {
-          ee2.removeListener(subscriptionListeners[i])
-          delete subscriptionListeners[i]
+          ee2.removeListener(subscriptionListeners[x])
+          delete subscriptionListeners[x]
         }
-      })
-      cb && cb()
+      }
     }
     conn.on('remote',function(rem){
       if (rem.type && rem.type == 'NEXUS_MONITOR') {

@@ -15,7 +15,7 @@ var opti = require('optimist')
   , usage =
     [ ' ___  ___  _ _  _ _  ___'
     , '|   || -_||_\'_|| | ||_ -|'
-    , '|_|_||___||_,_||___||___|v'+nexus.version()
+    , '|_|_||___||_,_||___||___|v'+_pkg.version
     , ''
     , 'nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]'
     , ''
@@ -40,9 +40,10 @@ var opti = require('optimist')
     , ''
     , 'note: ps, restart, stop, stopall, cleanlogs and subscribe'
     , '      only work with a local or remote running nexus-server.'
+    , ''
     ].join('\n')
 
-process.title = 'nexus-v'+nexus.version()
+process.title = 'nexus-v'+_pkg.version
     
 var help = {}
 help.version   =   'nexus version .. will print the version of installed nexus'
