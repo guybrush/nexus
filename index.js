@@ -74,8 +74,8 @@ function nexus(configParam) {
     }
     this.unsubscribe = function(events, cb) {
       cb = _.isFunction(arguments.length-1) ? arguments.length-1 : function(){}
-      events = _.isString(events) 
-               ? [events] 
+      events = _.isString(events)
+               ? [events]
                : (_.isArray(events) && events.length>0) ? events : null
       if (!events) return cb(new Error('invalid first argument'))
       var remaining = []
@@ -113,7 +113,7 @@ function nexus(configParam) {
         })
         if (serverProc)
           return rem.stop()
-        
+
         serverProc = rem
       }
     })
@@ -162,7 +162,7 @@ function config(key, value, cb) {
 
   try { fileConfig = require(configPath) }
   catch (e) {} // no config-file, so we use currConfig or hardcoded defaults
-  
+
   currConfig.prefix  = currConfig.prefix  || fileConfig.prefix  || home+'/.nexus'
   currConfig.key     = currConfig.key     || fileConfig.key     || null
   currConfig.cert    = currConfig.cert    || fileConfig.cert    || null
@@ -194,6 +194,7 @@ function config(key, value, cb) {
 //------------------------------------------------------------------------------
 
 function install(opts, cb) {
+  debug('installing',opts)
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
@@ -207,25 +208,25 @@ function install(opts, cb) {
   mkdirp(tmpPath,0755,function(err){
     if (err) return cb(err)
     var env = process.env
-    env.npm_config_prefix = tmpPath 
+    env.npm_config_prefix = tmpPath
     cp.execFile( __dirname+'/node_modules/npm/cli.js'
-               , [ 'install', '-p', '-g', opts.package ] 
-               , { cwd: tmpPath, env:env } 
+               , [ 'install', '-p', '-g', opts.package ]
+               , { cwd: tmpPath, env:env }
                , installPackage )
   })
 
   function installPackage(err, stdout, stderr) {
-    if (err) return cb(err)    
+    if (err) return cb(err)
     var stdoutLines = stdout.split('\n')
     var tmpPathPkg = stdoutLines[stdoutLines.length-2]
     var package
-    try { 
+    try {
       package = require(tmpPathPkg+'/package.json')
     } catch(e) {
       console.error(new Error(e))
       return cb(new Error(e))
     }
-    
+
     var name = opts.name || package.name+'@'+package.version
     path.exists(_config.apps+'/'+name,function(exists){
       if (exists) {
@@ -236,10 +237,13 @@ function install(opts, cb) {
         }
         name = name+'_'+i
       }
+      debug('copying',tmpPathPkg,'→',_config.apps+'/'+name)
       ncp.ncp(tmpPathPkg,_config.apps+'/'+name,function(err){
         if (err) return cb(err)
+        debug('deleting',tmpPath)
         rimraf(tmpPath,function(err){
           if (err) return cb(err)
+          debug('installed',name)
           if (serverProc)
             ee2.emit('server::'+serverProc.id+'::installed',name)
           cb(null, name)
@@ -339,10 +343,10 @@ function ls(opts, cb) {
 function ps(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
-  
+
   if (arguments.length < 2)
     opts = {}
-    
+
   opts = opts || {}
   if (!opts.filter || !Array.isArray(opts.filter) || opts.filter.length==0)
     opts.filter = null
@@ -392,6 +396,7 @@ function ps(opts, cb) {
 //------------------------------------------------------------------------------
 
 function start(opts, cb) {
+  debug('starting',opts.script)
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
@@ -399,7 +404,7 @@ function start(opts, cb) {
 
   if (arguments.length != 2)
     return cb('start needs 2 arguments')
-  
+
   parseStart(opts, function(err, data){
     if (err) return cb(err)
     pf.basePort = 33333
@@ -410,13 +415,13 @@ function start(opts, cb) {
         cb(err, data)
         tempServer.close()
       }}).listen(port)
-      
+
       tempServer.on('ready',function(remote, conn){
         debug('starting monitor',data.script)
         var child = cp.execFile( __dirname+'/bin/monitor.js'
                                , [ '-c', JSON.stringify(config())
                                  , '-s', JSON.stringify(data)
-                                 , '-P', port ] 
+                                 , '-P', port ]
                                , {env:process.env} )
         child.stdout.on('data',function(d){
           debug('monitorScript-stdout',d.toString())
@@ -434,6 +439,7 @@ function start(opts, cb) {
 //------------------------------------------------------------------------------
 
 function restart(id, cb) {
+  debug('restarting',id)
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
@@ -450,6 +456,7 @@ function restart(id, cb) {
 //------------------------------------------------------------------------------
 
 function stop(id, cb) {
+  debug('stopping',id)
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
@@ -472,7 +479,10 @@ function stopall(cb) {
   if (keys.length==0) return cb(null,[])
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].stop(next)
-  }).done(cb).exec()
+  }).done(function(err,data){
+    if (!err) debug('stopped',data)
+    cb(err,data)
+  }).exec()
 }
 
 //------------------------------------------------------------------------------
@@ -483,11 +493,11 @@ function runscript(opts, stdout, stderr, cb) {
   if (!opts || !opts.name || !opts.script)
     return cb('name or script not defined')
   ls({name:opts.name},function(err,data){
-    if (err) 
+    if (err)
       return cb(err)
     if (!data.scripts[opts.script])
       return cb('the app "'+opts.name+'" has no script called "'+opts.script+'"')
-    
+
     var _config = config()
     var child = cp.exec
       ( data.scripts[opts.script]
@@ -615,7 +625,7 @@ function server(opts, cb) {
     })
     return
   }
-  
+
   if (opts.cmd && opts.cmd == 'start') {
     if (serverProc) return cb('server is already running')
     var startOptions =
@@ -623,7 +633,7 @@ function server(opts, cb) {
       , command: 'node'
       // , max: 100
       , package: _pkg
-      , env: 
+      , env:
         { NEXUS_CONFIG : JSON.stringify(config())
         , NODE_DEBUG : !!opts.debug
         }

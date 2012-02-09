@@ -298,10 +298,8 @@ function parseArgs() {
       break
     case 'start':
       var scriptOpts = process.argv.splice(process.argv.indexOf(argv._[0])+1)
-      
-      
       var script = argv._[0]
-      var opts = {script:script, options:options}
+      var opts = {script:script, options:scriptOpts}
       if (argv.debug) opts.env = {NODE_DEBUG:true}
       if (/^\//.test(script)) {
         nexus.start(opts, exit)

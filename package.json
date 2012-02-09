@@ -1,12 +1,12 @@
 { "name" : "nexus"
-, "version" : "0.0.12"
+, "version" : "0.0.13"
 , "description" : "remote program installation and control"
 , "repository" :
   { "type" : "git"
   , "url" : "git://github.com/guybrush/nexus.git"
   }
 , "bin" : { "nexus" : "./bin/cli.js" }
-, "scripts" : { "test" : "node ./node_modules/.bin/mocha" }
+, "scripts" : { "test" : "DEBUG=test node ./node_modules/.bin/mocha" }
 , "dependencies" :
   { "async-array"   : "0.1.7"
   , "fstream"       : "0.1.6"

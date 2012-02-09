@@ -228,7 +228,7 @@ function monitor(startOpts, startCb) {
   }
 
   function stop(cb) {
-    debug('monitor'+[self.id]+' stopping childprocess')
+    ee2.emit('debug','stopping')
     self.stopFlag = true
     info(function(err,data){
       if (err) return cb(err)
@@ -237,6 +237,7 @@ function monitor(startOpts, startCb) {
           cb('tried to kill process (pid:'+data.pid+') but it did not exit yet')
         },4000)
         self.child.once('exit',function(){
+          ee2.emit('debug','child exitted')
           self.stopFlag = false
           clearTimeout(timer)
           info(function(err,data){

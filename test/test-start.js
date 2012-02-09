@@ -6,12 +6,11 @@ var common = require('./common')
   , fs = require('fs')
   , http = require('http')
   , assert = require('assert')
-  
+
 module.exports =
 { 'nexus.start()':
   { before: scenario.before
   , beforeEach: function(){console.log('')}
-  , afterEach: function(done){scenario.clients[0].remote.stopall(done)}
   , after: scenario.after
   , 'script:"app-simple@0.0.0",options:[port]': function(done){
       this.timeout(10000)
@@ -22,10 +21,10 @@ module.exports =
         debug('started app on port '+port)
         assert.ok(!err)
         assert.equal(data.name,'app-simple@0.0.0')
-        done()  
+        done()
       })
     }
-  , 'script:"app-error@0.0.0",options:[port]': function(done){
+  , 'script:"app-error@0.0.0" options:[port]': function(done){
       this.timeout(10000)
       var plan = common.plan(4,done)
       var port = Math.floor(Math.random() * 40000 + 10000)
@@ -55,8 +54,8 @@ module.exports =
         remote.subscribe('monitor::'+resStart.id+'::start',function(event,data){
           debug('restarted script')
           setTimeout(function(){sendRequest()},500)
-        })  
-      }) 
+        })
+      })
     }
   }
 }

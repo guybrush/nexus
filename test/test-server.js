@@ -15,7 +15,7 @@ var nexus = require('../index')(__dirname+'/common/config')
 module.exports =
 { 'nexus.server()':
   { after: function(done){common.cleanup(done)}
-  , beforeEach: function(){console.log('')} 
+  , beforeEach: function(){console.log('')}
   , 'cmd:"start"': function(done){
       this.timeout(5000) // on my computer, it takes ~2800ms :/
       var _did, _do = function(e){if(!_did){_did=true;done(e)}}
@@ -44,14 +44,15 @@ module.exports =
       })
     }
   , 'cmd:"stop"': function(done){
+      debug('stopping server')
       tmp.nexusRemote.server({cmd:'stop'},function(err,dataA){
         assert.ok(!err)
-        setTimeout(function(){
+        var iv = setInterval(function(){
           opts.reconnect = false
-          var client = dnode.connect(opts,function(r,c){
-            console.log('connected')
-          })
+          var client = dnode.connect(opts)
           client.on('error',function(err){
+            debug('server is not running anymore')
+            clearInterval(iv)
             assert.equal(err.code,'ECONNREFUSED')
             done()
           })

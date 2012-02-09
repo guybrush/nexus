@@ -4,10 +4,11 @@ var nexus = require('../../')
   , rimraf = require('rimraf')
   , debug = require('debug')('test')
 
-module.exports = 
-{ scenario: scenario 
+module.exports =
+{ scenario: scenario
 , plan: plan
 , cleanup: cleanup
+, config: require('./config')
 }
 
 // screnario()
@@ -16,42 +17,55 @@ function scenario(opts) {
   var self = this
   self.clients = []
   self.before = function(done){
-    nexus.install({package:__dirname+'/../fixtures/app-error'},function(err,data){
+    cleanup(function(err){
+      debug('cleaned up')
       if (err) return done(err)
-      nexus.install({package:__dirname+'/../fixtures/app-simple'},function(err,data){
+      nexus.install({package:__dirname+'/../fixtures/app-error'},function(err,data){
+        debug('installed',__dirname+'/../fixtures/app-error')
         if (err) return done(err)
-        nexus.server({cmd:'start'},function(err,data){
-          nexus.config(function(err,cfg){
-            var clientOpts = { port : cfg.port
-                             , host : cfg.host
-                             , key  : cfg.key ? fs.readFileSync(cfg.key) : null
-                             , cert : cfg.cert ? fs.readFileSync(cfg.cert) : null
-                             , reconnect : 100 }
-            for (var i=0;i<opts.clients;i++) {
-              var client = dnode.connect(clientOpts, function(remote, conn){
-                self.clients.push( { client : client
-                                   , conn   : conn.id
-                                   , remote : remote } )
-                done()
-              })
-              client.on('error',console.error)
-            }
+        nexus.install({package:__dirname+'/../fixtures/app-simple'},function(err,data){
+          debug('installed',__dirname+'/../fixtures/app-simple')
+          if (err) return done(err)
+          nexus.server({cmd:'start'},function(err,data){
+            debug('started server')
+            nexus.config(function(err,cfg){
+              var clientOpts = { port : cfg.port
+                               , host : cfg.host
+                               , key  : cfg.key ? fs.readFileSync(cfg.key) : null
+                               , cert : cfg.cert ? fs.readFileSync(cfg.cert) : null
+                               , reconnect : 100 }
+              for (var i=0;i<opts.clients;i++) {
+                var client = dnode.connect(clientOpts, function(remote, conn){
+                  debug('client connected')
+                  self.clients.push( { client : client
+                                     , conn   : conn.id
+                                     , remote : remote } )
+                  conn.on('error',console.error)
+                  done()
+                })
+                client.on('error',console.error)
+              }
+            })
           })
         })
       })
     })
   }
   self.after = function(done) {
-    var iv = setInterval(function() {
+    self.clients[0].client.on('error',function(e){debug('clERR',e)})
+    //self.clients[0].conn.on('error',function(e){debug('coERR',e)})
+    //var iv = setInterval(function() {
       self.clients[0].remote.stopall(function(err,data){
+        debug('stopped all')
         if (err) return done(err)
         self.clients[0].remote.server({cmd:'stop'},function(err,data){
+          debug('stopped server')
           if (err) return
-          clearInterval(iv)
+          //clearInterval(iv)
           cleanup(done)
-        })                                                                     
+        })
       })
-    },400)
+    //},400)
   }
   return self
 }

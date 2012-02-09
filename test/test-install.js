@@ -13,7 +13,7 @@ var common = require('./common')
 module.exports =
 { 'nexus.install()':
   { before: function(done){server.listen(port,done)}
-  , beforeEach: function(){console.log('')} 
+  , beforeEach: function(){console.log('')}
   , after: function(done){server.close();common.cleanup(done)}
   , 'name:"<name>" package:"http://<url>/<path>.tar.gz"': function(done){
       var opts = { package : 'http://localhost:'+port+'/app-simple.tar.gz'
@@ -43,7 +43,7 @@ module.exports =
   , 'name:"<name>", package:"http://<url>/<path>.tar.gz"': function(done){
       var opts = { package : __dirname+'/fixtures/app-error'
                  , name    : 'errorapp' }
-      debug('installing',opts.package,'→',opts.name)           
+      debug('installing',opts.package,'→',opts.name)
       nexus.install(opts, function(err,data){
         debug('installed',opts.package,'→',data)
         assert.equal(null,err)
@@ -57,7 +57,7 @@ module.exports =
     }
   , 'name:null, package:"<local path>"': function(done){
       var opts = { package : __dirname+'/fixtures/app-error' }
-      debug('installing',opts.package,'→',opts.name) 
+      debug('installing',opts.package,'→',opts.name)
       nexus.install(opts, function(err,data){
         debug('installed',opts.package,'→',data)
         assert.equal(null,err)
