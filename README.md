@@ -10,15 +10,15 @@
                                               \_`---´___`---´-´
                                                /../..\ /..\..\
 
-* nexus provides a cli and a dnode-interface to install, uninstall, start, stop 
+* nexus provides a cli and a dnode-interface to install, uninstall, start, stop
   and observe local and remote programs (npm packages).
 * running programs are `require('child_process').spawn`'ed child-processes of
-  monitor-servers (dnode-clients). the monitor-servers will try to reconnect to 
-  the nexus-server (dnode-server). the nexus-server is also a 
-  `require('child_process').spawn`'ed child-process of a monitor-server - 
+  monitor-servers (dnode-clients). the monitor-servers will try to reconnect to
+  the nexus-server (dnode-server). the nexus-server is also a
+  `require('child_process').spawn`'ed child-process of a monitor-server -
   which itself will try to reconnect to its own child-process.
 * all the config, logs and programs live in `~/.nexus` by default.
-* nexus is built upon [npm] and [dnode] and is inspired by [forever].  
+* nexus is built upon [npm] and [dnode] and is inspired by [forever].
 * nexus is still *super-alpha*.
 
 ## install
@@ -26,6 +26,7 @@
 * install [node]
 * install [npm]
 * `npm install nexus -g`
+* `npm test nexus -g`
 
 ## cli
 
