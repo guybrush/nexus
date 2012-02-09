@@ -59,37 +59,35 @@ function nexus(configParam) {
     this.remote    = remote
     this.server    = server
     this.subscribe = function(event, emit, cb) {
-      if (event == '*' || event == 'all') event = '*::*::*'
+      if (event == '*' || event == 'all') event = '**'
       if (!subscriptions[event]) {
         subscriptions[event] = {}
         subscriptionListeners[event] = function(data){
           var self = this
-          _.each(subscriptions[event],function(x,i){
-            x(self.event,data)
-          })
+          _.each(subscriptions[event],function(x,i){x(self.event,data)})
         }
         ee2.on(event,subscriptionListeners[event])
       }
       subscriptions[event][conn.id] = emit
       cb && cb()
     }
-    this.unsubscribe = function(event, cb) {
-      if (arguments.length<2) {
-        cb = arguments.length-1 || function() {}
-        _.each(subscriptions,function(x,i){unsubscribe(x)})
-        return cb()
-      }
-      if (!subscriptions[event])
-        return cb(new Error('not subscribed to event "'+event+'"'))
-      unsubscribe(subscriptions[event])
-      cb()
-      function unsubscribe(x) {
-        delete x[currId]
+    this.unsubscribe = function(events, cb) {
+      cb = _.isFunction(arguments.length-1) ? arguments.length-1 : function(){}
+      events = _.isString(events) 
+               ? [events] 
+               : (_.isArray(events) && events.length>0) ? events : null
+      if (!events) return cb(new Error('invalid first argument'))
+      var remaining = []
+      _.each(subscriptions,function(x,i){
+        if (!x[conn.id]) return
+        if (!~events.indexOf(i)) return remaining.push(i)
+        delete x[conn.id]
         if (Object.keys(x).length == 0) {
-          ee2.removeListener(subscriptionListeners[x])
-          delete subscriptionListeners[x]
+          ee2.removeListener(subscriptionListeners[i])
+          delete subscriptionListeners[i]
         }
-      }
+      })
+      cb(null, remaining)
     }
     conn.on('remote',function(rem){
       if (rem.type && rem.type == 'NEXUS_MONITOR') {

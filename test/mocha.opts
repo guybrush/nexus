@@ -1,0 +1,3 @@
+-t 10000
+-R spec
+-u exports

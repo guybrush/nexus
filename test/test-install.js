@@ -4,30 +4,20 @@ var common = require('./common')
   , http = require('http')
   , assert = require('assert')
   
-describe('nexus.install',function(){
-    
-  var port = Math.floor(Math.random() * 40000 + 10000)
-  var server = http.createServer(function(req,res){
-    var stream = fs.createReadStream(__dirname+'/fixtures/app-simple.tar.gz')
-    stream.pipe(res)
-  })
-    
-  before(function(done){
-    server.listen(port,done)
-  })
+var port = Math.floor(Math.random() * 40000 + 10000)
+var server = http.createServer(function(req,res){
+  var stream = fs.createReadStream(__dirname+'/fixtures/app-simple.tar.gz')
+  stream.pipe(res)
+})
   
-  after(function(done){
-    server.close()
-    common.cleanup(done)
-  })
-  
-  afterEach(function(done){common.cleanup(done)})
-    
-  describe('tarball', function(){
-    var opts = { package : 'http://localhost:'+port+'/app-simple.tar.gz'
-               , name    : 'gnag' }
-    
-    it('should install the tarball and append `_$i` upon name-collision',function(done){
+module.exports =
+{ 'nexus.install':
+  { before: function(done){server.listen(port,done)}
+  , after: function(done){server.close();common.cleanup(done)}
+  , 'install tarball from url and append `_$i` upon name-collision': function(done){
+    Math.floor(Math.random() * 40000 + 10000)
+      var opts = { package : 'http://localhost:'+port+'/app-simple.tar.gz'
+                 , name    : 'gnag' }
       nexus.install(opts, function(err,data){
         assert.equal(null,err)
         assert.equal(data,'gnag')
@@ -45,13 +35,10 @@ describe('nexus.install',function(){
           })
         })
       })
-    })
-  })
-  
-  describe('local folder',function(){
-    var opts = { package : __dirname+'/fixtures/app-error'
-               , name    : 'errorapp' }
-    it('should install the folder',function(done){
+    }
+  , 'local folder with name': function(done){
+      var opts = { package : __dirname+'/fixtures/app-error'
+                 , name    : 'errorapp' }
       nexus.install(opts, function(err,data){
         assert.equal(null,err)
         assert.equal(data,'errorapp')
@@ -61,12 +48,9 @@ describe('nexus.install',function(){
           done()
         })
       })
-    })
-  })
-  
-  describe('unnamed',function(){
-    var opts = { package : __dirname+'/fixtures/app-error' }
-    it('should install the folder under the name: <pkg-name>@<pkg-version>',function(done){
+    }
+  , 'local folder w/o name → <pkg-name>@<pkg-version>': function(done){
+      var opts = { package : __dirname+'/fixtures/app-error' }
       nexus.install(opts, function(err,data){
         assert.equal(null,err)
         assert.equal(data,'app-error@0.0.0')
@@ -76,16 +60,14 @@ describe('nexus.install',function(){
           done()
         })
       })
-    })
-  })
-  
-  describe('invalid url', function() {
-    it('should not throw, but passes the error along', function(done){
-      nexus.install({package:'http://321-foo-bar-123.com/package.tar.gz'},function(err,data){
+    }
+  , 'invalid url should not throw, but passes the error along': function(done){
+      var opts = {package:'http://321-foo-bar-123.com/package.tar.gz'}
+      nexus.install(opts, function(err,data){
         assert.equal(err.code,1)
         done()
       })
-    })
-  })
-})
+    }
+  }
+}
 

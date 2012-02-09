@@ -9,23 +9,19 @@ var opts = { port : cfg.port
            , key  : cfg.key ? fs.readFileSync(cfg.key) : null
            , cert : cfg.cert ? fs.readFileSync(cfg.cert) : null
            , reconnect : 100 }
+var tmp = {}
 
-describe('nexus.server()',function(){
-  var nexusRemote
-  after(function(done){
-    nexusRemote.server({cmd:'stop'},function(){
-      common.cleanup(done)
-    })
-  })
-  describe('cmd:start',function(){
-    it('should start the server',function(done){
+module.exports =
+{ 'nexus.server()': 
+  { after: function(done){common.cleanup(done)}
+  , 'cmd:start': function(done){
       this.timeout(5000) // on my computer, it takes ~2800ms :/
+      var _did, _do = function(e){if(!_did){_did=true;done(e)}}
       nexus.server({cmd:'start'},function(err,dataA){
         assert.equal(null,err)
-        var _did, _do = function(e){if(!_did){_did=true,done(e)}}
         var client = dnode.connect(opts,function(remote,conn){
-          nexusRemote = remote
-          remote.subscribe('server::*::connected',function(e,d){
+          tmp.nexusRemote = remote
+          remote.subscribe('server::*::*',function(e,d){
             if (_did) return
             remote.server(function(err,dataB){
               assert.equal(dataA.id,dataB.id)
@@ -34,12 +30,27 @@ describe('nexus.server()',function(){
           })
           remote.server(function(err,dataB){
             if (err) return
-            //assert.equal(dataA.id,dataB.id)
+            assert.equal(dataA.id,dataB.id)
             _do()
           })
         })
-        client.on('error',function(){})
+        client.on('error',function(){})   
       })
-    })
-  })
-})
+    }
+  , 'cmd:stop': function(done){
+      tmp.nexusRemote.server({cmd:'stop'},function(err,dataA){
+        assert.ok(!err)
+        setTimeout(function(){
+          opts.reconnect = false
+          var client = dnode.connect(opts,function(r,c){
+            console.log('connected')
+          })
+          client.on('error',function(err){
+            assert.equal(err.code,'ECONNREFUSED')
+            done()
+          })
+        },200)
+      })
+    }
+  }
+}

@@ -6,7 +6,7 @@
   , "url" : "git://github.com/guybrush/nexus.git"
   }
 , "bin" : { "nexus" : "./bin/cli.js" }
-, "scripts" : { "test" : "node ./node_modules/.bin/mocha test/*.js --reporter spec --timeout 10000 --ignore-leaks" }
+, "scripts" : { "test" : "node ./node_modules/.bin/mocha" }
 , "dependencies" :
   { "async-array"   : "0.1.7"
   , "fstream"       : "0.1.6"
