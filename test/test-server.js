@@ -27,17 +27,9 @@ module.exports =
         var client = dnode.connect(opts,function(remote,conn){
           debug('connected to server')
           tmp.nexusRemote = remote
-          remote.subscribe('server::*::*',function(e,d){
-            if (_did) return
-            remote.server(function(err,dataB){
-              assert.equal(dataA.id,dataB.id)
-              _do()
-            })
-          })
-          remote.server(function(err,dataB){
-            if (err) return
+          tmp.nexusRemote.server(function(err,dataB){
             assert.equal(dataA.id,dataB.id)
-            _do()
+            done()
           })
         })
         client.on('error',function(){})

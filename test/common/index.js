@@ -52,20 +52,17 @@ function scenario(opts) {
     })
   }
   self.after = function(done) {
-    self.clients[0].client.on('error',function(e){debug('clERR',e)})
-    //self.clients[0].conn.on('error',function(e){debug('coERR',e)})
-    //var iv = setInterval(function() {
-      self.clients[0].remote.stopall(function(err,data){
-        debug('stopped all')
-        if (err) return done(err)
-        self.clients[0].remote.server({cmd:'stop'},function(err,data){
-          debug('stopped server')
-          if (err) return
-          //clearInterval(iv)
-          cleanup(done)
-        })
+    self.clients[0].client.on('error',function(e){debug('client-error',e)})
+    self.clients[0].remote.stopall(function(err,data){
+      debug('stopped all')
+      if (err) return done(err)
+      self.clients[0].remote.server({cmd:'stop'},function(err,data){
+        debug('stopped server')
+        if (err) return
+        //clearInterval(iv)
+        cleanup(done)
       })
-    //},400)
+    })
   }
   return self
 }

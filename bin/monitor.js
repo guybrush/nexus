@@ -136,7 +136,7 @@ function monitor(startOpts, startCb) {
     
     var opts = { port : _config.port
                , host : _config.host
-               , reconnect : 500 }
+               , reconnect : 100 }
     
     try {
       if (_config.key)

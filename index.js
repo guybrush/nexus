@@ -608,15 +608,14 @@ function remote(rem, cb) {
 //------------------------------------------------------------------------------
 
 function server(opts, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function(){}
+  cb = _.isFunction(arguments[arguments.length-1]) 
+       ? arguments[arguments.length-1]
+       : function() {}
+       
+  opts = (_.isObject(opts) && Object.keys(opts).length>0) 
+         ? opts : null
 
-  if (arguments.length == 1 && serverProc)
-    serverProc.info(cb)
-
-  opts = opts || {}
+  if (!opts && serverProc) return serverProc.info(cb)
 
   if (opts.cmd && opts.cmd == 'version') {
     if (!serverProc) return cb('server is not running')
@@ -628,37 +627,51 @@ function server(opts, cb) {
 
   if (opts.cmd && opts.cmd == 'start') {
     if (serverProc) return cb('server is already running')
-    var startOptions =
+    
+    var _config = config()
+    var startOpts =
       { script: __dirname+'/bin/server.js'
       , command: 'node'
       // , max: 100
       , package: _pkg
       , env:
-        { NEXUS_CONFIG : JSON.stringify(config())
+        { NEXUS_CONFIG : JSON.stringify(_config)
         , NODE_DEBUG : !!opts.debug
         }
       }
 
-    return start(startOptions, cb)
+    start(startOpts, function(err,data){
+      var clientOpts = { port : _config.port
+                       , host : _config.host
+                       , reconnect : 100 }
+      try {
+        if (_config.key)
+          clientOpts.key = fs.readFileSync(_config.key)
+        if (_config.cert)
+          clientOpts.cert = fs.readFileSync(_config.cert)
+      }
+      catch (e) {
+        cb(e)
+        throw e
+      }
+      var client = dnode.connect(clientOpts,function(r,c){
+        r.server(cb)
+      })
+      client.on('error',function(){})
+    })
   }
-
-  if (opts.cmd && opts.cmd == 'stop') {
+  else if (opts.cmd && opts.cmd == 'stop') {
     if (serverProc) {
       cb(null,'will try to stop the server, check with `nexus server`')
       return serverProc.stop(cb)
     }
     else return cb('cant stop, server is not running')
   }
-
-  if (opts.cmd && opts.cmd == 'restart') {
+  else if (opts.cmd && opts.cmd == 'restart') {
     cb(null,'will try to restart the server, check with `nexus server`')
     return serverProc.restart(cb)
   }
-
-  if (serverProc)
-    return serverProc.info(cb)
-
-  cb('server is not running')
+  else cb('server is not running')
 }
 
 //------------------------------------------------------------------------------
