@@ -10,7 +10,8 @@
 , "dependencies" :
   { "async-array"   : "0.1.7"
   , "fstream"       : "0.1.6"
-  , "dnode"         : "*"
+  , "debug"         : "0.5.x"
+  , "dnode"         : "0.9.x"
   , "eventemitter2" : "0.4.3"
   , "mkdirp"        : "0.3.0"
   , "ncp"           : "0.2.3"

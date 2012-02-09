@@ -28,6 +28,7 @@ var fs      = require('fs')
   , pf      = require('portfinder')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
+  , debug   = require('debug')('nexus')
   , procs   = {}
   , serverProc = null
   , subscriptions = {}
@@ -411,17 +412,18 @@ function start(opts, cb) {
       }}).listen(port)
       
       tempServer.on('ready',function(remote, conn){
+        debug('starting monitor',data.script)
         var child = cp.execFile( __dirname+'/bin/monitor.js'
                                , [ '-c', JSON.stringify(config())
                                  , '-s', JSON.stringify(data)
-                                 , '-P', port ]
-                               , {title:'foo'} )
-        // child.stdout.on('data',function(d){
-        //   console.log('monitorScript-stdout',d.toString())
-        // })
-        // child.stderr.on('data',function(d){
-        //   console.log('monitorScript-stderr',d.toString())
-        // })
+                                 , '-P', port ] 
+                               , {env:process.env} )
+        child.stdout.on('data',function(d){
+          debug('monitorScript-stdout',d.toString())
+        })
+        child.stderr.on('data',function(d){
+          debug('monitorScript-stderr',d.toString())
+        })
       })
     })
   })
@@ -464,7 +466,10 @@ function stop(id, cb) {
 //------------------------------------------------------------------------------
 
 function stopall(cb) {
+  debug('stopping all')
   if (!cb) cb = function() {}
+  var keys = Object.keys(procs)
+  if (keys.length==0) return cb(null,[])
   new AA(Object.keys(procs)).map(function(x,i,next){
     procs[x].stop(next)
   }).done(cb).exec()
@@ -618,7 +623,10 @@ function server(opts, cb) {
       , command: 'node'
       // , max: 100
       , package: _pkg
-      , env: {NEXUS_CONFIG:JSON.stringify(config())}
+      , env: 
+        { NEXUS_CONFIG : JSON.stringify(config())
+        , NODE_DEBUG : !!opts.debug
+        }
       }
 
     return start(startOptions, cb)
@@ -648,6 +656,7 @@ function server(opts, cb) {
 //------------------------------------------------------------------------------
 
 function parseStart(opts, cb) {
+  debug('parsing start-options',opts.script)
   var result = {}
   opts = opts || {}
   //console.log('parseStart',opts)

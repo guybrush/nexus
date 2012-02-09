@@ -1,25 +1,31 @@
 var nexus = require('../index')(__dirname+'/common/config')
-var common = require('./common')
-var assert = require('assert')
-var dnode = require('dnode')
-var fs = require('fs')
-var cfg = nexus.config()
-var opts = { port : cfg.port
+  , common = require('./common')
+  , assert = require('assert')
+  , dnode = require('dnode')
+  , fs = require('fs')
+  , debug = require('debug')('test')
+  , cfg = nexus.config()
+  , tmp = {}
+  , opts = { port : cfg.port
            , host : cfg.host
            , key  : cfg.key ? fs.readFileSync(cfg.key) : null
            , cert : cfg.cert ? fs.readFileSync(cfg.cert) : null
            , reconnect : 100 }
-var tmp = {}
 
 module.exports =
-{ 'nexus.server()': 
+{ 'nexus.server()':
   { after: function(done){common.cleanup(done)}
-  , 'cmd:start': function(done){
+  , beforeEach: function(){console.log('')} 
+  , 'cmd:"start"': function(done){
       this.timeout(5000) // on my computer, it takes ~2800ms :/
       var _did, _do = function(e){if(!_did){_did=true;done(e)}}
-      nexus.server({cmd:'start'},function(err,dataA){
+      debug('starting server')
+      nexus.server({cmd:'start',debug:true},function(err,dataA){
+        debug('started server')
         assert.equal(null,err)
+        debug('connecting to server')
         var client = dnode.connect(opts,function(remote,conn){
+          debug('connected to server')
           tmp.nexusRemote = remote
           remote.subscribe('server::*::*',function(e,d){
             if (_did) return
@@ -34,10 +40,10 @@ module.exports =
             _do()
           })
         })
-        client.on('error',function(){})   
+        client.on('error',function(){})
       })
     }
-  , 'cmd:stop': function(done){
+  , 'cmd:"stop"': function(done){
       tmp.nexusRemote.server({cmd:'stop'},function(err,dataA){
         assert.ok(!err)
         setTimeout(function(){

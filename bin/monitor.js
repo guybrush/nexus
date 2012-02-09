@@ -4,7 +4,7 @@
 //
 // -c <JSON.stringified-nexusConfig> 
 // -s <JSON.stringified-startOptions>
-// -p <localTempServerPort>
+// -p <localTempServerPort>                                
 // -P <remoteTempServerPort>
 
 var nexus = require('../')
@@ -20,6 +20,7 @@ var nexus = require('../')
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
   , fs = require('fs')
   , subscriptions = {} 
+  , debug = require('debug')('nexus')
 
 process.title = 'nexus-monitor:'+JSON.parse(opti.argv.c).port
   
@@ -41,12 +42,12 @@ if (!process.env.NEXUS_MONITOR) {
                            , '-s', opti.argv.s
                            , '-p', port ] 
                          , { env : process.env } )
-        // child.stdout.on('data',function(d){
-        //   console.log('monitorChild-stdout',d.toString())
-        // })
-        // child.stderr.on('data',function(d){
-        //   console.log('monitorChild-stderr',d.toString())
-        // })
+        child.stdout.on('data',function(d){
+          debug('monitorChild-stdout',d.toString())
+        })
+        child.stderr.on('data',function(d){
+          debug('monitorChild-stderr',d.toString())
+        })
       })
     })
   })
@@ -215,6 +216,7 @@ function monitor(startOpts, startCb) {
   }
 
   function restart(cb) {
+    debug('monitor'+[self.id]+' restarting childprocess')
     self.crashed = 0
     self.restartFlag = true
     stop(function(){
@@ -226,6 +228,7 @@ function monitor(startOpts, startCb) {
   }
 
   function stop(cb) {
+    debug('monitor'+[self.id]+' stopping childprocess')
     self.stopFlag = true
     info(function(err,data){
       if (err) return cb(err)

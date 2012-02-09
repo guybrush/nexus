@@ -297,15 +297,19 @@ function parseArgs() {
       nexus.ps(opts, exit)
       break
     case 'start':
-      var options = process.argv.splice(process.argv.indexOf(argv._[0])+1)
+      var scriptOpts = process.argv.splice(process.argv.indexOf(argv._[0])+1)
+      
+      
       var script = argv._[0]
+      var opts = {script:script, options:options}
+      if (argv.debug) opts.env = {NODE_DEBUG:true}
       if (/^\//.test(script)) {
-        nexus.start({script:script, options:options}, exit)
+        nexus.start(opts, exit)
       }
       else {
         path.exists(process.cwd()+'/'+script,function(exists){
           if (exists) script = process.cwd()+'/'+script
-          nexus.start({script:script, options:options}, exit)
+          nexus.start(opts, exit)
         })
       }
       break
@@ -342,7 +346,7 @@ function parseArgs() {
       nexus.cleanlogs(function(err,data){exit(err,'deleted '+data+' logfiles')})
       break
     case 'server':
-      nexus.server({cmd:argv._[0]}, exit)
+      nexus.server({cmd:argv._[0],debug:argv.debug}, exit)
       break
     case 'subscribe':
       var emit = function(event, data) {console.log(event,'→',data)}

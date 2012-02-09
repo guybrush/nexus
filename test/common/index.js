@@ -2,6 +2,7 @@ var nexus = require('../../')
   , fs = require('fs')
   , dnode = require('dnode')
   , rimraf = require('rimraf')
+  , debug = require('debug')('test')
 
 module.exports = 
 { scenario: scenario 
@@ -41,13 +42,16 @@ function scenario(opts) {
     })
   }
   self.after = function(done) {
-    self.clients[0].remote.stopall(function(err,data){   
-      if (err) return done(err)
-      self.clients[0].remote.server({cmd:'stop'},function(err,data){
+    var iv = setInterval(function() {
+      self.clients[0].remote.stopall(function(err,data){
         if (err) return done(err)
-        cleanup(done)
-      })                                                                      
-    })
+        self.clients[0].remote.server({cmd:'stop'},function(err,data){
+          if (err) return
+          clearInterval(iv)
+          cleanup(done)
+        })                                                                     
+      })
+    },400)
   }
   return self
 }
