@@ -42,7 +42,7 @@ var fs      = require('fs')
 
 function nexus(configParam) {
   userConfig = configParam
-  function dnodeInterface(remote, conn) {
+  function dnodeServer(remote, conn) {
     var self = this
     this.version   = version
     this.config    = config
@@ -122,23 +122,26 @@ function nexus(configParam) {
     })
     conn.on('end',function(){self.unsubscribe()})
   }
-  dnodeInterface.version = version
-  dnodeInterface.config = config
-  dnodeInterface.ls = ls
-  dnodeInterface.install = install
-  dnodeInterface.uninstall = uninstall
-  dnodeInterface.start = start
-  dnodeInterface.runscript = runscript
-  dnodeInterface.logs = logs
-  dnodeInterface.server = server
-  return dnodeInterface
+  dnodeServer.version = version
+  dnodeServer.config = config
+  dnodeServer.ls = ls
+  dnodeServer.install = install
+  dnodeServer.uninstall = uninstall
+  dnodeServer.start = start
+  dnodeServer.runscript = runscript
+  dnodeServer.logs = logs
+  dnodeServer.server = server
+  return dnodeServer
 }
 
 //------------------------------------------------------------------------------
 //                                               version
 //------------------------------------------------------------------------------
 
-function version(cb) {cb && cb(null, _pkg.version); return _pkg.version}
+function version(cb) {
+  cb && cb(null, _pkg.version)
+  return _pkg.version
+}
 
 //------------------------------------------------------------------------------
 //                                               config
@@ -153,7 +156,7 @@ function config(key, value, cb) {
 
   var currConfig = {}
     , fileConfig = {}
-    , home = ( process.platform === "win32" // HAHA!
+    , home = ( process.platform === "win32"
              ? process.env.USERPROFILE
              : process.env.HOME )
     , configPath = home+'/.nexus/config.js'
@@ -212,10 +215,10 @@ function install(opts, cb) {
     if (err) return cb(err)
     var env = process.env
     env.npm_config_prefix = tmpPath
-    cp.execFile( __dirname+'/node_modules/npm/cli.js'
-               , [ 'install', '-p', '-g', opts.package ]
-               , { cwd: tmpPath, env:env }
-               , installPackage )
+    var c = cp.execFile( __dirname+'/node_modules/npm/cli.js'
+                       , [ 'install', '-p', '-g', opts.package ]
+                       , { cwd: tmpPath, env:env }
+                       , installPackage )
   })
 
   function installPackage(err, stdout, stderr) {
@@ -292,49 +295,44 @@ function ls(opts, cb) {
   var _config = config()
   if (opts && opts.name) {
     path.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
-      if (!exists) return cb('package is not installed: '+opts.name)
-      var pkg
-      try {
-        pkg = JSON.parse(fs.readFileSync(_config.apps+'/'+opts.name+'/package.json','utf-8'))
-      } catch(e) { return cb(e) }
-      if (!opts.filter || opts.filter.length == 0)
-        return cb(null, pkg)
-      var result = {}
-      _.each(opts.filter, function(x,i){
-        var info = objPath(pkg,x)
-        if (info !== undefined) result[x] = info
-        else result[x] = 'UNDEFINED'
-      })
-      cb(null,result)
+      if (!exists) return cb(new Error('package is not installed: '+opts.name))
+      readPackages([_config.apps+'/'+opts.name+'/package.json'])
     })
   }
   else {
-    fs.readdir(_config.apps,function(err,data){
-      if (err) return cb(err)
-      var result = {}
-      new AA(data).map(function(x,i,next){
-        try {
-          var pkg = JSON.parse(fs.readFileSync(_config.apps+'/'+x+'/package.json','utf-8'))
-          if (!opts.filter || opts.filter.length == 0) {
-            result[x] = pkg
-          }
-          else {
-            result[x] = {}
-            _.each(opts.filter, function(y,j){
-              var info = objPath(pkg,y)
-              if (info !== undefined) result[x][y] = info
-              else result[x][y] = 'UNDEFINED'
-            })
-          }
-        } catch(e) {
-          return next(e)
+    fs.readdir(_config.apps,function(e,d){
+      if (e) return cb(e)
+      readPackages(d)  
+    })
+  }
+  
+  function readPackages(arr) {
+    var result = {}
+    new AA(arr).map(function(x,i,next){
+      fs.readFile(_config.apps+'/'+x+'/package.json','utf-8',function(e,d){
+        try {d = JSON.parse(d)}
+        catch(e) {}
+        if (e) {
+          result[x] = 'UNDEFINED'
+          return next()
+        }
+        if (!opts.filter || opts.filter.length == 0) {
+          result[x] = d
+        }
+        else {
+          result[x] = {}
+          _.each(opts.filter, function(y,j){
+            var info = objPath(d,y)
+            if (info !== undefined) result[x][y] = info
+            else result[x][y] = 'UNDEFINED'
+          })
         }
         next()
-      }).done(function(err,data){
-        if (err) return cb(err)
-        cb && cb(err,result)
-      }).exec()
-    })
+      })
+    }).done(function(err,data){
+      if (err) return cb(err)
+      cb && cb(err,result)
+    }).exec()
   }
 }
 

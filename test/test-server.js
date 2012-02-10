@@ -1,4 +1,4 @@
-var nexus = require('../index')(__dirname+'/common/config')
+var nexus = require('../')(__dirname+'/common/config')
   , common = require('./common')
   , assert = require('assert')
   , dnode = require('dnode')
