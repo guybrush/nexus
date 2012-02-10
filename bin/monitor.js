@@ -158,6 +158,7 @@ function monitor(startOpts) {
 //------------------------------------------------------------------------------
 
   function client(remote, conn) {
+    conn.on('error',function(e){console.error(e)})
     debug('CONNECTED TO SERVER')
     this.type = self.type
     this.info = info
