@@ -10,7 +10,7 @@ var common = require('./common')
 module.exports =
 { 'nexus.start()':
   { before: scenario.before
-  , beforeEach: function(){console.log('')}
+  , beforeEach: function(){debug('')}
   , after: scenario.after
   , 'script:"app-simple@0.0.0",options:[port]': function(done){
       this.timeout(10000)

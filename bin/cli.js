@@ -356,7 +356,7 @@ function parseArgs() {
 }
 
 function exit(err,msg) {
-  if (err) console.log('ERROR:',err)
+  if (err) console.error(err)
   else console.log(msg)
   _conn && _conn.end()
   process.exit(0)

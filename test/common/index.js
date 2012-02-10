@@ -34,6 +34,7 @@ function scenario(opts) {
                                , key  : cfg.key ? fs.readFileSync(cfg.key) : null
                                , cert : cfg.cert ? fs.readFileSync(cfg.cert) : null
                                , reconnect : 100 }
+              debug('starting '+opts.clients+' clients')
               for (var i=0;i<opts.clients;i++) {
                 var client = dnode.connect(clientOpts, function(remote, conn){
                   debug('client connected')

@@ -25,16 +25,17 @@ var fs      = require('fs')
   , rimraf  = require('rimraf')
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
-  , pf      = require('portfinder')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
   , debug   = require('debug')('nexus')
-  , procs   = {}
-  , serverProc = null
+  , monitors = {}
+  , serverMonitor = null
   , subscriptions = {}
   , subscriptionListeners = {}
   , userConfig = null
 
+// ee2.onAny(function(data){debug(this.event,'→',data)})
+  
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
@@ -43,7 +44,6 @@ function nexus(configParam) {
   userConfig = configParam
   function dnodeInterface(remote, conn) {
     var self = this
-      , currId = null
     this.version   = version
     this.config    = config
     this.ls        = ls
@@ -91,19 +91,21 @@ function nexus(configParam) {
       cb(null, remaining)
     }
     conn.on('remote',function(rem){
-      if (rem.type && rem.type == 'NEXUS_MONITOR') {
-        currId = rem.id
-        ee2.emit('monitor::'+currId+'::connected')
-        procs[currId] = rem
+      if (!rem.type || !rem.id) return
+      if (rem.type == 'NEXUS_MONITOR') {
+        monitors[rem.id+''] = rem
+        ee2.emit('monitor::'+rem.id+'::connected')
         rem.subscribe(function(event,data){
-          ee2.emit('monitor::'+currId+'::'+event,data)
+          ee2.emit('monitor::'+rem.id+'::'+event,data)
         })
         conn.on('end',function(){
-          ee2.emit('monitor::'+currId+'::disconnected')
-          delete procs[currId]
+          ee2.emit('monitor::'+rem.id+'::disconnected')
+          delete monitors[rem.id]
         })
       }
-      if (rem.type && rem.type == 'NEXUS_SERVER_MONITOR') {
+      if (rem.type == 'NEXUS_SERVER_MONITOR') {
+        if (serverMonitor) return rem.stop()
+        serverMonitor = rem
         ee2.emit('server::'+rem.id+'::connected')
         rem.subscribe(function(event,data){
           ee2.emit('server::'+rem.id+'::'+event,data)
@@ -111,10 +113,6 @@ function nexus(configParam) {
         conn.on('end',function(){
           ee2.emit('server::'+rem.id+'::disconnected')
         })
-        if (serverProc)
-          return rem.stop()
-
-        serverProc = rem
       }
     })
     conn.on('end',function(){self.unsubscribe()})
@@ -223,8 +221,7 @@ function install(opts, cb) {
     try {
       package = require(tmpPathPkg+'/package.json')
     } catch(e) {
-      console.error(new Error(e))
-      return cb(new Error(e))
+      return cb(e)
     }
 
     var name = opts.name || package.name+'@'+package.version
@@ -244,8 +241,8 @@ function install(opts, cb) {
         rimraf(tmpPath,function(err){
           if (err) return cb(err)
           debug('installed',name)
-          if (serverProc)
-            ee2.emit('server::'+serverProc.id+'::installed',name)
+          if (serverMonitor)
+            ee2.emit('server::'+serverMonitor.id+'::installed',name)
           cb(null, name)
         })
       })
@@ -272,8 +269,8 @@ function uninstall(opts, cb) {
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
     rimraf(_config.apps+'/'+opts,function(){
-      if (serverProc)
-        ee2.emit('server::'+serverProc.id+'::uninstalled',opts)
+      if (serverMonitor)
+        ee2.emit('server::'+serverMonitor.id+'::uninstalled',opts)
       cb(null,'uninstalled '+opts)
     })
   })
@@ -329,7 +326,7 @@ function ls(opts, cb) {
         }
         next()
       }).done(function(err,data){
-        if (err) return error(err,cb)
+        if (err) return cb(err)
         cb && cb(err,result)
       }).exec()
     })
@@ -353,14 +350,14 @@ function ps(opts, cb) {
 
   var result = {}
 
-  if (Object.keys(procs).length == 0)
+  if (Object.keys(monitors).length == 0)
     return cb(null,result)
 
-  if (opts.id && procs[opts.id]) {
+  if (opts.id && monitors[opts.id]) {
     if (!opts.filter) {
-      return procs[opts.id].info(cb)
+      return monitors[opts.id].info(cb)
     }
-    procs[opts.id].info(function(err,data){
+    monitors[opts.id].info(function(err,data){
       _.each(opts.filter, function(x,i){
         var info = objPath(data,x)
         if (info !== undefined) result[x] = info
@@ -371,8 +368,8 @@ function ps(opts, cb) {
     return
   }
 
-  new AA(Object.keys(procs)).map(function(x,i,next){
-    procs[x].info(function(err,data){
+  new AA(Object.keys(monitors)).map(function(x,i,next){
+    monitors[x].info(function(err,data){
       if (!opts.filter)
         result[x] = data
       else {
@@ -386,7 +383,7 @@ function ps(opts, cb) {
       next(err,data)
     })
   }).done(function(err,data){
-    if (err) return error(err,cb)
+    if (err) return cb(err)
     cb && cb(err,result)
   }).exec()
 }
@@ -397,39 +394,29 @@ function ps(opts, cb) {
 
 function start(opts, cb) {
   debug('starting',opts.script)
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function(){}
+  cb = _.isFunction(arguments[arguments.length-1]) 
+       ? arguments[arguments.length-1]
+       : function() {}
 
-  if (arguments.length != 2)
-    return cb('start needs 2 arguments')
+  opts = (_.isObject(opts) && Object.keys(opts).length>0) 
+         ? opts : null
 
+  if (!opts) return cb(new Error('no start-options defined'))
+         
   parseStart(opts, function(err, data){
+    debug('parsedStart',data.script)
     if (err) return cb(err)
-    pf.basePort = 33333
-    pf.getPort(function(err,port){
-      // a tempServer to make starting apps without a
-      // running nexus-server possible
-      var tempServer = dnode({done:function(err, data){
-        cb(err, data)
-        tempServer.close()
-      }}).listen(port)
-
-      tempServer.on('ready',function(remote, conn){
-        debug('starting monitor',data.script)
-        var child = cp.execFile( __dirname+'/bin/monitor.js'
-                               , [ '-c', JSON.stringify(config())
-                                 , '-s', JSON.stringify(data)
-                                 , '-P', port ]
-                               , {env:process.env} )
-        child.stdout.on('data',function(d){
-          debug('monitorScript-stdout',d.toString())
-        })
-        child.stderr.on('data',function(d){
-          debug('monitorScript-stderr',d.toString())
-        })
+    genId(function(err,id){
+      debug('starting monitor',id,data.script)
+      ee2.on('monitor::'+id+'::connected',function(){
+        monitors[id].start(cb)
       })
+      var child = cp.execFile( __dirname+'/bin/monitor.js'
+                             , [ '-c', JSON.stringify(config())
+                               , '-s', JSON.stringify(data) 
+                               , '-i', id ] )
+      // child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
+      // child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
     })
   })
 }
@@ -445,10 +432,10 @@ function restart(id, cb) {
   else
     cb = function(){}
 
-  if (!id || !procs[id])
+  if (!id || !monitors[id])
     return cb('there is no process with id: '+id)
 
-  procs[id].restart(cb)
+  monitors[id].restart(cb)
 }
 
 //------------------------------------------------------------------------------
@@ -462,10 +449,10 @@ function stop(id, cb) {
   else
     cb = function(){}
 
-  if (!id || !procs[id])
-    return cb('there is no process with id: '+id)
+  if (!id || !monitors[id])
+    return cb(new Error('there is no process with id: '+id))
 
-  procs[id].stop(cb)
+  monitors[id].stop(cb)
 }
 
 //------------------------------------------------------------------------------
@@ -475,10 +462,10 @@ function stop(id, cb) {
 function stopall(cb) {
   debug('stopping all')
   if (!cb) cb = function() {}
-  var keys = Object.keys(procs)
+  var keys = Object.keys(monitors)
   if (keys.length==0) return cb(null,[])
-  new AA(Object.keys(procs)).map(function(x,i,next){
-    procs[x].stop(next)
+  new AA(Object.keys(monitors)).map(function(x,i,next){
+    monitors[x].stop(next)
   }).done(function(err,data){
     if (!err) debug('stopped',data)
     cb(err,data)
@@ -491,12 +478,13 @@ function stopall(cb) {
 
 function runscript(opts, stdout, stderr, cb) {
   if (!opts || !opts.name || !opts.script)
-    return cb('name or script not defined')
+    return cb(new Error('name or script not defined'))
   ls({name:opts.name},function(err,data){
     if (err)
       return cb(err)
     if (!data.scripts[opts.script])
-      return cb('the app "'+opts.name+'" has no script called "'+opts.script+'"')
+      return cb(new Error('the app "'+opts.name
+                         +'" has no script called "'+opts.script+'"'))
 
     var _config = config()
     var child = cp.exec
@@ -530,7 +518,7 @@ function logs(opts, cb) {
 
   if (!opts.file) {
     return fs.readdir(_config.logs,function(err,data){
-      if (err) return error(err,cb)
+      if (err) return cb(err)
       cb(err, data.sort())
     })
   }
@@ -554,19 +542,19 @@ function cleanlogs(cb) {
   if (!cb) cb = function() {}
   var _config = config()
   fs.readdir(_config.logs,function(err,data){
-    if (err) return error(err,cb)
+    if (err) return cb(err)
     var toDel = []
     _.each(data,function(x,i){
       var split = x.split('.')
         , id = split[split.length-3]
-      if (!procs[id] && (serverProc.id != id))
+      if (!monitors[id] && (serverMonitor.id != id))
         toDel.push(x)
     })
     new AA(toDel).map(function(x,i,next){
       fs.unlink(_config.logs+'/'+x,next)
     }).done(function(err,data){
-      if (err) return error(err,cb)
-      ee2.emit('server::'+serverProc.id+'::cleanedlogs',data)
+      if (err) return cb(err)
+      ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
       cb(null, data.length)
     }).exec()
   })
@@ -583,7 +571,7 @@ function remote(rem, cb) {
     cb = function(){}
 
   if (!_config.remotes[rem])
-    return cb('dont know about the remote "'+rem+'"')
+    return cb(new Error('dont know about the remote "'+rem+'"'))
 
   var _config = config()
   var opts = {}
@@ -612,27 +600,31 @@ function server(opts, cb) {
        ? arguments[arguments.length-1]
        : function() {}
        
-  opts = (_.isObject(opts) && Object.keys(opts).length>0) 
+  var optsKeys = Object.keys(opts)
+  opts = (_.isObject(opts) && opts.cmd) 
          ? opts : null
 
-  if (!opts && serverProc) return serverProc.info(cb)
-
+  if (!opts && !serverMonitor) 
+    return cb(new Error('server is not running'))
+         
+  if (!opts && serverMonitor) 
+    return serverMonitor.info(cb)
+  
   if (opts.cmd && opts.cmd == 'version') {
-    if (!serverProc) return cb('server is not running')
-    serverProc.info(function(err,data){
+    if (!serverMonitor) return cb('server is not running')
+    serverMonitor.info(function(err,data){
       cb(err,data.package.version)
     })
     return
   }
 
   if (opts.cmd && opts.cmd == 'start') {
-    if (serverProc) return cb('server is already running')
-    
+    if (serverMonitor) 
+      return cb(new Error('server is already running'))
     var _config = config()
     var startOpts =
       { script: __dirname+'/bin/server.js'
       , command: 'node'
-      // , max: 100
       , package: _pkg
       , env:
         { NEXUS_CONFIG : JSON.stringify(_config)
@@ -640,38 +632,54 @@ function server(opts, cb) {
         }
       }
 
-    start(startOpts, function(err,data){
-      var clientOpts = { port : _config.port
-                       , host : _config.host
-                       , reconnect : 100 }
-      try {
-        if (_config.key)
-          clientOpts.key = fs.readFileSync(_config.key)
-        if (_config.cert)
-          clientOpts.cert = fs.readFileSync(_config.cert)
-      }
-      catch (e) {
-        cb(e)
-        throw e
-      }
-      var client = dnode.connect(clientOpts,function(r,c){
-        r.server(cb)
+    start(startOpts)
+
+    var clientOpts = { port : _config.port
+                     , host : _config.host
+                     , reconnect : 100 }
+    try {
+      if (_config.key)
+        clientOpts.key = fs.readFileSync(_config.key)
+      if (_config.cert)
+        clientOpts.cert = fs.readFileSync(_config.cert)
+    }
+    catch (e) {
+      cb(e)
+    }
+
+    var client = dnode.connect(clientOpts,function(r,c){
+      var _didit = false
+      r.subscribe('server::*::connected',function(){
+        r.server(function(err, data){
+          if (_didit) return
+          cb(err,data)
+          _didit = true
+          c.end()
+          //process.exit(0)
+        })
       })
-      client.on('error',function(){})
+      r.server(function(err,data){
+        if (err || _didit) return
+        cb(err,data)
+        _didit = true
+        c.end()
+        //process.exit(0)
+      }) 
     })
+    client.on('error',function(e){console.error(e)})
   }
   else if (opts.cmd && opts.cmd == 'stop') {
-    if (serverProc) {
+    if (serverMonitor) {
       cb(null,'will try to stop the server, check with `nexus server`')
-      return serverProc.stop(cb)
+      return serverMonitor.stop(cb)
     }
     else return cb('cant stop, server is not running')
   }
   else if (opts.cmd && opts.cmd == 'restart') {
     cb(null,'will try to restart the server, check with `nexus server`')
-    return serverProc.restart(cb)
+    return serverMonitor.restart(cb)
   }
-  else cb('server is not running')
+  else cb(new Error('invalid arguments'))
 }
 
 //------------------------------------------------------------------------------
@@ -800,13 +808,24 @@ function objPath(obj, keyString, value) {
 }
 
 //------------------------------------------------------------------------------
-//                                               error
+//                                               genId
 //------------------------------------------------------------------------------
 
-function error(err,cb) {
-  console.log('error:',err)
-  if (serverProc)
-    ee2.emit('server::'+serverProc.id+'::error',err)
-  cb(err)
+function genId(cb) {
+  config(function(err,_config){
+    if (err) return cb(err)
+    fs.readdir(_config.logs, function(err,data){
+      if (err) return cb(err)
+      var currIds = [], id
+      _.each(data,function(x,i){
+        var split = x.split('.')
+        currIds.push(split[split.length-3])
+      })
+      do {
+        id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)+''
+      } while(currIds.indexOf(id) != -1)
+      cb(null,id)
+    })
+  })
 }
 
