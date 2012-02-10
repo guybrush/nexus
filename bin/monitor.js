@@ -120,12 +120,7 @@ function monitor(startOpts) {
   self.stopFlag = false
   self.env = startOpts.env
   self.restartTimeout = 200
-  self.env = process.env
-  
-  if (startOpts.env) {
-    for (var x in startOpts.env)
-      self.env[x] = startOpts.env[x]
-  }
+  self.env = startOpts.env
   
   var logFile = self.script
   
@@ -184,10 +179,15 @@ function monitor(startOpts) {
 
   function start(cb) {
     debug('STARTING')
+    var env = process.env
+    if (self.env) {
+      for (var x in self.env)
+        env[x] = self.env[x]
+    }
     self.child = spawn( self.command
                       , [self.script].concat(self.options)
                       , { cwd : self.cwd
-                        , env : self.env
+                        , env : env
                         } )
 
     ee2.emit('start', self.child.pid)
