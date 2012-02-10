@@ -19,21 +19,21 @@ module.exports =
       var opts = { package : 'http://localhost:'+port+'/app-simple.tar.gz'
                  , name    : 'gnag' }
       debug('installing',opts.package,'→',opts.name)
-      nexus.install(opts, function(err,data){
-        debug('installed',opts.package,'→',data)
-        assert.equal(null,err)
-        assert.equal(data,'gnag')
-        nexus.ls({name:'gnag'},function(err,data){
-          assert.equal(null,err)
-          assert.equal(data.name,'app-simple')
+      nexus.install(opts, function(err,dataA){
+        debug('installed',opts.package,'→',dataA)
+        assert.ok(!err)
+        assert.equal(Object.keys(dataA)[0],'gnag')
+        nexus.ls({name:'gnag'},function(err,dataB){
+          assert.ok(!err)
+          assert.equal(dataB.name,'app-simple')
           debug('installing',opts.package,'→',opts.name)
-          nexus.install(opts, function(err,data){
-            debug('installed',opts.package,'→',data)
-            assert.equal(null,err)
-            assert.equal(data,'gnag_1')
-            nexus.ls({name:'gnag_1'},function(err,data){
-              assert.equal(null,err)
-              assert.equal(data.name,'app-simple')
+          nexus.install(opts, function(err,dataC){
+            debug('installed',opts.package,'→',dataC)
+            assert.ok(!err)
+            assert.equal(Object.keys(dataC)[0],'gnag_1')
+            nexus.ls({name:'gnag_1'},function(err,dataD){
+              assert.ok(!err)
+              assert.equal(dataD.name,'app-simple')
               done()
             })
           })
@@ -46,10 +46,10 @@ module.exports =
       debug('installing',opts.package,'→',opts.name)
       nexus.install(opts, function(err,data){
         debug('installed',opts.package,'→',data)
-        assert.equal(null,err)
-        assert.equal(data,'errorapp')
+        assert.ok(!err)
+        assert.equal(Object.keys(data)[0],'errorapp')
         nexus.ls({name:'errorapp'},function(err,data){
-          assert.equal(null,err)
+          assert.ok(!err)
           assert.equal(data.name,'app-error')
           done()
         })
@@ -60,10 +60,10 @@ module.exports =
       debug('installing',opts.package,'→',opts.name)
       nexus.install(opts, function(err,data){
         debug('installed',opts.package,'→',data)
-        assert.equal(null,err)
-        assert.equal(data,'app-error@0.0.0')
+        assert.ok(!err)
+        assert.equal(Object.keys(data)[0],'app-error@0.0.0')
         nexus.ls({name:'app-error@0.0.0'},function(err,data){
-          assert.equal(null,err)
+          assert.ok(!err)
           assert.equal(data.name,'app-error')
           done()
         })

@@ -215,10 +215,10 @@ function install(opts, cb) {
     if (err) return cb(err)
     var env = process.env
     env.npm_config_prefix = tmpPath
-    var c = cp.execFile( __dirname+'/node_modules/npm/cli.js'
-                       , [ 'install', '-p', '-g', opts.package ]
-                       , { cwd: tmpPath, env:env }
-                       , installPackage )
+    cp.execFile( __dirname+'/node_modules/npm/cli.js'
+               , [ 'install', '-p', '-g', opts.package ]
+               , { cwd: tmpPath, env:env }
+               , installPackage )
   })
 
   function installPackage(err, stdout, stderr) {
@@ -251,7 +251,9 @@ function install(opts, cb) {
           debug('installed',name)
           if (serverMonitor)
             ee2.emit('server::'+serverMonitor.id+'::installed',name)
-          cb(null, name)
+          var result = {}
+          result[name] = package
+          cb(null, result)
         })
       })
     })
@@ -296,7 +298,7 @@ function ls(opts, cb) {
   if (opts && opts.name) {
     path.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
       if (!exists) return cb(new Error('package is not installed: '+opts.name))
-      readPackages([_config.apps+'/'+opts.name+'/package.json'])
+      readPackages([opts.name])
     })
   }
   else {
@@ -331,6 +333,7 @@ function ls(opts, cb) {
       })
     }).done(function(err,data){
       if (err) return cb(err)
+      if (arr.length==1) result = result[Object.keys(result)[0]]
       cb && cb(err,result)
     }).exec()
   }

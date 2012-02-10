@@ -73,7 +73,8 @@ else {
   var startOpts = JSON.parse(opti.argv.s)
   var clientOpts = { port : _config.port
                    , host : _config.host
-                   , reconnect : 100 }
+                   , reconnect : 100 
+                   }
 
   try {
     if (_config.key)
@@ -87,7 +88,7 @@ else {
   var monitorClient = dnode(monitor(startOpts))
   monitorClient.connect(clientOpts)
   monitorClient.on('error',function(err){
-    if (err.code != 'ECONNREFUSED') console.log(err)
+    console.log(err)
   })
 }
 
