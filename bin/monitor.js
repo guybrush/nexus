@@ -59,14 +59,15 @@ if (!process.env.NEXUS_MONITOR) {
                    , [ __filename
                      , '-c', opti.argv.c
                      , '-s', opti.argv.s 
-                     , '-i', opti.argv.i ]
+                     , '-i', process.argv[process.argv.indexOf('-i')+1] 
+                     ]
                    , { env : process.env } )
   child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
   child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
 }
 else {
   _config = JSON.parse(opti.argv.c)
-  process.title = 'nexus-monitor('+opti.argv.i+'):'+_config.port
+  process.title = 'nexus-monitor('+process.argv[process.argv.indexOf('-i')+1]+'):'+_config.port
   delete process.env.NEXUS_MONITOR
   
   var startOpts = JSON.parse(opti.argv.s)
@@ -106,7 +107,7 @@ function monitor(startOpts) {
 
   var self = this
 
-  self.id = opti.argv.i
+  self.id = process.argv[process.argv.indexOf('-i')+1]
   self.crashed = 0
   self.ctime = 0
   self.name = startOpts.name
@@ -305,24 +306,6 @@ function monitor(startOpts) {
         , max : self.max
         } )
   }
-
-//------------------------------------------------------------------------------
-//                                                        genId
-//------------------------------------------------------------------------------
-
-  function genId(cb) {
-    fs.readdir(_config.logs, function(err,data){
-      if (err) return cb(err)
-      var currIds = [], id
-      _.each(data,function(x,i){
-        var split = x.split('.')
-        currIds.push(split[split.length-3])
-      })
-      do {
-        id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)+''
-      } while(currIds.indexOf(id) != -1)
-      cb(null,id)
-    })
-  }
+  
 }
 

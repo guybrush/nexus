@@ -19,7 +19,7 @@
   , "mkdirp"        : "0.3.0"
   , "ncp"           : "0.2.3"
   , "npm"           : "1.1.0-2"
-  , "optimist"      : "0.2.8"
+  , "optimist"      : "0.3.x"
   , "ps-tree"       : "0.0.2"
   , "rimraf"        : "2.0.1"
   , "underscore"    : "1.3.1"
