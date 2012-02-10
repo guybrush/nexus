@@ -39,14 +39,19 @@ if (!process.env.NEXUS_MONITOR) {
   catch (e) {
     throw e
   }
-  var to = setTimeout(function(){process.exit(0)},10000)
-  var monitorStarterClient = dnode({type:'NEXUS_MONITOR_STARTER'})
-    .connect(clientOpts,function(r,c){
-      r.subscribe('monitor::'+opti.argv.i+'::start',function(){
-        clearTimeout(to)
-        process.exit(0)
+  var to = setTimeout(function(){
+    console.error('monitor could not connect in 5seconds')
+    process.exit(0)
+  },5000)
+  var monitorStarterClient = 
+    dnode({type:'NEXUS_MONITOR_STARTER'
+          ,id:opti.argv.i})
+      .connect(clientOpts,function(r,c){
+        r.subscribe('monitor::'+opti.argv.i+'::connected',function(){
+          clearTimeout(to)
+          process.exit(0)
+        })
       })
-    })
   monitorStarterClient.on('error',function(err){
     if (err.code != 'ECONNREFUSED') console.error(err)
   })
@@ -56,8 +61,8 @@ if (!process.env.NEXUS_MONITOR) {
                      , '-s', opti.argv.s 
                      , '-i', opti.argv.i ]
                    , { env : process.env } )
-  // child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
-  // child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
+  child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
+  child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
 }
 else {
   _config = JSON.parse(opti.argv.c)
@@ -178,7 +183,7 @@ function monitor(startOpts) {
 //------------------------------------------------------------------------------
 
   function start(cb) {
-    console.log('STARTING')
+    debug('STARTING')
     self.child = spawn( self.command
                       , [self.script].concat(self.options)
                       , { cwd : self.cwd

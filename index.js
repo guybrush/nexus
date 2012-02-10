@@ -92,11 +92,15 @@ function nexus(configParam) {
     }
     conn.on('remote',function(rem){
       if (!rem.type || !rem.id) return
+      if (rem.type == 'NEXUS_MONITOR_STARTER') {
+        ee2.emit('monitor-starter::'+rem.id+'::connected')
+      }
       if (rem.type == 'NEXUS_MONITOR') {
         monitors[rem.id+''] = rem
-        ee2.emit('monitor::'+rem.id+'::connected')
         rem.subscribe(function(event,data){
           ee2.emit('monitor::'+rem.id+'::'+event,data)
+        },function(){
+          ee2.emit('monitor::'+rem.id+'::connected')
         })
         conn.on('end',function(){
           ee2.emit('monitor::'+rem.id+'::disconnected')
@@ -106,9 +110,10 @@ function nexus(configParam) {
       if (rem.type == 'NEXUS_SERVER_MONITOR') {
         if (serverMonitor) return rem.stop()
         serverMonitor = rem
-        ee2.emit('server::'+rem.id+'::connected')
         rem.subscribe(function(event,data){
           ee2.emit('server::'+rem.id+'::'+event,data)
+        },function(){
+          ee2.emit('server::'+rem.id+'::connected')
         })
         conn.on('end',function(){
           ee2.emit('server::'+rem.id+'::disconnected')
@@ -404,19 +409,23 @@ function start(opts, cb) {
   if (!opts) return cb(new Error('no start-options defined'))
          
   parseStart(opts, function(err, data){
-    debug('parsedStart',data.script)
     if (err) return cb(err)
+    debug('parsedStart',data.script)
     genId(function(err,id){
       debug('starting monitor',id,data.script)
       ee2.on('monitor::'+id+'::connected',function(){
         monitors[id].start(cb)
       })
-      var child = cp.execFile( __dirname+'/bin/monitor.js'
-                             , [ '-c', JSON.stringify(config())
-                               , '-s', JSON.stringify(data) 
-                               , '-i', id ] )
-      // child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
-      // child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
+      var child = cp.execFile
+        ( __dirname+'/bin/monitor.js'
+        , [ '-c', JSON.stringify(config())
+          , '-s', JSON.stringify(data) 
+          , '-i', id ]
+        , null
+        , function(err,stdout,stderr){if (err) cb(err)}
+        )
+      child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
+      child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
     })
   })
 }
@@ -447,7 +456,7 @@ function stop(id, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
-    cb = function(){}
+    cb = function(){}                              
 
   if (!id || !monitors[id])
     return cb(new Error('there is no process with id: '+id))
@@ -657,7 +666,7 @@ function server(opts, cb) {
           c.end()
           //process.exit(0)
         })
-      })
+      })                                             
       r.server(function(err,data){
         if (err || _didit) return
         cb(err,data)
