@@ -24,37 +24,6 @@ process.title = 'nexus-monitor-starter('+opti.argv.c+')'
 
 if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
-  _config = JSON.parse(opti.argv.c)
-  var startOpts = JSON.parse(opti.argv.s)
-  var clientOpts = { port : _config.port
-                   , host : _config.host
-                   , reconnect : 100 }
-
-  try {
-    if (_config.key)
-      clientOpts.key = fs.readFileSync(_config.key)
-    if (_config.cert)
-      clientOpts.cert = fs.readFileSync(_config.cert)
-  }
-  catch (e) {
-    throw e
-  }
-  var to = setTimeout(function(){
-    console.error('monitor could not connect in 5seconds')
-    process.exit(0)
-  },5000)
-  var monitorStarterClient = 
-    dnode({type:'NEXUS_MONITOR_STARTER'
-          ,id:opti.argv.i})
-      .connect(clientOpts,function(r,c){
-        r.subscribe('monitor::'+opti.argv.i+'::connected',function(){
-          clearTimeout(to)
-          process.exit(0)
-        })
-      })
-  monitorStarterClient.on('error',function(err){
-    if (err.code != 'ECONNREFUSED') console.error(err)
-  })
   var child = spawn( 'node'
                    , [ __filename
                      , '-c', opti.argv.c
@@ -64,6 +33,7 @@ if (!process.env.NEXUS_MONITOR) {
                    , { env : process.env } )
   child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
   child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
+  process.exit(0)
 }
 else {
   _config = JSON.parse(opti.argv.c)
@@ -73,7 +43,7 @@ else {
   var startOpts = JSON.parse(opti.argv.s)
   var clientOpts = { port : _config.port
                    , host : _config.host
-                   , reconnect : 100 
+                   , reconnect : 500 
                    }
 
   try {
@@ -96,7 +66,6 @@ ee2.onAny(function(data){
   var self = this
   _.each(subscriptions,function(x,i){
     x(self.event,data)
-    //debug(self.event,'→',data)
   })
 })
 
@@ -109,6 +78,7 @@ function monitor(startOpts) {
   var self = this
 
   self.id = process.argv[process.argv.indexOf('-i')+1]
+  self.startedOnce = false
   self.crashed = 0
   self.ctime = 0
   self.name = startOpts.name
@@ -151,6 +121,10 @@ function monitor(startOpts) {
   if (self.type == 'NEXUS_SERVER_MONITOR')
     start()
   
+  setTimeout(function(){
+    if (!self.startedOnce) start()
+  },500)
+  
   return client
 
 //------------------------------------------------------------------------------
@@ -182,6 +156,9 @@ function monitor(startOpts) {
 
   function start(cb) {
     debug('STARTING')
+    self.startedOnce = true
+    if (self.child) 
+      return cb(new Error('is already running'))
     var env = process.env
     if (self.env) {
       for (var x in self.env)
