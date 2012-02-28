@@ -77,11 +77,10 @@ function nexus(configParam) {
       events = _.isString(events)
                ? [events]
                : (_.isArray(events) && events.length>0) ? events : null
-      if (!events) return cb(new Error('invalid first argument'))
       var remaining = []
       _.each(subscriptions,function(x,i){
         if (!x[conn.id]) return
-        if (!~events.indexOf(i)) return remaining.push(i)
+        if (events && !~events.indexOf(i)) return remaining.push(i)
         delete x[conn.id]
         if (Object.keys(x).length == 0) {
           ee2.removeListener(subscriptionListeners[i])
@@ -422,8 +421,11 @@ function start(opts, cb) {
         , [ '-c', JSON.stringify(config())
           , '-s', JSON.stringify(data) 
           , '-i', id ]
-        , null
-        , function(err,stdout,stderr){if (err) cb(err)}
+        //, {env:process.env}
+        , function(err,stdout,stderr){
+            if (err) return cb(err)
+            if (!serverMonitor) cb(null,data)
+          }
         )
       child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
       child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})

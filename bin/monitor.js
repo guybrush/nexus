@@ -30,7 +30,8 @@ if (!process.env.NEXUS_MONITOR) {
                      , '-s', opti.argv.s 
                      , '-i', process.argv[process.argv.indexOf('-i')+1] 
                      ]
-                   , { env : process.env } )
+                   , { env : process.env } 
+                   )
   child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
   child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
   process.exit(0)
