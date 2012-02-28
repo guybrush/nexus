@@ -77,10 +77,11 @@ function nexus(configParam) {
       events = _.isString(events)
                ? [events]
                : (_.isArray(events) && events.length>0) ? events : null
+      if (!events) return cb(new Error('invalid first argument'))
       var remaining = []
       _.each(subscriptions,function(x,i){
         if (!x[conn.id]) return
-        if (events && !~events.indexOf(i)) return remaining.push(i)
+        if (!~events.indexOf(i)) return remaining.push(i)
         delete x[conn.id]
         if (Object.keys(x).length == 0) {
           ee2.removeListener(subscriptionListeners[i])
@@ -427,8 +428,8 @@ function start(opts, cb) {
             if (!serverMonitor) cb(null,data)
           }
         )
-      child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
-      child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
+      // child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
+      // child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
     })
   })
 }
@@ -617,8 +618,8 @@ function server(opts, cb) {
          ? opts : null
 
   if (!opts && !serverMonitor) 
-    return cb(new Error('server is not running'))
-         
+    return cb('server is not running')
+
   if (!opts && serverMonitor) 
     return serverMonitor.info(cb)
   
@@ -644,6 +645,7 @@ function server(opts, cb) {
         }
       }
 
+    debug('starting',startOpts.script,startOpts.env)
     start(startOpts)
 
     var clientOpts = { port : _config.port
@@ -659,7 +661,9 @@ function server(opts, cb) {
       cb(e)
     }
 
+    debug('connecting',clientOpts)
     var client = dnode.connect(clientOpts,function(r,c){
+      debug('connected')
       var _didit = false
       r.subscribe('server::*::connected',function(){
         r.server(function(err, data){
@@ -678,7 +682,7 @@ function server(opts, cb) {
         //process.exit(0)
       }) 
     })
-    client.on('error',function(e){console.error(e)})
+    client.on('error',function(e){debug(e.code)})
   }
   else if (opts.cmd && opts.cmd == 'stop') {
     if (serverMonitor) {

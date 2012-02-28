@@ -1,5 +1,5 @@
 { "name" : "nexus"
-, "version" : "0.0.17"
+, "version" : "0.0.18"
 , "description" : "remote program installation and control"
 , "main" : "./nexus.js"
 , "bin" : { "nexus" : "./bin/cli.js" }
@@ -11,7 +11,7 @@
   { "async-array"   : "0.1.7"
   , "fstream"       : "0.1.12"
   , "debug"         : "0.5.x"
-  , "dnode"         : "https://github.com/guybrush/dnode/tarball/gc"
+  , "dnode"         : "git://github.com/guybrush/dnode.git#gc"
   , "eventemitter2" : "0.4.8"
   , "mkdirp"        : "0.3.0"
   , "ncp"           : "0.2.3"
@@ -21,7 +21,7 @@
   , "rimraf"        : "2.0.1"
   , "underscore"    : "1.3.1"
   }
-, "devDependencies" : { "mocha" : "0.10.x" }
+, "devDependencies" : { "mocha" : "0.13.x" }
 , "engines" : { "node" : "0.6.x" }
 , "repository" :
   { "type" : "git"

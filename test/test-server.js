@@ -15,43 +15,45 @@ var nexus = require('../')(__dirname+'/common/config')
 module.exports =
 { 'nexus.server()':
   { after: function(done){common.cleanup(done)}
-  , beforeEach: function(){debug('')}
-  , 'cmd:"start"': function(done){
-      this.timeout(10000) // on my computer, it takes ~2800ms :/
-      var _did, _do = function(e){if(!_did){_did=true;done(e)}}
-      debug('starting server')
-      nexus.server({cmd:'start'},function(err,dataA){
-        debug('started server')
-        assert.equal(null,err)
-        debug('connecting to server')
-        var client = dnode.connect(opts,function(remote,conn){
-          debug('connected to server')
-          tmp.nexusRemote = remote
-          tmp.nexusRemote.server(function(err,dataB){
-            assert.equal(dataA.id,dataB.id)
-            done()
+  , 'cmd:"start"': 
+    { 'should start the nexus-server': function(done){
+        this.timeout(10000) // on my computer, it takes ~2800ms :/
+        debug('starting server')
+        nexus.server({cmd:'start'},function(err,dataA){
+          debug('started server')
+          assert.ok(!err)
+          debug('connecting to server')
+          var client = dnode.connect(opts,function(remote,conn){
+            debug('connected to server')
+            tmp.nexusRemote = remote
+            tmp.nexusRemote.server(function(err,dataB){
+              assert.equal(dataA.id,dataB.id)
+              done()                  
+            })
           })
+          client.on('error',function(){})
         })
-        client.on('error',function(){})
-      })
-    }
-  , 'cmd:"stop"': function(done){
-      debug('stopping server')
-      tmp.nexusRemote.server({cmd:'stop'},function(err,dataA){
-        assert.ok(!err)
-        opts.reconnect = false
-        ;(function check(){
-          var client = dnode.connect(opts,function(){
-            client.end()
-            setTimeout(check,200)
+      }
+    , 'cmd:"stop"':
+      { 'should stop the nexus-server': function(done){
+          debug('stopping server')
+          tmp.nexusRemote.server({cmd:'stop'},function(err,dataA){
+            assert.ok(!err)
+            opts.reconnect = false
+            ;(function check(){
+              var client = dnode.connect(opts,function(){
+                client.end()
+                setTimeout(check,100)
+              })
+              client.on('error',function(err){
+                if (err.code=='ECONNREFUSED') return done()
+                client.end()
+                setTimeout(check,100)
+              })
+            })()
           })
-          client.on('error',function(err){
-            if (err.code=='ECONNREFUSED') return done()
-            client.end()
-            setTimeout(check,200)
-          })
-        })()
-      })
+        }
+      }
     }
   }
 }

@@ -41,10 +41,10 @@ function scenario(opts) {
                   self.clients.push( { client : client
                                      , conn   : conn.id
                                      , remote : remote } )
-                  conn.on('error',console.error)
+                  conn.on('error',debug)
                   done()
                 })
-                client.on('error',console.error)
+                client.on('error',debug)
               }
             })
           })
