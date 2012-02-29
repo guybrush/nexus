@@ -417,19 +417,20 @@ function start(opts, cb) {
       ee2.on('monitor::'+id+'::connected',function(){
         monitors[id].start(cb)
       })
-      var child = cp.execFile
-        ( __dirname+'/bin/monitor.js'
-        , [ '-c', JSON.stringify(config())
+      var child = cp.spawn
+        ( 'node'
+        , [ __dirname+'/bin/monitor.js'
+          , '-c', JSON.stringify(config())
           , '-s', JSON.stringify(data) 
           , '-i', id ]
         //, {env:process.env}
-        , function(err,stdout,stderr){
-            if (err) return cb(err)
-            if (!serverMonitor) cb(null,data)
-          }
+        //, function(err,stdout,stderr){
+        //    if (err) return cb(err)
+        //    if (!serverMonitor) cb(null,data)
+        //  }
         )
-      // child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
-      // child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
+      child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
+      child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
     })
   })
 }

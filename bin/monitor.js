@@ -7,10 +7,10 @@
 // -i <id>
 
 var nexus = require('../')
-  , _config
+  , opti = require('optimist')
+  , _config = opti.argv.c ? JSON.parse(opti.argv.c) : {}
   , dnode = require('dnode')
   , _ = require('underscore')
-  , opti = require('optimist')
   , spawn = require('child_process').spawn
   , fstream = require('fstream')
   , psTree = require('ps-tree')
@@ -20,6 +20,8 @@ var nexus = require('../')
   , subscriptions = {}
   , debug = require('debug')('nexus')
 
+delete _config.remotes
+  
 process.title = 'nexus-monitor-starter('+opti.argv.c+')'
 
 if (!process.env.NEXUS_MONITOR) {
@@ -32,13 +34,12 @@ if (!process.env.NEXUS_MONITOR) {
                      ]
                    , { env : process.env } 
                    )
-  // child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
-  // child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
+  debug('spawned child '+child.pid)
+  child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
+  child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
   setTimeout(function(){process.exit(0)},5000)
-  //process.exit(0)
 }
 else {
-  _config = JSON.parse(opti.argv.c)
   process.title = 'nexus-monitor('+process.argv[process.argv.indexOf('-i')+1]+'):'+_config.port
   delete process.env.NEXUS_MONITOR
   

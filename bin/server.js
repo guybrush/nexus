@@ -3,7 +3,7 @@
 var fs = require('fs')
   , dnode = require('dnode')
   , AA = require('async-array')
-  , _config = JSON.parse(process.env.NEXUS_CONFIG)
+  , _config = require(process.env.HOME+'/.nexus/config.js') // JSON.parse(process.env.NEXUS_CONFIG)
   , nexus = require('../nexus')
   , opts = { port : _config.port
            , host : _config.host }
