@@ -2,9 +2,9 @@
 
 var opti = require('optimist')
   , argv = opti.argv
-  , confIndex = process.argv.slice(0,process.argv.indexOf(argv._[0])).indexOf('-c')
-  , confFile = !~confIndex ? null : process.argv[confIndex]
-  , nexus = require('../')(confFile)
+  , argvNexus = opti.parse(process.argv.slice(0,process.argv.indexOf(argv._[0])))
+  , argvCmd = opti.parse(process.argv.slice(process.argv.indexOf(argv._[0])+1))
+  , nexus = require('../')(argvNexus.c)
   , _config = nexus.config()
   , _pkg = require('../package.json')
   , opti = require('optimist')
@@ -45,7 +45,7 @@ var opti = require('optimist')
     ].join('\n')
 
 process.title = 'nexus-v'+_pkg.version
-    
+
 var help = {}
 help.version   =   'nexus version .. will print the version of installed nexus'
 help.config    = [ 'nexus config .. show all config'
@@ -87,7 +87,7 @@ help.ls        = [ 'nexus ls [<appName>] [<filter>]'
                  , 'neuxs ls foo                  .. show all infos about the app "foo"'
                  , 'nexus ls --name --version     .. list all installed apps and'
                  , '                                 filter `package.name` and `package.version`'
-                 , 'nexus ls foo --name --version .. show `package.name` and `package.version` of' 
+                 , 'nexus ls foo --name --version .. show `package.name` and `package.version` of'
                  , '                                 of the installed app "foo"'
                  ].join('\n')
 help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
@@ -209,31 +209,31 @@ else if (argv._[0] == 'help') {
 }
 else {
   var opts = {}
-  if (argv.r && _config.remotes[argv.r]) {
-    opts.host = _config.remotes[argv.r].host
-    opts.port = _config.remotes[argv.r].port
+  if (argvNexus.r && _config.remotes[argvNexus.r]) {
+    opts.host = _config.remotes[argvNexus.r].host
+    opts.port = _config.remotes[argvNexus.r].port
     try {
-      if (_config.remotes[argv.r].key)
-        opts.key = fs.readFileSync(_config.remotes[argv.r].key)
-    } catch(e) { exit('can not read key-file: '+_config.remotes[argv.r].key) }
+      if (_config.remotes[argvNexus.r].key)
+        opts.key = fs.readFileSync(_config.remotes[argvNexus.r].key)
+    } catch(e) { exit('can not read key-file: '+_config.remotes[r].key,e) }
     try {
-      if (_config.remotes[argv.r].cert)
-        opts.cert = fs.readFileSync(_config.remotes[argv.r].cert)
-    } catch(e) { exit('can not read cert-file: '+_config.remotes[argv.r].cert) }
+      if (_config.remotes[argvNexus.r].cert)
+        opts.cert = fs.readFileSync(_config.remotes[argvNexus.r].cert)
+    } catch(e) { exit('can not read cert-file: '+_config.remotes[argvNexus.r].cert,e) }
   } else {
     opts.host = _config.host
     opts.port = _config.port
     try {
       if (_config.key)
         opts.key = fs.readFileSync(_config.key)
-    } catch(e) { exit('can not read key-file: '+_config.key) }
+    } catch(e) { exit('can not read key-file: '+_config.key,e) }
     try {
       if (_config.cert)
         opts.cert = fs.readFileSync(_config.cert)
-    } catch(e) { exit('can not read cert-file: '+_config.cert) }
+    } catch(e) { exit('can not read cert-file: '+_config.cert,e) }
   }
   var client = dnode({type:'NEXUS_CLI'})
-  
+
   client.connect(opts, function(remote, conn){
     _conn = conn
     nexus = remote
@@ -247,7 +247,7 @@ else {
     conn.on('end',function(){exit('disconnected from server')})
   })
   client.on('error',function(err){
-    if (err.code == 'ECONNREFUSED' && !argv.r) {
+    if (err.code == 'ECONNREFUSED' && !argvNexus.r) {
       if (['version','config','ls','install','uninstall'
           ,'server','logs','start'
           ].indexOf(argv._[0]) != -1) {
@@ -271,8 +271,9 @@ function parseArgs() {
       break
     case 'ls':
       var opts = {}
-      opts.name = argv._[0]
-      opts.filter = _.without(Object.keys(argv),'_','$0')
+      if (argv._[0]) opts.name = argv._[0]
+      var filter = _.without(Object.keys(argvCmd),'_','$0')
+      if (filter.length>0) opts.filter = filter
       nexus.ls(opts, exit)
       break
     case 'install':
@@ -293,8 +294,9 @@ function parseArgs() {
       break
     case 'ps':
       var opts = {}
-      opts.id = argv._[0]
-      opts.filter = _.without(Object.keys(argv),'_','$0')
+      if (argv._[0]) opts.id = argv._[0]
+      var filter = _.without(Object.keys(argvCmd),'_','$0')
+      if (filter.length>0) opts.filter = filter
       nexus.ps(opts, exit)
       break
     case 'start':
@@ -329,7 +331,7 @@ function parseArgs() {
       var stderr = function(data) {console.log('stderr →',data)}
       nexus.runscript(opts, stdout, stderr, function(err, kill){
         if (err) return exit(err)
-        require('tty').setRawMode(true);   
+        require('tty').setRawMode(true);
         var stdin = process.openStdin()
         stdin.on('keypress', function (chunk, key) {
           if (key && key.ctrl && key.name == 'c') {
