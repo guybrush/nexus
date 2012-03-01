@@ -2,7 +2,8 @@
 
 var opti = require('optimist')
   , argv = opti.argv
-  , confFile = Array.isArray(argv.c) ? argv.c[0] : argv.c
+  , confIndex = process.argv.slice(0,process.argv.indexOf(argv._[0])).indexOf('-c')
+  , confFile = !~confIndex ? null : process.argv[confIndex]
   , nexus = require('../')(confFile)
   , _config = nexus.config()
   , _pkg = require('../package.json')

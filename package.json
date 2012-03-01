@@ -1,5 +1,5 @@
 { "name" : "nexus"
-, "version" : "0.0.20"
+, "version" : "0.0.21"
 , "description" : "remote program installation and control"
 , "main" : "./nexus.js"
 , "bin" : { "nexus" : "./bin/cli.js" }
