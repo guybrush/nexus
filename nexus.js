@@ -417,12 +417,16 @@ function start(opts, cb) {
       ee2.on('monitor::'+id+'::connected',function(){
         monitors[id].start(cb)
       })
-      var child = cp.spawn
-        ( 'node'
-        , [ __dirname+'/bin/monitor.js'
-          , '-c', JSON.stringify(config())
+      var child = cp.execFile
+        ( __dirname+'/bin/monitor.js'
+        , [ '-c', JSON.stringify(config())
           , '-s', JSON.stringify(data) 
           , '-i', id ]
+        //( 'node'
+        //, [ __dirname+'/bin/monitor.js'
+        //  , '-c', JSON.stringify(config())
+        //  , '-s', JSON.stringify(data) 
+        //  , '-i', id ]
         //, {env:process.env}
         //, function(err,stdout,stderr){
         //    if (err) return cb(err)
@@ -636,6 +640,7 @@ function server(opts, cb) {
     if (serverMonitor) 
       return cb(new Error('server is already running'))
     var _config = config()
+    delete _config.remotes
     var startOpts =
       { script: __dirname+'/bin/server.js'
       , command: 'node'

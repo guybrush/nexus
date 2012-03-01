@@ -38,6 +38,7 @@ if (!process.env.NEXUS_MONITOR) {
   child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
   child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
   setTimeout(function(){process.exit(0)},5000)
+  //process.exit(0)
 }
 else {
   process.title = 'nexus-monitor('+process.argv[process.argv.indexOf('-i')+1]+'):'+_config.port
