@@ -427,7 +427,7 @@ function start(opts, cb) {
         //  , '-c', JSON.stringify(config())
         //  , '-s', JSON.stringify(data) 
         //  , '-i', id ]
-        //, {env:process.env}
+        , { env : process.env }
         //, function(err,stdout,stderr){
         //    if (err) return cb(err)
         //    if (!serverMonitor) cb(null,data)
