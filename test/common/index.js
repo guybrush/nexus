@@ -1,4 +1,4 @@
-var nexus = require('../../')
+var nexus = require('../../')(__dirname+'/config')
   , fs = require('fs')
   , dnode = require('dnode')
   , rimraf = require('rimraf')
@@ -8,7 +8,6 @@ module.exports =
 { scenario: scenario
 , plan: plan
 , cleanup: cleanup
-, config: require('./config')
 }
 
 // screnario()
@@ -38,6 +37,7 @@ function scenario(opts) {
               for (var i=0;i<opts.clients;i++) {
                 var client = dnode.connect(clientOpts, function(remote, conn){
                   debug('client connected')
+                  //remote.subscribe('**',function(){debug('**',[].slice.call(arguments))})
                   self.clients.push( { client : client
                                      , conn   : conn.id
                                      , remote : remote } )

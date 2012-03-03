@@ -266,6 +266,7 @@ function install(opts, cb) {
 //------------------------------------------------------------------------------
 
 function uninstall(opts, cb) {
+  debug('uninstalling',opts)
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
 
@@ -274,14 +275,27 @@ function uninstall(opts, cb) {
   else
     return cb('not sure how to handle the parameter')
 
+  var self = this
   var _config = config()
   var path = _config.apps+'/'+opts
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
-    rimraf(_config.apps+'/'+opts,function(){
-      if (serverMonitor)
-        ee2.emit('server::'+serverMonitor.id+'::uninstalled',opts)
-      cb(null,'uninstalled '+opts)
+    ps(function(err,res){
+      if (err) return cb(err)
+      ee2.emit('debug','checking for running "'+opts+'"',res)
+      var running = []
+      _.each(res,function(x,i){
+        if (x.name == opts) running.push(i)
+      })
+      if (running.length > 0) 
+        return cb('cant uninstall "'+opts+'", '
+                 +'monitors are running: '
+                 +JSON.stringify(running))
+      rimraf(_config.apps+'/'+opts,function(){
+        if (serverMonitor)
+          ee2.emit('server::'+serverMonitor.id+'::uninstalled',opts)
+        cb(null,opts)
+      })
     })
   })
 }
@@ -651,7 +665,7 @@ function server(opts, cb) {
         }
       }
 
-    debug('starting',startOpts.script,startOpts.env)
+    debug('server-start starting',startOpts.script)
     start(startOpts)
 
     var clientOpts = { port : _config.port
@@ -667,9 +681,9 @@ function server(opts, cb) {
       cb(e)
     }
 
-    debug('connecting',clientOpts)
+    debug('server-start connecting')
     var client = dnode.connect(clientOpts,function(r,c){
-      debug('connected')
+      debug('server-start connected')
       var _didit = false
       r.subscribe('server::*::connected',function(){
         r.server(function(err, data){

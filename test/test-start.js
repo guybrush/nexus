@@ -1,6 +1,6 @@
 var common = require('./common')
   , scenario = common.scenario({clients:1})
-  , nexus = require('../')(common.config)
+  , nexus = require('../')(__dirname+'/common/config')
   , debug = require('debug')('test')
   , dnode = require('dnode')
   , fs = require('fs')
@@ -10,7 +10,6 @@ var common = require('./common')
 module.exports =
 { 'nexus.start()':
   { before: scenario.before
-  , beforeEach: function(){debug('')}
   , after: scenario.after
   , 'script:"app-simple@0.0.0",options:[port]': function(done){
       this.timeout(10000)
