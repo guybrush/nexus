@@ -315,10 +315,10 @@ function parseArgs() {
       }
       break
     case 'restart':
-      nexus.restart(process.argv[3], exit)
+      nexus.restart(argvCmd._[0], exit)
       break
     case 'stop':
-      nexus.stop(process.argv[3], exit)
+      nexus.stop(argvCmd._[0], exit)
       break
     case 'stopall':
       nexus.stopall(exit)
