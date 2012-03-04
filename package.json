@@ -1,6 +1,6 @@
 {
   "name": "nexus",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "description": "remote program installation and control",
   "main": "./nexus.js",
   "bin": {
