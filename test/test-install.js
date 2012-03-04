@@ -22,18 +22,30 @@ module.exports =
       nexus.install(opts, function(err,dataA){
         debug('installed',opts.package,'→',dataA)
         assert.ok(!err)
-        assert.equal(Object.keys(dataA)[0],'gnag')
+        Object.keys(dataA).forEach(function(x){
+          assert.equal(x,'gnag')
+          assert.equal(dataA[x].name,'app-simple')
+        })
         nexus.ls({name:'gnag'},function(err,dataB){
           assert.ok(!err)
-          assert.equal(dataB.name,'app-simple')
+          Object.keys(dataB).forEach(function(x){
+            assert.equal(x,'gnag')
+            assert.equal(dataB[x].name,'app-simple')
+          })
           debug('installing',opts.package,'→',opts.name)
           nexus.install(opts, function(err,dataC){
             debug('installed',opts.package,'→',dataC)
             assert.ok(!err)
-            assert.equal(Object.keys(dataC)[0],'gnag_1')
+            Object.keys(dataC).forEach(function(x){
+              assert.equal(x,'gnag_1')
+              assert.equal(dataC[x].name,'app-simple')
+            })
             nexus.ls({name:'gnag_1'},function(err,dataD){
               assert.ok(!err)
-              assert.equal(dataD.name,'app-simple')
+              Object.keys(dataD).forEach(function(x,i){
+                assert.equal(x,'gnag_1')
+                assert.equal(dataD[x].name,'app-simple')
+              })
               done()
             })
           })
@@ -50,7 +62,10 @@ module.exports =
         assert.equal(Object.keys(data)[0],'errorapp')
         nexus.ls({name:'errorapp'},function(err,data){
           assert.ok(!err)
-          assert.equal(data.name,'app-error')
+          Object.keys(data).forEach(function(x,i){
+            assert.equal(x,'errorapp')
+            assert.equal(data[x].name,'app-error')
+          })
           done()
         })
       })
@@ -64,7 +79,10 @@ module.exports =
         assert.equal(Object.keys(data)[0],'app-error@0.0.0')
         nexus.ls({name:'app-error@0.0.0'},function(err,data){
           assert.ok(!err)
-          assert.equal(data.name,'app-error')
+          Object.keys(data).forEach(function(x,i){
+            assert.equal(x,'app-error@0.0.0')
+            assert.equal(data[x].name,'app-error')
+          })
           done()
         })
       })

@@ -347,7 +347,6 @@ function ls(opts, cb) {
       })
     }).done(function(err,data){
       if (err) return cb(err)
-      if (arr.length==1) result = result[Object.keys(result)[0]]
       cb && cb(err,result)
     }).exec()
   }

@@ -61,7 +61,8 @@ function scenario(opts) {
         debug('stopped server')
         if (err) return
         //clearInterval(iv)
-        cleanup(done)
+        //cleanup(done)
+        done()
       })
     })
   }
