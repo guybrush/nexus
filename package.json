@@ -7,8 +7,8 @@
     "nexus": "./bin/cli.js"
   },
   "scripts": {
-    "test": "node ./node_modules/.bin/mocha",
-    "debug": "DEBUG=test,nexus node ./node_modules/.bin/mocha"
+    "test": "./node_modules/.bin/mocha",
+    "debug": "DEBUG=test,nexus ./node_modules/.bin/mocha"
   },
   "dependencies": {
     "async-array": "0.1.7",

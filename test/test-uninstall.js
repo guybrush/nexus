@@ -1,6 +1,5 @@
 var common = require('./common')
   , scenario = common.scenario({clients:1})
-  , nexus = require('../')(__dirname+'/common/config')
   , debug = require('debug')('test')
   , dnode = require('dnode')
   , fs = require('fs')
@@ -21,6 +20,7 @@ module.exports =
   , 'app-simple@0.0.0 (while running)': function(done){
       scenario.clients[0].remote.start({script:'app-simple@0.0.0'},function(errA,resA){
         debug('started',resA[Object.keys(resA)[0]].name)
+        scenario.clients[0].remote.subscribe('**',common.ee2log('remote'))
         scenario.clients[0].remote.uninstall('app-simple@0.0.0',function(errB,resB){
           debug('tried to uninstall, error:',errB)
           assert.ok(errB)

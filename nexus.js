@@ -266,7 +266,6 @@ function install(opts, cb) {
 //------------------------------------------------------------------------------
 
 function uninstall(opts, cb) {
-  debug('uninstalling',opts)
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
 
@@ -278,11 +277,11 @@ function uninstall(opts, cb) {
   var self = this
   var _config = config()
   var path = _config.apps+'/'+opts
+  
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
     ps(function(err,res){
       if (err) return cb(err)
-      ee2.emit('debug','checking for running "'+opts+'"',res)
       var running = []
       _.each(res,function(x,i){
         if (x.name == opts) running.push(i)
@@ -372,6 +371,7 @@ function ps(opts, cb) {
   if (Object.keys(monitors).length == 0)
     return cb(null,result)
 
+  ee2.emit('debug::ps',{opts:opts})
   if (opts.id && monitors[opts.id]) {
     if (!opts.filter) {
       return monitors[opts.id].info(cb)
@@ -483,7 +483,12 @@ function stop(id, cb) {
   if (!id || !monitors[id])
     return cb(new Error('there is no process with id: '+id))
 
-  monitors[id].stop(cb)
+  monitors[id].stop(function(err,data){
+    if (err) return cb(err)
+    ee2.once('monitor::'+id+'::disconnected',function(){
+      cb(null,data)
+    })
+  })
 }
 
 //------------------------------------------------------------------------------
@@ -496,11 +501,10 @@ function stopall(cb) {
   var keys = Object.keys(monitors)
   if (keys.length==0) return cb(null,[])
   new AA(Object.keys(monitors)).map(function(x,i,next){
-    monitors[x].stop(next)
-  }).done(function(err,data){
-    if (!err) debug('stopped',data)
-    cb(err,data)
-  }).exec()
+    monitors[x].stop(function(err,data){
+      ee2.once('monitor::'+x+'::disconnected',function(){next(null,data)})
+    })
+  }).done(cb).exec()
 }
 
 //------------------------------------------------------------------------------

@@ -8,6 +8,7 @@ module.exports =
 { scenario: scenario
 , plan: plan
 , cleanup: cleanup
+, ee2log: ee2log
 }
 
 // screnario()
@@ -82,3 +83,10 @@ function plan(todo,cb) {
 function cleanup(cb) {
   rimraf(__dirname+'/root',cb)
 }
+
+function ee2log(name){
+  return function(){
+    debug((name || '☼')+':',this.event,'→',[].slice.call(arguments))
+  }
+}
+
