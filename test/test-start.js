@@ -1,6 +1,5 @@
 var common = require('./common')
   , scenario = common.scenario({clients:1})
-  , nexus = require('../')(__dirname+'/common/config')
   , debug = require('debug')('test')
   , dnode = require('dnode')
   , fs = require('fs')
@@ -52,6 +51,7 @@ module.exports =
         }
         remote.subscribe('monitor::'+resStart.id+'::start',function(event,data){
           debug('restarted script')
+          if (plan.todo == 0) return
           setTimeout(function(){sendRequest()},500)
         })
       })

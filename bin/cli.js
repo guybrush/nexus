@@ -231,9 +231,9 @@ else {
       if (_config.cert)
         opts.cert = fs.readFileSync(_config.cert)
     } catch(e) { exit('can not read cert-file: '+_config.cert,e) }
+    if (_config.socket) opts = _config.socket
   }
   var client = dnode({type:'NEXUS_CLI'})
-
   client.connect(opts, function(remote, conn){
     _conn = conn
     nexus = remote

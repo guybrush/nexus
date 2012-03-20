@@ -5,5 +5,6 @@ module.exports =
 , cert : __dirname+'/agent2-cert.pem'
 , ca : __dirname+'/ca'
 , prefix : __dirname+'/root'
+, socket : __dirname+'/root/socket'
 }
 

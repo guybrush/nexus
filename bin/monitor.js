@@ -35,13 +35,17 @@ if (!process.env.NEXUS_MONITOR) {
                    , { env : process.env } 
                    )
   debug('spawned child '+child.pid)
-  child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
-  child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
-  setTimeout(function(){process.exit(0)},5000)
+  // child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
+  // child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
+  setTimeout(function(){process.exit(0)},4000)
   //process.exit(0)
 }
 else {
-  process.title = 'nexus-monitor('+process.argv[process.argv.indexOf('-i')+1]+'):'+_config.port
+  var title = 'nexus-monitor'
+  title = title+'('+process.argv[process.argv.indexOf('-i')+1]+')'
+  if (_config.socket) title = title+':'+_config.socket
+  else title = title+':'+_config.port
+  process.title = title
   delete process.env.NEXUS_MONITOR
   
   var startOpts = JSON.parse(opti.argv.s)
@@ -49,29 +53,32 @@ else {
                    , host : _config.host
                    , reconnect : 500 
                    }
-
-  try {
-    if (_config.key)
-      clientOpts.key = fs.readFileSync(_config.key)
-    if (_config.cert)
-      clientOpts.cert = fs.readFileSync(_config.cert)
-  }
-  catch (e) {
-    throw e
+  if (!_config.socket) {
+    try {
+      if (_config.key)
+        clientOpts.key = fs.readFileSync(_config.key)
+      if (_config.cert)
+        clientOpts.cert = fs.readFileSync(_config.cert)
+    }
+    catch (e) {
+      throw e
+    }
   }
   var monitorClient = dnode(monitor(startOpts))
-  monitorClient.connect(clientOpts)
+  if (!_config.socket)
+    monitorClient.connect(clientOpts)
+  else
+    monitorClient.connect(_config.socket,{reconnect:500})
   monitorClient.on('error',function(err){
     console.log(err)
   })
-}
-
-ee2.onAny(function(data){
-  var self = this
-  _.each(subscriptions,function(x,i){
-    x(self.event,data)
+  ee2.onAny(function(data){
+    var self = this
+    _.each(subscriptions,function(x,i){
+      x(self.event,data)
+    })
   })
-})
+}
 
 //------------------------------------------------------------------------------
 //                                                        monitor (constructor)
@@ -183,9 +190,11 @@ function monitor(startOpts) {
     self.child.stderr.pipe(fsStderr)
 
     self.child.stdout.on('data',function(data){
+      debug('child-stdout',data.toString())
       ee2.emit('stdout', data.toString())
     })
     self.child.stderr.on('data',function(data){
+      debug('child-stderr',data.toString())
       ee2.emit('stderr', data.toString())
     })
     self.child.once('exit',function(code){
@@ -227,9 +236,10 @@ function monitor(startOpts) {
 //                                                        stop
 //------------------------------------------------------------------------------
 
-  function stop(cb) {
+  function stop(cb) {                   
     ee2.emit('debug','stopping')
     self.stopFlag = true
+    
     info(function(err,data){
       if (err) return cb(err)
       if (data.running) {
@@ -240,7 +250,7 @@ function monitor(startOpts) {
           ee2.emit('debug','child exitted')
           self.stopFlag = false
           clearTimeout(timer)
-          info(function(err,data){
+          info(function(err,data){    
             cb && cb(err,data)
             if (!self.restartFlag) process.exit(0)
           })

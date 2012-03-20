@@ -8,7 +8,10 @@ var fs = require('fs')
   , opts = { port : _config.port
            , host : _config.host }
 
-process.title = 'nexus-server:'+_config.port
+var title = 'nexus-server'
+if (_config.port) title = title+':'+_config.port
+if (_config.socket) title = title+':'+_config.socket
+process.title = title
            
 console.log('starting server',_config)
            
@@ -51,6 +54,29 @@ else {
 }
 
 function start() {
+  if (_config.socket) {
+    var unixServer = dnode(nexus(_config)).listen(_config.socket)
+    unixServer.on('ready',function(){
+      console.log('started unix-server '+_config.socket)
+      var client = dnode({type:'NEXUS_PROXY'})
+      client.connect(_config.socket,function(rem,conn){
+        var server = dnode(rem).listen(opts)
+        server.on('error',function(err){
+          console.error(err)
+        })
+        server.on('ready',function(){
+          console.log('started server')
+        })
+      })
+      client.on('error',function(e){
+        console.error(e)
+      })
+    })
+    unixServer.on('error',function(err){
+      console.error(err)
+    })
+    return
+  }
   var server = dnode(nexus(_config)).listen(opts)
   server.on('error',function(err){
     console.error(err)

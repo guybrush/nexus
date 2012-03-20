@@ -34,7 +34,7 @@ var fs      = require('fs')
   , subscriptionListeners = {}
   , userConfig = null
 
-// ee2.onAny(function(data){debug(this.event,'→',data)})
+ee2.onAny(function(data){debug(this.event,'→',data)})
   
 //------------------------------------------------------------------------------
 //                                               constructor
@@ -173,6 +173,7 @@ function config(key, value, cb) {
   currConfig.key     = currConfig.key     || fileConfig.key     || null
   currConfig.cert    = currConfig.cert    || fileConfig.cert    || null
   currConfig.ca      = currConfig.ca      || fileConfig.ca      || null
+  currConfig.socket  = currConfig.socket  || fileConfig.socket  || null
   currConfig.tmp     = currConfig.tmp     || fileConfig.tmp     || currConfig.prefix+'/tmp'
   currConfig.apps    = currConfig.apps    || fileConfig.apps    || currConfig.prefix+'/apps'
   currConfig.logs    = currConfig.logs    || fileConfig.logs    || currConfig.prefix+'/logs'
@@ -430,24 +431,24 @@ function start(opts, cb) {
       ee2.on('monitor::'+id+'::connected',function(){
         monitors[id].start(cb)
       })
-      var child = cp.execFile
-        ( __dirname+'/bin/monitor.js'
-        , [ '-c', JSON.stringify(config())
-          , '-s', JSON.stringify(data) 
-          , '-i', id ]
-        //( 'node'
-        //, [ __dirname+'/bin/monitor.js'
-        //  , '-c', JSON.stringify(config())
+      var child = cp.spawn
+        //( __dirname+'/bin/monitor.js'
+        //, [ '-c', JSON.stringify(config())
         //  , '-s', JSON.stringify(data) 
         //  , '-i', id ]
-        , { env : process.env }
+        ( 'node'
+        , [ __dirname+'/bin/monitor.js'
+          , '-c', JSON.stringify(config())
+          , '-s', JSON.stringify(data) 
+          , '-i', id ]
+        //, { env : process.env }
         //, function(err,stdout,stderr){
         //    if (err) return cb(err)
         //    if (!serverMonitor) cb(null,data)
         //  }
         )
-      child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
-      child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
+      // child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
+      // child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
     })
   })
 }
@@ -496,13 +497,15 @@ function stop(id, cb) {
 //------------------------------------------------------------------------------
 
 function stopall(cb) {
-  debug('stopping all')
   if (!cb) cb = function() {}
   var keys = Object.keys(monitors)
   if (keys.length==0) return cb(null,[])
   new AA(Object.keys(monitors)).map(function(x,i,next){
+    ee2.emit('debug','stopping '+x)
     monitors[x].stop(function(err,data){
-      ee2.once('monitor::'+x+'::disconnected',function(){next(null,data)})
+      ee2.once('monitor::'+x+'::disconnected',function(){
+        next(null,data)
+      })
     })
   }).done(cb).exec()
 }
@@ -596,37 +599,6 @@ function cleanlogs(cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               remote
-//------------------------------------------------------------------------------
-
-function remote(rem, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function(){}
-
-  if (!_config.remotes[rem])
-    return cb(new Error('dont know about the remote "'+rem+'"'))
-
-  var _config = config()
-  var opts = {}
-  opts.host = _config.remotes[rem].host
-  opts.port = _config.remotes[rem].port
-  try {
-    if (_config.remotes[rem].key)
-      opts.key = fs.readFileSync(_config.remotes[rem].key)
-    if (_config.remotes[argv.r].cert)
-      opts.cert = fs.readFileSync(_config.remotes[rem].cert)
-  } catch(e) { return cb(e) }
-
-  var client = dnode({type:'NEXUS_REMOTE'})
-  client.connect(opts, function(remote, conn) {
-    cb(null, remote)
-  })
-  client.on('error',function(err){cb(err)})
-}
-
-//------------------------------------------------------------------------------
 //                                               server
 //------------------------------------------------------------------------------
 
@@ -644,7 +616,8 @@ function server(opts, cb) {
 
   if (!opts && serverMonitor) 
     return serverMonitor.info(cb)
-  
+    // return cb(null,serverMonitor)
+    
   if (opts.cmd && opts.cmd == 'version') {
     if (!serverMonitor) return cb('server is not running')
     serverMonitor.info(function(err,data){
@@ -671,41 +644,49 @@ function server(opts, cb) {
     debug('server-start starting',startOpts.script)
     start(startOpts)
 
-    var clientOpts = { port : _config.port
-                     , host : _config.host
-                     , reconnect : 100 }
-    try {
-      if (_config.key)
-        clientOpts.key = fs.readFileSync(_config.key)
-      if (_config.cert)
-        clientOpts.cert = fs.readFileSync(_config.cert)
-    }
-    catch (e) {
-      cb(e)
-    }
-
-    debug('server-start connecting')
-    var client = dnode.connect(clientOpts,function(r,c){
-      debug('server-start connected')
-      var _didit = false
-      r.subscribe('server::*::connected',function(){
-        r.server(function(err, data){
-          if (_didit) return
-          cb(err,data)
-          _didit = true
-          c.end()
-          //process.exit(0)
+    var client
+    
+    if (!_config.socket) {
+      var clientOpts = { port : _config.port
+                       , host : _config.host }
+      try {
+        if (_config.key)
+          clientOpts.key = fs.readFileSync(_config.key)
+        if (_config.cert)
+          clientOpts.cert = fs.readFileSync(_config.cert)
+      }
+      catch (e) {
+        cb(e)
+      }
+      ;(function check(){
+        var client = dnode.connect(clientOpts,function(r,c){
+          r.server(function(err, data){
+            if (err) return setTimeout(check,100)
+            client.end()
+            cb(err,data)
+          })
         })
-      })                                             
-      r.server(function(err,data){
-        if (err || _didit) return
-        cb(err,data)
-        _didit = true
-        c.end()
-        //process.exit(0)
-      }) 
-    })
-    client.on('error',function(e){debug(e.code)})
+        client.on('error',function(e){
+          if (e.code === 'ECONNREFUSED')
+            setTimeout(check,100)
+        })
+      })() 
+    }
+    else {
+      ;(function check(){
+        var client = dnode.connect(_config.socket,function(r,c){
+          r.server(function(err, data){
+            if (err) return setTimeout(check,100)
+            client.end()
+            cb(err,data)
+          })
+        })
+        client.on('error',function(e){
+          if (e.code === 'ENOENT')
+            setTimeout(check,100)
+        })
+      })()
+    }
   }
   else if (opts.cmd && opts.cmd == 'stop') {
     if (serverMonitor) {
@@ -718,7 +699,7 @@ function server(opts, cb) {
     cb(null,'will try to restart the server, check with `nexus server`')
     return serverMonitor.restart(cb)
   }
-  else cb(new Error('invalid arguments'))
+  else cb('invalid arguments')
 }
 
 //------------------------------------------------------------------------------
