@@ -247,7 +247,7 @@ else {
     conn.on('end',function(){exit('disconnected from server')})
   })
   client.on('error',function(err){
-    if (err.code == 'ECONNREFUSED' && !argvNexus.r) {
+    if ((err.code == 'ECONNREFUSED' || err.code == 'ENOENT') && !argvNexus.r) {
       if (['version','config','ls','install','uninstall'
           ,'server','logs','start'
           ].indexOf(argv._[0]) != -1) {
