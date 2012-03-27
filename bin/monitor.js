@@ -26,19 +26,13 @@ process.title = 'nexus-monitor-starter('+opti.argv.c+')'
 
 if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
-  var child = spawn( 'node'
-                   , [ __filename
-                     , '-c', opti.argv.c
-                     , '-s', opti.argv.s 
-                     , '-i', process.argv[process.argv.indexOf('-i')+1] 
-                     ]
-                   , { env : process.env } 
-                   )
-  debug('spawned child '+child.pid)
-  // child.stdout.on('data',function(d){debug('monitorChild-stdout',d.toString())})
-  // child.stderr.on('data',function(d){debug('monitorChild-stderr',d.toString())})
-  setTimeout(function(){process.exit(0)},4000)
-  //process.exit(0)
+  var opts = [ __filename
+             , '-c', opti.argv.c
+             , '-s', opti.argv.s 
+             , '-i', process.argv[process.argv.indexOf('-i')+1] 
+             ]
+  var child = spawn('node', opts, {env:process.env})
+  process.exit(0)
 }
 else {
   var title = 'nexus-monitor'
