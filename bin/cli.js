@@ -34,7 +34,6 @@ var opti = require('optimist')
     , '    stopall   .. stop all running programs'
     , '    runscript .. execute a script, defined in the package.json'
     , '    logs      .. access log-files'
-    , '    cleanlogs .. remove old log-files (of not-running programs)'
     , '    subscribe .. subscribe to events'
     , '    server    .. start/stop/restart the nexus-server'
     , '    help      .. try `nexus help <command>` for more info'
@@ -181,8 +180,9 @@ help.runscript = [ 'nexus runscript [<appName> <scriptName>]'
                  , ''
                  , 'nexus runscript foo test .. will run the apps.foo.package.scripts.test -script'
                  ].join('\n')
-help.logs      = [ 'nexus logs .. list all logfiles'
-                 , 'nexus logs <file> [-n <number of lines>] .. -n is 20 per default'
+help.logs      = [ 'nexus logs clean .. delete all log-files of not running apps'
+                 , 'nexus logs stdout <id> [-n <number of lines>] .. -n is 20 per default'
+                 , 'nexus logs stderr <id> [-n <number of lines>] .. -n is 20 per default'
                  , ''
                  , 'note: the name of log-files is the path to the script without the'
                  , '      nexus-apps-root-path appended by ".<id>.[stdout/stderr].log"'
@@ -341,10 +341,13 @@ function parseArgs() {
       })
       break
     case 'logs':
-      nexus.logs({file:argv._[0], lines:argv.n}, exit)
-      break
-    case 'cleanlogs':
-      nexus.cleanlogs(function(err,data){exit(err,'deleted '+data+' logfiles')})
+      if (!argvCmd._[0]) exit(help.logs)
+      var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}
+      if (!opts.cmd) return exit(help.logs)
+      if ( opts.cmd == 'stdout' && !opts.id
+           || opts.cmd == 'stderr' && !opts.id) 
+        return exit('invalid/no <id>',help.logs)
+      nexus.logs(opts, exit)
       break
     case 'server':
       nexus.server({cmd:argv._[0],debug:argv.debug}, exit)
@@ -359,8 +362,8 @@ function parseArgs() {
 }
 
 function exit(err,msg) {
-  if (err) console.error(err)
-  else console.log(msg)
+  if (err) console.error({error:err})
+  console.log(msg)
   _conn && _conn.end()
   process.exit(0)
 }

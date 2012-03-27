@@ -1,32 +1,8 @@
 { "name" : "app-complex"
 , "version" : "0.0.0"
-, "dependencies" : { "jade" : "0.19.0" }
+, "dependencies" : { "jade" : "0.22.0" }
 , "config" : { "port" : "48976" }
-, "scripts" :
-  { "install"       : "echo install && pwd"
-  , "preinstall"    : "echo preinstall && pwd"
-  , "postinstall"   : "echo postinstall"
-  , "preupdate"     : "echo preupdate && pwd"
-  , "update"        : "echo update && pwd"
-  , "postupdate"    : "echo postupdate && pwd"
-  , "prestart"      : "echo prestart && node_modules/bin/jade < index.jade > index.html"
-  , "start"         : "echo start && NODE_ENV=production node server.js"
-  , "poststart"     : "echo poststart && pwd"
-  , "prerestart"    : "echo prerestart && pwd"
-  , "restart"       : "echo restart && pwd"
-  , "postrestart"   : "echo postrestart && pwd"
-  , "prestop"       : "echo prestop && pwd"
-  , "stop"          : "echo stop && pwd"
-  , "poststop"      : "echo poststop && pwd"
-  , "preuninstall"  : "echo preuninstall && pwd"
-  , "uninstall"     : "echo uninstall && pwd"
-  , "postuninstall" : "echo postuninstall && pwd"
-  , "pretest"       : "echo pretest && pwd"
-  , "test"          : "echo test && node test.js"
-  , "posttest"      : "echo posttest && pwd"
-  , "crash"         : "echo crash && pwd"
-  , "postcrash"     : "echo postcrash"
-  , "exit"          : "echo exit && pwd"
-  , "postexit"      : "echo postexit && pwd"
+, "scripts" : { 
+    "buildAssets" : "node_modules/.bin/jade < index.jade > index.html" 
   }
 }

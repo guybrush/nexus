@@ -98,6 +98,7 @@ function monitor(startOpts) {
   self.env = startOpts.env
   self.restartTimeout = 200
   self.env = startOpts.env
+  self.env.NEXUS_MONITOR_ID = self.id
   
   var logFile = self.script
   
@@ -108,7 +109,7 @@ function monitor(startOpts) {
     logFile = logFile.slice(_config.apps.length+1)
   }
   
-  logFile = logFile.replace(/[\/\s]/g,'_')+'.'+self.id
+  logFile = logFile.replace(/[\/\s\.]/g,'_')+'.'+self.id
   
   self.logScriptStdout = _config.logs+'/'+logFile+'.stdout.log'
   self.logScriptStderr = _config.logs+'/'+logFile+'.stderr.log'

@@ -29,6 +29,7 @@ var fs      = require('fs')
   , _pkg    = require('./package.json')
   , debug   = require('debug')('nexus')
   , monitors = {}
+  , apps = {}
   , serverMonitor = null
   , subscriptions = {}
   , subscriptionListeners = {}
@@ -76,8 +77,10 @@ function nexus(configParam) {
       cb = _.isFunction(arguments.length-1) ? arguments.length-1 : function(){}
       events = _.isString(events)
                ? [events]
-               : (_.isArray(events) && events.length>0) ? events : null
-      if (!events) return cb(new Error('invalid first argument'))
+               : (_.isArray(events) && events.length>0) 
+                 ? Object.keys(subscriptions) 
+                 : []
+
       var remaining = []
       _.each(subscriptions,function(x,i){
         if (!x[conn.id]) return
@@ -105,6 +108,7 @@ function nexus(configParam) {
         conn.on('end',function(){
           ee2.emit('monitor::'+rem.id+'::disconnected')
           delete monitors[rem.id]
+          self.unsubscribe()
         })
       }
       if (rem.type == 'NEXUS_SERVER_MONITOR') {
@@ -117,10 +121,22 @@ function nexus(configParam) {
         })
         conn.on('end',function(){
           ee2.emit('server::'+rem.id+'::disconnected')
+          self.unsubscribe()
+        })
+      }
+      if (rem.type == 'NEXUS_APP') {
+        if (!monitors[rem.id+''] || apps[rem.id+'']) {
+          conn.end()
+          return
+        }
+        apps[rem.id+''] = rem
+        ee2.emit('app::'+rem.id+'::connected')
+        conn.on('end',function(){
+          ee2.emit('app::'+rem.id+'::disconnected')
+          delete apps[rem.id+'']
         })
       }
     })
-    conn.on('end',function(){self.unsubscribe()})
   }
   dnodeServer.version = version
   dnodeServer.config = config
@@ -372,12 +388,16 @@ function ps(opts, cb) {
   if (Object.keys(monitors).length == 0)
     return cb(null,result)
 
-  ee2.emit('debug::ps',{opts:opts})
   if (opts.id && monitors[opts.id]) {
     if (!opts.filter) {
-      return monitors[opts.id].info(cb)
+      monitors[opts.id].info(function(err,data){
+        if (apps[opts.id]) data.app = apps[opts.id]
+        cb(err,data)
+      })
+      return
     }
     monitors[opts.id].info(function(err,data){
+      if (apps[opts.id]) data.app = apps[opts.id]
       _.each(opts.filter, function(x,i){
         var info = objPath(data,x)
         if (info !== undefined) result[x] = info
@@ -432,23 +452,12 @@ function start(opts, cb) {
         monitors[id].start(cb)
       })
       var child = cp.spawn
-        //( __dirname+'/bin/monitor.js'
-        //, [ '-c', JSON.stringify(config())
-        //  , '-s', JSON.stringify(data) 
-        //  , '-i', id ]
         ( 'node'
         , [ __dirname+'/bin/monitor.js'
           , '-c', JSON.stringify(config())
           , '-s', JSON.stringify(data) 
           , '-i', id ]
-        //, { env : process.env }
-        //, function(err,stdout,stderr){
-        //    if (err) return cb(err)
-        //    if (!serverMonitor) cb(null,data)
-        //  }
         )
-      // child.stdout.on('data',function(d){debug('monitor-stdout',d.toString())})
-      // child.stderr.on('data',function(d){debug('monitor-stderr',d.toString())})
     })
   })
 }
@@ -517,7 +526,7 @@ function stopall(cb) {
 function runscript(opts, stdout, stderr, cb) {
   if (!opts || !opts.name || !opts.script)
     return cb(new Error('name or script not defined'))
-  ls({name:opts.name},function(err,data){
+  ls({name:opts.name},function(err, data){
     if (err)
       return cb(err)
     if (!data.scripts[opts.script])
@@ -532,7 +541,7 @@ function runscript(opts, stdout, stderr, cb) {
           cb(err)
         } )
     cb(null,function(cb){
-      process.kill(child.pid,'SIGHUP')
+      process.kill(child.pid, 'SIGHUP')
       cb && cb()
     })
     stdout && child.stdout.on('data',function(d){stdout(d)})
@@ -541,7 +550,7 @@ function runscript(opts, stdout, stderr, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                               logs
+//                            logs(<cmd>[[,<id>],<cb>])
 //------------------------------------------------------------------------------
 
 function logs(opts, cb) {
@@ -549,26 +558,67 @@ function logs(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
+  
+  opts = opts === Object(opts) ? opts : {}
+    ee2.emit('debug::logs::config','arr')
+  if ( opts.cmd === undefined 
+       || !~['stdout','stderr','clean'].indexOf(opts.cmd) 
+       || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) 
+    return cb(new Error('invalid arguments'))
+  
+  ee2.emit('debug::logs::config',{opts:opts})
+  config(function(err, _config){
+    ee2.emit('debug::logs::config',_config.logs)
+    if (err) return cb(err)
+    switch (opts.cmd) {
+      case 'stdout':
+      case 'stderr':
+        readFile(opts.id, opts.cmd, cb)
+        break
+      case 'clean':
+        clean(cb)
+        break
+      default: 
+        return cb(new Error('invalid first argument (unknown)'))
+    }
+ 
+    function readFile(id, type, _cb) {
+      fs.readdir(_config.logs,function(err,dataDir){
+        if (err) return _cb(err)
+        var file
+        _.each(dataDir,function(x,i){ if (x.split('.')[1] == id) file = x })
+        if (!file) return _cb(new Error('log-file not found'))
+        fs.readFile(_config.logs+'/'+file, 'utf8', function(err, dataFile){
+          if (err) return _cb(err,cb)
+          var lines = dataFile.split('\n')
+          if (!opts.lines)
+            return _cb(null, lines.splice(lines.length-20).join('\n'))
+          if (opts.lines >= lines.length)
+            opts.lines = lines.length
+          _cb(null, lines.splice(lines.length - opts.lines).join('\n'))
+        })
+      })
+    }
 
-  opts = opts || {}
-
-  var _config = config()
-
-  if (!opts.file) {
-    return fs.readdir(_config.logs,function(err,data){
-      if (err) return cb(err)
-      cb(err, data.sort())
-    })
-  }
-
-  fs.readFile(_config.logs+'/'+opts.file,'utf8',function(err,data){
-    if (err) return error(err,cb)
-    var lines = data.split('\n')
-    if (!opts.lines)
-      return cb(null, lines.splice(lines.length-20).join('\n'))
-    if (opts.lines >= lines.length)
-      opts.lines = lines.length
-    cb(null, lines.splice(lines.length - opts.lines).join('\n'))
+    function clean(_cb) {
+      fs.readdir(_config.logs,function(err,data){
+        if (err) return _cb(err)
+        var toDel = []
+        _.each(data,function(x,i){
+          var split = x.split('.')
+            , id = split[1]
+          if (!monitors[id] && (serverMonitor.id != id))
+            toDel.push(x)
+        })
+        new AA(toDel).map(function(x,i,next){
+          fs.unlink(_config.logs+'/'+x,next)
+        }).done(function(err,data){
+          if (err) return _cb(err)
+          ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
+          _cb(null, data.length)
+        }).exec()
+      }) 
+    }
   })
 }
 
