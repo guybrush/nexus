@@ -28,8 +28,8 @@ var fs      = require('fs')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
   , debug   = require('debug')('nexus')
-  , monitors = {}
   , apps = {}
+  , monitors = {}
   , serverMonitor = null
   , subscriptions = {}
   , subscriptionListeners = {}
@@ -78,8 +78,8 @@ function nexus(configParam) {
       events = _.isString(events)
                ? [events]
                : (_.isArray(events) && events.length>0) 
-                 ? Object.keys(subscriptions) 
-                 : []
+                 ? events 
+                 : Object.keys(subscriptions)
 
       var remaining = []
       _.each(subscriptions,function(x,i){
@@ -391,13 +391,11 @@ function ps(opts, cb) {
   if (opts.id && monitors[opts.id]) {
     if (!opts.filter) {
       monitors[opts.id].info(function(err,data){
-        if (apps[opts.id]) data.app = apps[opts.id]
         cb(err,data)
       })
       return
     }
     monitors[opts.id].info(function(err,data){
-      if (apps[opts.id]) data.app = apps[opts.id]
       _.each(opts.filter, function(x,i){
         var info = objPath(data,x)
         if (info !== undefined) result[x] = info
@@ -550,7 +548,7 @@ function runscript(opts, stdout, stderr, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                            logs(<cmd>[[,<id>],<cb>])
+//                                                logs 
 //------------------------------------------------------------------------------
 
 function logs(opts, cb) {
@@ -560,7 +558,7 @@ function logs(opts, cb) {
     cb = function(){}
   
   opts = opts === Object(opts) ? opts : {}
-    ee2.emit('debug::logs::config','arr')
+  
   if ( opts.cmd === undefined 
        || !~['stdout','stderr','clean'].indexOf(opts.cmd) 
        || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) 

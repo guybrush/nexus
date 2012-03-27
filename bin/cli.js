@@ -343,10 +343,6 @@ function parseArgs() {
     case 'logs':
       if (!argvCmd._[0]) exit(help.logs)
       var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}
-      if (!opts.cmd) return exit(help.logs)
-      if ( opts.cmd == 'stdout' && !opts.id
-           || opts.cmd == 'stderr' && !opts.id) 
-        return exit('invalid/no <id>',help.logs)
       nexus.logs(opts, exit)
       break
     case 'server':
@@ -363,7 +359,7 @@ function parseArgs() {
 
 function exit(err,msg) {
   if (err) console.error({error:err})
-  console.log(msg)
+  else console.log(msg)
   _conn && _conn.end()
   process.exit(0)
 }
