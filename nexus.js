@@ -388,6 +388,8 @@ function ps(opts, cb) {
     return cb(null,result)
 
   if (opts.id && monitors[opts.id]) {
+    if (!monitors[opts.id])
+      return cb('monitor with id: "'+opts.id+'" is not connected')
     if (!opts.filter) {
       monitors[opts.id].info(function(err,data){
         cb(err,data)
@@ -561,15 +563,14 @@ function logs(opts, cb) {
   
   opts = opts === Object(opts) ? opts : {}
   
-  if ( opts.cmd === undefined 
-       || !~['stdout','stderr','clean'].indexOf(opts.cmd) 
-       || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) 
+  if ( opts.cmd !== undefined
+       && ( !~['stdout','stderr','clean'].indexOf(opts.cmd) 
+            || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) ) 
     return cb(new Error('invalid arguments'))
   
-  ee2.emit('debug::logs::config',{opts:opts})
   config(function(err, _config){
-    ee2.emit('debug::logs::config',_config.logs)
     if (err) return cb(err)
+    if (!opts.cmd) return listLogs(cb)
     switch (opts.cmd) {
       case 'stdout':
       case 'stderr':
@@ -582,14 +583,38 @@ function logs(opts, cb) {
         return cb(new Error('invalid first argument (unknown)'))
     }
  
+    function listLogs(_cb) {
+      fs.readdir(_config.logs,function(err,dataDir){
+        if (err) return _cb(err)
+        var result = {}
+        _.each(dataDir,function(x,i){
+          var id = x.split('.')[1]
+          result[id] = {running:false}
+          result[id].script = x.split('.')[0]
+          if (serverMonitor && serverMonitor.id == id)
+            result[id].running = true
+        })
+        ps(function(err,dataPs){
+          if (err) return _cb(err)
+          _.each(dataPs,function(x,i){result[x.id] = {running:x.running}})
+          _cb(null, result)
+        })
+      })
+    }
+    
     function readFile(id, type, _cb) {
       fs.readdir(_config.logs,function(err,dataDir){
         if (err) return _cb(err)
         var file
-        _.each(dataDir,function(x,i){ if (x.split('.')[1] == id) file = x })
+        _.each(dataDir,function(x,i){ 
+          if ( x.split('.')[1] == id && x.split('.')[2] == type ) 
+            file = x 
+        })
         if (!file) return _cb(new Error('log-file not found'))
+        console.log('hmmmm',file)
         fs.readFile(_config.logs+'/'+file, 'utf8', function(err, dataFile){
-          if (err) return _cb(err,cb)
+          if (err) return _cb(err)
+          console.log('hmmmm',dataFile)
           var lines = dataFile.split('\n')
           if (!opts.lines)
             return _cb(null, lines.splice(lines.length-20).join('\n'))

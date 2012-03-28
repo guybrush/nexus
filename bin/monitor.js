@@ -280,10 +280,10 @@ function monitor(startOpts) {
         , name : self.name
         , command : self.command
         , script : self.script
-        , logScriptStdout : self.logScriptStdout
-        , logScriptStderr : self.logScriptStderr
-        , logMonitorStdout : self.logMonitorStdout
-        , logMonitorStderr : self.logMonitorStderr
+        // , logScriptStdout : self.logScriptStdout
+        // , logScriptStderr : self.logScriptStderr
+        // , logMonitorStdout : self.logMonitorStdout
+        // , logMonitorStderr : self.logMonitorStderr
         , package : self.package
         , monitorPid : process.pid
         , pid : self.child ? self.child.pid : null

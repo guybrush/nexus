@@ -180,7 +180,8 @@ help.runscript = [ 'nexus runscript [<appName> <scriptName>]'
                  , ''
                  , 'nexus runscript foo test .. will run the apps.foo.package.scripts.test -script'
                  ].join('\n')
-help.logs      = [ 'nexus logs clean .. delete all log-files of not running apps'
+help.logs      = [ 'nexus logs       .. list available logs' 
+                 , 'nexus logs clean .. delete all log-files of not running apps'
                  , 'nexus logs stdout <id> [-n <number of lines>] .. -n is 20 per default'
                  , 'nexus logs stderr <id> [-n <number of lines>] .. -n is 20 per default'
                  , ''
@@ -341,7 +342,6 @@ function parseArgs() {
       })
       break
     case 'logs':
-      if (!argvCmd._[0]) exit(help.logs)
       var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}
       nexus.logs(opts, exit)
       break
