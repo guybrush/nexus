@@ -277,7 +277,6 @@ function install(opts, cb) {
   }
 }
 
-
 //------------------------------------------------------------------------------
 //                                               uninstall
 //------------------------------------------------------------------------------
@@ -527,13 +526,15 @@ function runscript(opts, stdout, stderr, cb) {
   ls({name:opts.name},function(err, data){
     if (err)
       return cb(err)
-    if (!data.scripts[opts.script])
+    if ( !data[opts.name] 
+         || !data[opts.name].scripts
+         || !data[opts.name].scripts[opts.script] )
       return cb(new Error('the app "'+opts.name
                          +'" has no script called "'+opts.script+'"'))
 
     var _config = config()
     var child = cp.exec
-      ( data.scripts[opts.script]
+      ( data[opts.name].scripts[opts.script]
       , {cwd:_config.apps+'/'+opts.name}
       , function(err,stdout,stderr){
           cb(err)
