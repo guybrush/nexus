@@ -535,7 +535,8 @@ function runscript(opts, stdout, stderr, cb) {
     var _config = config()
     var child = cp.exec
       ( data[opts.name].scripts[opts.script]
-      , {cwd:_config.apps+'/'+opts.name}
+      , { timeout : 1000*3600*10
+        , cwd     : _config.apps+'/'+opts.name }
       , function(err,stdout,stderr){
           cb(err)
         } )
