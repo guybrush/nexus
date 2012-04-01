@@ -38,7 +38,7 @@ var opti = require('optimist')
     , '    server    .. start/stop/restart the nexus-server'
     , '    help      .. try `nexus help <command>` for more info'
     , ''
-    , 'note: ps, restart, stop, stopall, cleanlogs and subscribe'
+    , 'note: ps, restart, stop, stopall, subscribe and `logs clean`'
     , '      only work with a local or remote running nexus-server.'
     , ''
     ].join('\n')

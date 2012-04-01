@@ -32,7 +32,7 @@
 * install [node]
 * install [npm]
 * `npm install nexus -g`
-* `npm test nexus -g`
+* `npm test nexus`
 
 ## cli
 
@@ -57,32 +57,33 @@ commands:
     server    .. start/stop/restart the nexus-server
     help      .. try `nexus help <command>` for more info
 
-note: ps, restart, stop, stopall, cleanlogs and subscribe
+note: ps, restart, stop, stopall, subscribe and `logs clean`
       only work with a local or remote running nexus-server.
 ```
 
 ## config
 
 the nexus-cli will create a `~/.nexus`-directory if it doesnt exist. you can
-create a `~/.nexus/config.js`-file which exposes a json-object.
+create a `~/.nexus/config.js`-file which exposes a json-object, or just a
+`~/.nexus/config.json` - it will be `require()`'ed.
 
 at least, `socket` or `port` (or both) must be set - everything else is 
 optional. if no `socket` is defined, the cli will use the `key` and `cert` to
-connecto to the nexus-server.
+connect to the local nexus-server.
 
 ``` javascript
-{ socket  : '/path/to/socket'    // if set, the nexus-server will listen on that port
-                                 // local cli and monitor-servers will connect to it
-, port    : 12345                // if set, the nexus-server will listen on that port
-                                 // remote nexus-cli can connect (see -r option)
-, host    : '0.0.0.0'
-, key     : '/path/to/key.pem'   // if set, the nexus-server uses tls
-, cert    : '/path/to/cert.pem'  // if set, the nexus-server uses tls
-, ca      : '/path/to/ca'        // every file in that directory will be read into the ca
-, remotes :                      // can be used with the cli: `nexus -r foo ps`
-  { local : { port:12345, key:key, cert:cert, host:'0.0.0.0' }
-  , foo   : { port:12346, key:key, cert:cert, host:'foo.com' }
-  , bar   : { port:12347, key:key, cert:cert, host:'bar.com' }
+{ socket  : '/path/to/socket'  // if set, the nexus-server will listen on that port
+                               // local cli and monitor-servers will connect to it
+, port    : 12345              // if set, the nexus-server will listen on that port
+                               // remote nexus-cli can connect (see -r option)
+, host    : '0.0.0.0'          
+, key     : <key>              // if set, the nexus-server uses tls
+, cert    : <cert>             // if set, the nexus-server uses tls
+, ca      : '/path/to/ca'      // every file in that directory will be read into the ca
+, remotes :                    // can be used with the cli: `nexus -r foo ps`
+  { local : { port:12345, key:<key>, cert:<cert>, host:'0.0.0.0' }
+  , foo   : { port:12346, key:<key>, cert:<cert>, host:'foo.com' }
+  , bar   : { port:12347, key:<key>, cert:<cert>, host:'bar.com' }
   }
 } 
 ```
