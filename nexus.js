@@ -57,7 +57,6 @@ function nexus(configParam) {
     this.stopall   = stopall
     this.runscript = runscript
     this.logs      = logs
-    this.cleanlogs = cleanlogs
     this.remote    = remote
     this.server    = server
     this.subscribe = function(event, emit, cb) {
@@ -95,9 +94,6 @@ function nexus(configParam) {
     }
     conn.on('remote',function(rem){
       if (!rem.type || !rem.id) return
-      if (rem.type == 'NEXUS_MONITOR_STARTER') {
-        ee2.emit('monitor-starter::'+rem.id+'::connected')
-      }
       if (rem.type == 'NEXUS_MONITOR') {
         monitors[rem.id+''] = rem
         rem.subscribe(function(event,data){
@@ -611,10 +607,8 @@ function logs(opts, cb) {
             file = x 
         })
         if (!file) return _cb(new Error('log-file not found'))
-        console.log('hmmmm',file)
         fs.readFile(_config.logs+'/'+file, 'utf8', function(err, dataFile){
           if (err) return _cb(err)
-          console.log('hmmmm',dataFile)
           var lines = dataFile.split('\n')
           if (!opts.lines)
             return _cb(null, lines.splice(lines.length-20).join('\n'))
@@ -632,44 +626,19 @@ function logs(opts, cb) {
         _.each(data,function(x,i){
           var split = x.split('.')
             , id = split[1]
-          if (!monitors[id] && (serverMonitor.id != id))
+          if (!monitors[id] && (!serverMonitor || (serverMonitor.id != id)))
             toDel.push(x)
         })
         new AA(toDel).map(function(x,i,next){
           fs.unlink(_config.logs+'/'+x,next)
         }).done(function(err,data){
           if (err) return _cb(err)
-          ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
+          if (serverMonitor)
+            ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
           _cb(null, data.length)
         }).exec()
       }) 
     }
-  })
-}
-
-//------------------------------------------------------------------------------
-//                                               cleanlogs
-//------------------------------------------------------------------------------
-
-function cleanlogs(cb) {
-  if (!cb) cb = function() {}
-  var _config = config()
-  fs.readdir(_config.logs,function(err,data){
-    if (err) return cb(err)
-    var toDel = []
-    _.each(data,function(x,i){
-      var split = x.split('.')
-        , id = split[split.length-3]
-      if (!monitors[id] && (serverMonitor.id != id))
-        toDel.push(x)
-    })
-    new AA(toDel).map(function(x,i,next){
-      fs.unlink(_config.logs+'/'+x,next)
-    }).done(function(err,data){
-      if (err) return cb(err)
-      ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
-      cb(null, data.length)
-    }).exec()
   })
 }
 
@@ -781,11 +750,27 @@ function server(opts, cb) {
 //                                               parseStart
 //------------------------------------------------------------------------------
 
+//     : CWD+"/<appName>" exists
+// (A)   ? start CWD+"/<appName>"
+//       : /\\//.test(<appName>)
+//         ? <appName>.split("/")[0] is an installed app
+// (B)       ? script = nexusApps+"/"+<appName>
+//           : invalid startScript
+//         : <appName> an installed app
+//           ? look for package.json-startScript
+// (C)         ? 'node foo.js -b ar' -> spawn( 'node'
+//                                           , ['/<pathToApp>/foo.js','-b','ar']
+//                                           , {cwd:'/<pathToApp>'} )
+//             : appPath+"/server.js" exists || appPath+"/app.js" exists
+// (D)           ? script = appName+"/server.js" || appName+"/app.js"
+//               : invalid startScript
+//           : invalid startScript
+
 function parseStart(opts, cb) {
   debug('parsing start-options',opts.script)
   var result = {}
   opts = opts || {}
-  //console.log('parseStart',opts)
+
   if (!opts.script) return cb('no script defined')
 
   result.script = null
@@ -801,7 +786,7 @@ function parseStart(opts, cb) {
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
   if (path.existsSync(_config.apps+'/'+maybeApp)) {
-    //console.log('---- A')
+    // console.log('---- A')
     result.name = maybeApp.split('/')[0]
     appPath = _config.apps+'/'+maybeApp
     try {
@@ -815,6 +800,7 @@ function parseStart(opts, cb) {
   // handle `nexus start appName/path/to/script`
   if (!result.script && /\//.test(opts.script)) {
     if (path.existsSync(_config.apps+'/'+opts.script)) {
+      // console.log('---- B')
       result.name = opts.script.split('/')[0]
       result.script = _config.apps+'/'+opts.script
     }
@@ -825,31 +811,29 @@ function parseStart(opts, cb) {
     if (result.package
         && result.package.scripts
         && result.package.scripts.start) {
-      //console.log('---- AA')
+      // console.log('---- C')
       var startScript = result.package.scripts.start
       if (/\w/.test(startScript)) {
-        //console.log('---- AAA')
+        // parse options
         var split = startScript.split(' ')
         var isScript = path.existsSync(appPath+'/'+split[0])
         if (isScript) {
-          //console.log('---- AAAA')
           result.script = appPath+'/'+split[0]
           result.options = result.options || split.splice(1)
         }
         else {
-          //console.log('---- AAAB')
           result.command = split[0]
           result.script = appPath+'/'+split[1]
           result.options = result.options || split.splice(2)
         }
       }
       else {
-        //console.log('---- AAB')
+        // no options
         result.script = appPath+'/'+startScript
       }
     }
     else if (appPath) {
-      //console.log('---- AB')
+      // console.log('---- D')
       var serverJsExists = path.existsSync(appPath+'/server.js')
       var appJsExists = path.existsSync(appPath+'/app.js')
       if (serverJsExists) result.script = appPath+'/server.js'

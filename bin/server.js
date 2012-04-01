@@ -75,8 +75,8 @@ function start() {
     unixServer.on('error',function(err){
       console.error(err)
     })
-    return
   }
+  console.log('starting server',opts)
   var server = dnode(nexus(_config)).listen(opts)
   server.on('error',function(err){
     console.error(err)
