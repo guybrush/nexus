@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
+//      
+//      |<------------ argvNexus -------------->|          |<- argvCmd ->|
+
 var opti = require('optimist')
   , argv = opti.argv
   , argvNexus = opti.parse(process.argv.slice(0,process.argv.indexOf(argv._[0])))
@@ -128,7 +132,7 @@ help.ps        = [ 'nexus ps [<id>] [<filter>]'
                  , 'note: if no <id> is passed, it will list all running programs'
                  , '      if no <filter> is passed, it will print all information'
                  ].join('\n')
-help.start     = [ 'nexus start [<nexusOptions>] <appName> [<appOptions>]'
+help.start     = [ 'nexus start [<startOptions>] <appName> [<appOptions>]'
                  , ''
                  , 'examples:'
                  , ''
@@ -137,12 +141,14 @@ help.start     = [ 'nexus start [<nexusOptions>] <appName> [<appOptions>]'
                  , 'nexus start /home/me/foo.js -p 3003'
                  , 'nexus start ./foo.js -p 3004'
                  , 'nexus start foo.js -p 3005'
-                 , 'nexus start -m 0 installedApp .. start the app "installedApp" without restart'
+                 , 'nexus start --max 0 installedApp'
+                 , 'nexus start --env.DEBUG=* foo.js'
                  , ''
-                 , 'nexusOptions:'
+                 , 'startOptions:'
                  , ''
-                 , '-m, --max     .. restart script upon crash only <max> times'
-                 , '-c, --command .. start script with <command>'
+                 , '--env .. set the process.environment.DEBUG'
+                 , '--max .. restart script upon crash only <max> times'
+                 , '--cmd .. start script with <command>'
                  , ''
                  , 'the algorithm looks like this:'
                  , ''
@@ -301,9 +307,16 @@ function parseArgs() {
       nexus.ps(opts, exit)
       break
     case 'start':
-      var scriptOpts = process.argv.splice(process.argv.indexOf(argv._[0])+1)
+      var scriptOpts = process.argv.slice(process.argv.indexOf(argv._[0])+1)
+      var startOpts = process.argv.slice( process.argv.indexOf(cmd)+1
+                                        , process.argv.indexOf(argv._[0]) )
+      startOpts = opti.parse(startOpts)
+      var env = startOpts.env || null
+      var max = startOpts.max || null
+      var cmd = startOpts.cmd || null
       var script = argv._[0]
-      var opts = {script:script, options:scriptOpts}
+      var opts = {script:script, options:scriptOpts, env:env, max:max, cmd:cmd}
+      
       if (argv.debug) opts.env = {NODE_DEBUG:true}
       if (/^\//.test(script)) {
         nexus.start(opts, exit)
