@@ -40,6 +40,7 @@ var opti = require('optimist')
     , '    logs      .. access log-files'
     , '    subscribe .. subscribe to events'
     , '    server    .. start/stop/restart the nexus-server'
+    , '    reboot    .. usefull to recover from a system-reboot'
     , '    help      .. try `nexus help <command>` for more info'
     , ''
     , 'note: ps, restart, stop, stopall, subscribe and `logs clean`'
@@ -206,6 +207,18 @@ help.server    = [ 'nexus server .. (without any options) will print information
                  , 'nexus server version  .. print version of the current running nexus-server'
                  , ''
                  , 'note: the default-configFile-path is ~/.nexus/config.js'
+                 , 'note: starting the nexus-server will reset the reboot-database (see `nexus help reboot`)'
+                 ].join('\n')
+help.reboot    = [ 'nexus reboot [<path to database>]'
+                 , ''
+                 , 'the nexus-server (see `nexus help server`) will reset and then'
+                 , 'write information about running programs into a database (dirty).'
+                 , ''
+                 , '`nexus reboot` will stop all running nexus-apps/monitors and'
+                 , 'query the database for what programs have run before.'
+                 , 'these programs will get started again.'
+                 , ''
+                 , 'note: the default-path for the database is ~/.nexus/db.dirty'
                  ].join('\n')
 
 if (!argv._[0]) exit(null, usage)

@@ -590,11 +590,7 @@ function logs(opts, cb) {
           if (serverMonitor && serverMonitor.id == id)
             result[id].running = true
         })
-        ps(function(err,dataPs){
-          if (err) return _cb(err)
-          _.each(dataPs,function(x,i){result[x.id] = {running:x.running}})
-          _cb(null, result)
-        })
+        _cb(null, result)
       })
     }
     
