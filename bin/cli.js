@@ -284,7 +284,7 @@ function parseArgs() {
   var cmd = argv._.shift()
   switch (cmd) {
     case 'version':
-      exit(null,_pkg.version)
+      nexus.version(exit)
       break
     case 'config':
       nexus.config(exit)
