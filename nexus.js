@@ -701,14 +701,15 @@ function server(opts, cb) {
       ;(function check(){
         var client = dnode.connect(clientOpts,function(r,c){
           r.server(function(err, data){
-            if (err) return setTimeout(check,100)
             client.end()
+            if (err) return setTimeout(check,20)
             cb(err,data)
           })
         })
         client.on('error',function(e){
-          if (e.code === 'ECONNREFUSED')
-            setTimeout(check,100)
+          client.end()
+          if (e.code === 'ECONNREFUSED') 
+            setTimeout(check,20)
         })
       })() 
     }
@@ -716,14 +717,15 @@ function server(opts, cb) {
       ;(function check(){
         var client = dnode.connect(_config.socket,function(r,c){
           r.server(function(err, data){
-            if (err) return setTimeout(check,100)
             client.end()
+            if (err) return setTimeout(check,20)
             cb(err,data)
           })
         })
         client.on('error',function(e){
-          if (e.code === 'ENOENT')
-            setTimeout(check,100)
+          client.end()
+          if (e.code === 'ENOENT') 
+            setTimeout(check,20)
         })
       })()
     }

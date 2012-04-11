@@ -18,8 +18,7 @@ var nexus = require('../')
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
   , fs = require('fs')
   , subscriptions = {}
-  , debug = require('debug')('nexus')
-
+  
 delete _config.remotes
   
 process.title = 'nexus-monitor-starter('+opti.argv.c+')'
@@ -45,7 +44,7 @@ else {
   var startOpts = JSON.parse(opti.argv.s)
   var clientOpts = { port : _config.port
                    , host : _config.host
-                   , reconnect : 500 
+                   , reconnect : 200 
                    }
   if (!_config.socket) {
     try {
@@ -62,7 +61,7 @@ else {
   if (!_config.socket)
     monitorClient.connect(clientOpts)
   else
-    monitorClient.connect(_config.socket,{reconnect:500})
+    monitorClient.connect(_config.socket,{reconnect:100})
   monitorClient.on('error',function(err){
     console.log(err)
   })
@@ -139,7 +138,6 @@ function monitor(startOpts) {
 
   function client(remote, conn) {
     conn.on('error',function(e){console.error(e)})
-    debug('CONNECTED TO SERVER')
     this.type = self.type
     this.info = info
     this.id = self.id
@@ -161,7 +159,6 @@ function monitor(startOpts) {
 //------------------------------------------------------------------------------
 
   function start(cb) {
-    debug('STARTING')
     self.startedOnce = true
     if (self.child) 
       return cb(new Error('is already running'))
@@ -185,11 +182,9 @@ function monitor(startOpts) {
     self.child.stderr.pipe(fsStderr)
 
     self.child.stdout.on('data',function(data){
-      debug('child-stdout',data.toString())
       ee2.emit('stdout', data.toString())
     })
     self.child.stderr.on('data',function(data){
-      debug('child-stderr',data.toString())
       ee2.emit('stderr', data.toString())
     })
     self.child.once('exit',function(code){
@@ -216,7 +211,6 @@ function monitor(startOpts) {
 //------------------------------------------------------------------------------
 
   function restart(cb) {
-    debug('monitor'+[self.id]+' restarting childprocess')
     self.crashed = 0
     self.restartFlag = true
     stop(function(){
@@ -232,7 +226,6 @@ function monitor(startOpts) {
 //------------------------------------------------------------------------------
 
   function stop(cb) {                   
-    ee2.emit('debug','stopping')
     self.stopFlag = true
     
     info(function(err,data){
@@ -242,7 +235,6 @@ function monitor(startOpts) {
           cb('tried to kill process (pid:'+data.pid+') but it did not exit yet')
         },4000)
         self.child.once('exit',function(){
-          ee2.emit('debug','child exitted')
           self.stopFlag = false
           clearTimeout(timer)
           info(function(err,data){    
