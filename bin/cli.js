@@ -27,7 +27,7 @@ var opti = require('optimist')
     , 'commands:'
     , ''
     , '    version   .. print version-number'
-    , '    config    .. get/set config'
+    , '    config    .. print config'
     , '    ls        .. list installed packages'
     , '    install   .. install packages'
     , '    uninstall .. uninstall packages'
@@ -51,8 +51,15 @@ var opti = require('optimist')
 process.title = 'nexus-v'+_pkg.version
 
 var help = {}
-help.version   =   'nexus version .. will print the version of installed nexus'
-help.config    = [ 'nexus config .. show all config'
+help.version   = [ 'nexus version .. will print the version of installed nexus'
+                 , '                 if the nexus-server is running it will'
+                 , '                 print the version of the nexus-server'
+                 , ''
+                 , 'nexus -r foo version .. will print the version of the remote'
+                 , '                        nexus-server'
+                 ].join('\n')
+help.config    = [ 'nexus config .. print local config'
+                 , 'nexus -r foo config .. print remote config'
                  // , 'nexus config <key> .. show value of config.<key>'
                  // , 'nexus config <key> <value> .. set config.<key> to <value>'
                  ].join('\n')
@@ -80,6 +87,7 @@ help.install   = [ 'nexus install <tarball url> [<package-name>]'
                  ].join('\n')
 help.uninstall = [ 'nexus uninstall <appName>'
                  , ''
+                 , 'note: while there are running programs of <appName> it cant be uninstalled'
                  , 'note: shortcut for "uninstall" is "rm"'
                  ].join('\n')
 help.rm        = help.uninstall
@@ -100,6 +108,7 @@ help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , ''
                  , 'examples:'
                  , ''
+                 , 'nexus subscribe                       .. subscribe to all events'
                  , 'nexus subscribe "*"                   .. subscribe to all events'
                  , 'nexus subscribe all                   .. subscribe to all events'
                  , 'nexus subscribe "*::*::*"             .. subscribe to all events'
@@ -116,7 +125,9 @@ help.subscribe = [ 'nexus subscribe <event> .. pipe events to stdout'
                  , ''
                  , 'note: in bash you may want to wrap the event with "",'
                  , '      since "*" is a wildcard in bash too..'
+                 , 'note: shortcut for "subscribe" is "sub"'
                  ].join('\n')
+help.sub       = help.subscribe
 help.ps        = [ 'nexus ps [<id>] [<filter>]'
                  , ''
                  , 'examples:'
@@ -374,6 +385,7 @@ function parseArgs() {
     case 'server':
       nexus.server({cmd:argv._[0],debug:argv.debug}, exit)
       break
+    case 'sub':
     case 'subscribe':
       var emit = function(event, data) {console.log(event,'→',data)}
       nexus.subscribe(argv._[0], emit)
