@@ -10,10 +10,10 @@
                                               \_`---´___`---´-´
                                                /../..\ /..\..\
 
-* nexus provides a cli and a dnode-interface to install, uninstall, start, stop
-  and observe local and remote programs (npm packages).
+* nexus provides a cli and a [dnode]-interface to install, uninstall, start, 
+  stop and observe local and remote programs (npm packages).
 * running programs are `require('child_process').spawn`'ed child-processes of
-  monitor-servers (dnode-clients). the monitor-servers will try to reconnect to
+  monitor-servers (dnode-clients). monitor-servers will try to reconnect to
   the nexus-server (dnode-server). the nexus-server is also a
   `require('child_process').spawn`'ed child-process of a monitor-server -
   which itself will try to reconnect to its own child-process.
@@ -30,9 +30,7 @@
 ## install
 
 * install [node]
-* install [npm]
 * `npm install nexus -g`
-* `npm test nexus`
 
 ## cli
 
@@ -42,7 +40,7 @@ nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
 commands:
 
     version   .. print version-number
-    config    .. get/set config
+    config    .. print config
     ls        .. list installed packages
     install   .. install packages
     uninstall .. uninstall packages
@@ -64,15 +62,15 @@ note: ps, restart, stop, stopall, subscribe and `logs clean`
 ## config
 
 the nexus-cli will create a `~/.nexus`-directory if it doesnt exist. you can
-create a `~/.nexus/config.js`-file which exposes a json-object, or just a
-`~/.nexus/config.json` - it will be `require()`'ed.
+create a `~/.nexus/config.js`-file which exposes a json-object, or pass a 
+path to a `.js/.json`-file to the cli or to the nexus-constructor - it will be 
+`require()`'ed.
 
 at least, `socket` or `port` (or both) must be set - everything else is 
-optional. if no `socket` is defined, the cli will use the `key` and `cert` to
-connect to the local nexus-server.
+optional.
 
 ``` javascript
-{ socket  : '/path/to/socket'  // if set, the nexus-server will listen on that port
+{ socket  : '/path/to/socket'  // if set, the nexus-server will listen on that UNIX-socket
                                // local cli and monitor-servers will connect to it
 , port    : 12345              // if set, the nexus-server will listen on that port
                                // remote nexus-cli can connect (see -r option)
