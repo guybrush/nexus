@@ -16,6 +16,7 @@ function scenario(opts) {
   if (!(this instanceof scenario)) return new scenario(opts)
   var self = this
   self.clients = []
+  self.config = null
   self.before = function(done){
     cleanup(function(err){
       debug('cleaned up')
@@ -29,6 +30,7 @@ function scenario(opts) {
           nexus.server({cmd:'start'},function(err,data){
             debug('started server')
             nexus.config(function(err,cfg){
+              self.config = cfg
               var clientOpts = { port : cfg.port
                                , host : cfg.host
                                , key  : cfg.key ? fs.readFileSync(cfg.key) : null
@@ -61,9 +63,15 @@ function scenario(opts) {
       self.clients[0].remote.server({cmd:'stop'},function(err,data){
         debug('stopped server')
         if (err) return
-        //clearInterval(iv)
-        //cleanup(done)
-        done()
+        ;(function check(){
+          var client = require('net').connect(self.config.socket,function(){
+            setTimeout(check,20)
+          })
+          client.on('error',function(e){
+            if (e.code === 'ECONNREFUSED')return done()
+            done(e)
+          })
+        })()
       })
     })
   }

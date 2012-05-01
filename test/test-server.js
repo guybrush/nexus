@@ -15,7 +15,8 @@ var nexus = require('../')(__dirname+'/common/config')
 
 module.exports =
 { 'nexus.server()':
-  { after: function(done){common.cleanup(done)}
+  { before:function(done){setTimeout(done,200)}
+  , after: function(done){common.cleanup(done)}
   , 'start/stop': function(done){
       this.timeout(10000) // on my computer, it takes ~2800ms :/
       debug('starting server')
