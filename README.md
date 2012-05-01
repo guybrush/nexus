@@ -10,7 +10,9 @@
                                               \_`---´___`---´-´
                                                /../..\ /..\..\
 
-* nexus provides a cli and a [dnode]-interface to install, uninstall, start, 
+[![build status](https://secure.travis-ci.org/guybrush/nexus.png)](http://travis-ci.org/guybrush/nexus)
+
+* nexus provides a cli and a [dnode]-interface to install, uninstall, start,
   stop and observe local and remote programs (npm packages).
 * running programs are `require('child_process').spawn`'ed child-processes of
   monitor-servers (dnode-clients). monitor-servers connect (and reconnect) to
@@ -18,7 +20,7 @@
   `require('child_process').spawn`'ed child-process of a monitor-server -
   which itself will connect (and reconnect) to its own child-process.
 * all the config, logs and programs live in `~/.nexus` by default.
-* nexus shells out into [npm], is built upon [dnode] and is inspired by 
+* nexus shells out into [npm], is built upon [dnode] and is inspired by
   [forever].
 * nexus is still *super-alpha*.
 
@@ -62,21 +64,21 @@ note: ps, restart, stop, stopall, subscribe and `logs clean`
 ## config
 
 the nexus-cli will create a `~/.nexus`-directory if it doesnt exist. you can
-create a `~/.nexus/config.js`-file which exposes a json-object, or pass a 
-path to a `.js/.json`-file to the cli (`-c`) or to the nexus-constructor - it 
+create a `~/.nexus/config.js`-file which exposes a json-object, or pass a
+path to a `.js/.json`-file to the cli (`-c`) or to the nexus-constructor - it
 will be `require()`'ed.
 
-if no config is passed to the cli or constructor, the config is 
-`{socket:home+'/.nexus/socket'}` - where `home` is either 
+if no config is passed to the cli or constructor, the config is
+`{socket:home+'/.nexus/socket'}` - where `home` is either
 `process.env.HOME` or `process.env.USERPROFILE` depending on `process.platform`.
 
-your config may look like this: 
+your config may look like this:
 ``` javascript
 { socket  : '/path/to/socket'    // if set, the nexus-server will listen on that UNIX-socket
                                  // local cli and monitor-servers will connect to it
 , port    : 12345                // if set, the nexus-server will listen on that port
                                  // remote nexus-cli can connect (see -r option)
-, host    : '0.0.0.0'          
+, host    : '0.0.0.0'
 , key     : '/path/to/key.pem'   // if set, the nexus-server uses tls
 , cert    : '/path/to/cert.pem'  // if set, the nexus-server uses tls
 , ca      : '/path/to/ca'        // every file in that directory will be read into the ca
@@ -85,18 +87,18 @@ your config may look like this:
   , foo   : { port:12346, key:<key>, cert:<cert>, host:'foo.com' }
   , bar   : { port:12347, key:<key>, cert:<cert>, host:'bar.com' }
   }
-} 
+}
 ```
-(at least `socket` or `port` (or both) must be set - everything else is 
+(at least `socket` or `port` (or both) must be set - everything else is
 optional.
 
 ## api
 
 ```
-// var config = '/some/file.js' 
+// var config = '/some/file.js'
 // var config = '/some/file.json'
 var config = { socket: '/path/to/unix-socket', port: 5656 }
-  
+
 var nexus = require('nexus')(config)
 
 nexus.version(cb)
