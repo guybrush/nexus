@@ -67,7 +67,7 @@ path to a `.js/.json`-file to the cli (`-c`) or to the nexus-constructor - it
 will be `require()`'ed.
 
 if no config is passed to the cli or constructor, the config is 
-`{socket:home+'/.nexus/config.js'}` - where `home` is either 
+`{socket:home+'/.nexus/socket'}` - where `home` is either 
 `process.env.HOME` or `process.env.USERPROFILE` depending on `process.platform`.
 
 your config may look like this: 
@@ -131,6 +131,5 @@ nexus.server(opts,cb)
 
 var dnode = require('dnode')
 dnode(nexus).listen(3000)
-
 ```
 
