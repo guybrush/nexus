@@ -36,7 +36,7 @@ var fs      = require('fs')
   , userConfig = null
 
 ee2.onAny(function(data){debug(this.event,'→',data)})
-  
+
 //------------------------------------------------------------------------------
 //                                               constructor
 //------------------------------------------------------------------------------
@@ -76,8 +76,8 @@ function nexus(configParam) {
       cb = _.isFunction(arguments.length-1) ? arguments.length-1 : function(){}
       events = _.isString(events)
                ? [events]
-               : (_.isArray(events) && events.length>0) 
-                 ? events 
+               : (_.isArray(events) && events.length>0)
+                 ? events
                  : Object.keys(subscriptions)
 
       var remaining = []
@@ -159,12 +159,7 @@ function version(cb) {
 //                                               config
 //------------------------------------------------------------------------------
 
-function config(key, value, cb) {
-
-  // #TODO get/set config
-
-  if (key && value && !cb) cb = value
-  if (key && !value && !cb) cb = key
+function config(cb) {
 
   var currConfig = {}
     , fileConfig = {}
@@ -289,7 +284,7 @@ function uninstall(opts, cb) {
   var self = this
   var _config = config()
   var path = _config.apps+'/'+opts
-  
+
   fs.stat(path,function(err,stat){
     if (err) return cb(opts+' not installed')
     ps(function(err,res){
@@ -298,7 +293,7 @@ function uninstall(opts, cb) {
       _.each(res,function(x,i){
         if (x.name == opts) running.push(i)
       })
-      if (running.length > 0) 
+      if (running.length > 0)
         return cb('cant uninstall "'+opts+'", '
                  +'monitors are running: '
                  +JSON.stringify(running))
@@ -329,10 +324,10 @@ function ls(opts, cb) {
   else {
     fs.readdir(_config.apps,function(e,d){
       if (e) return cb(e)
-      readPackages(d)  
+      readPackages(d)
     })
   }
-  
+
   function readPackages(arr) {
     var result = {}
     new AA(arr).map(function(x,i,next){
@@ -429,15 +424,15 @@ function ps(opts, cb) {
 
 function start(opts, cb) {
   debug('starting',opts.script)
-  cb = _.isFunction(arguments[arguments.length-1]) 
+  cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
        : function() {}
 
-  opts = (_.isObject(opts) && Object.keys(opts).length>0) 
+  opts = (_.isObject(opts) && Object.keys(opts).length>0)
          ? opts : null
 
   if (!opts) return cb(new Error('no start-options defined'))
-         
+
   parseStart(opts, function(err, data){
     if (err) return cb(err)
     debug('parsedStart',data.script)
@@ -450,7 +445,7 @@ function start(opts, cb) {
         ( 'node'
         , [ __dirname+'/bin/monitor.js'
           , '-c', JSON.stringify(config())
-          , '-s', JSON.stringify(data) 
+          , '-s', JSON.stringify(data)
           , '-i', id ]
         )
     })
@@ -483,7 +478,7 @@ function stop(id, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
   else
-    cb = function(){}                              
+    cb = function(){}
 
   if (!id || !monitors[id])
     return cb(new Error('there is no process with id: '+id))
@@ -524,7 +519,7 @@ function runscript(opts, stdout, stderr, cb) {
   ls({name:opts.name},function(err, data){
     if (err)
       return cb(err)
-    if ( !data[opts.name] 
+    if ( !data[opts.name]
          || !data[opts.name].scripts
          || !data[opts.name].scripts[opts.script] )
       return cb(new Error('the app "'+opts.name
@@ -548,7 +543,7 @@ function runscript(opts, stdout, stderr, cb) {
 }
 
 //------------------------------------------------------------------------------
-//                                                logs 
+//                                                logs
 //------------------------------------------------------------------------------
 
 function logs(opts, cb) {
@@ -556,14 +551,14 @@ function logs(opts, cb) {
     cb = arguments[arguments.length - 1]
   else
     cb = function(){}
-  
+
   opts = opts === Object(opts) ? opts : {}
-  
+
   if ( opts.cmd !== undefined
-       && ( !~['stdout','stderr','clean'].indexOf(opts.cmd) 
-            || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) ) 
+       && ( !~['stdout','stderr','clean'].indexOf(opts.cmd)
+            || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) )
     return cb(new Error('invalid arguments'))
-  
+
   config(function(err, _config){
     if (err) return cb(err)
     if (!opts.cmd) return listLogs(cb)
@@ -575,10 +570,10 @@ function logs(opts, cb) {
       case 'clean':
         clean(cb)
         break
-      default: 
+      default:
         return cb(new Error('invalid first argument (unknown)'))
     }
- 
+
     function listLogs(_cb) {
       fs.readdir(_config.logs,function(err,dataDir){
         if (err) return _cb(err)
@@ -593,14 +588,14 @@ function logs(opts, cb) {
         _cb(null, result)
       })
     }
-    
+
     function readFile(id, type, _cb) {
       fs.readdir(_config.logs,function(err,dataDir){
         if (err) return _cb(err)
         var file
-        _.each(dataDir,function(x,i){ 
-          if ( x.split('.')[1] == id && x.split('.')[2] == type ) 
-            file = x 
+        _.each(dataDir,function(x,i){
+          if ( x.split('.')[1] == id && x.split('.')[2] == type )
+            file = x
         })
         if (!file) return _cb(new Error('log-file not found'))
         fs.readFile(_config.logs+'/'+file, 'utf8', function(err, dataFile){
@@ -633,7 +628,7 @@ function logs(opts, cb) {
             ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
           _cb(null, data.length)
         }).exec()
-      }) 
+      })
     }
   })
 }
@@ -643,21 +638,21 @@ function logs(opts, cb) {
 //------------------------------------------------------------------------------
 
 function server(opts, cb) {
-  cb = _.isFunction(arguments[arguments.length-1]) 
+  cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
        : function() {}
-       
+
   var optsKeys = Object.keys(opts)
-  opts = (_.isObject(opts) && opts.cmd) 
+  opts = (_.isObject(opts) && opts.cmd)
          ? opts : null
 
-  if (!opts && !serverMonitor) 
+  if (!opts && !serverMonitor)
     return cb('server is not running')
 
-  if (!opts && serverMonitor) 
+  if (!opts && serverMonitor)
     return serverMonitor.info(cb)
     // return cb(null,serverMonitor)
-    
+
   if (opts.cmd && opts.cmd == 'version') {
     if (!serverMonitor) return cb('server is not running')
     serverMonitor.info(function(err,data){
@@ -667,7 +662,7 @@ function server(opts, cb) {
   }
 
   if (opts.cmd && opts.cmd == 'start') {
-    if (serverMonitor) 
+    if (serverMonitor)
       return cb(new Error('server is already running'))
     var _config = config()
     delete _config.remotes
@@ -685,10 +680,11 @@ function server(opts, cb) {
     start(startOpts)
 
     var client
-    
+
+    var clientOpts = _config.socket
     if (!_config.socket) {
-      var clientOpts = { port : _config.port
-                       , host : _config.host }
+      clientOpts = { port : _config.port
+                   , host : _config.host }
       try {
         if (_config.key)
           clientOpts.key = fs.readFileSync(_config.key)
@@ -698,37 +694,21 @@ function server(opts, cb) {
       catch (e) {
         cb(e)
       }
-      ;(function check(){
-        var client = dnode.connect(clientOpts,function(r,c){
-          r.server(function(err, data){
-            client.end()
-            if (err) return setTimeout(check,20)
-            cb(err,data)
-          })
-        })
-        client.on('error',function(e){
-          client.end()
-          if (e.code === 'ECONNREFUSED') 
-            setTimeout(check,20)
-        })
-      })() 
     }
-    else {
-      ;(function check(){
-        var client = dnode.connect(_config.socket,function(r,c){
-          r.server(function(err, data){
-            client.end()
-            if (err) return setTimeout(check,20)
-            cb(err,data)
-          })
-        })
-        client.on('error',function(e){
+    ;(function check(){
+      var client = dnode.connect(clientOpts,function(r,c){
+        r.server(function(err, data){
           client.end()
-          if (e.code === 'ENOENT') 
-            setTimeout(check,20)
+          if (err) return setTimeout(check,20)
+          cb(err,data)
         })
-      })()
-    }
+      })
+      client.on('error',function(e){
+        client.end()
+        if (e.code === 'ENOENT' || e.code === 'ECONNREFUSED')
+          setTimeout(check,20)
+      })
+    })()
   }
   else if (opts.cmd && opts.cmd == 'stop') {
     if (serverMonitor) {

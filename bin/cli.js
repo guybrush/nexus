@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
-//      
+//
 //      |<------------ argvNexus -------------->|          |<- argvCmd ->|
 
 var opti = require('optimist')
@@ -62,6 +62,32 @@ help.config    = [ 'nexus config .. print local config'
                  , 'nexus -r foo config .. print remote config'
                  // , 'nexus config <key> .. show value of config.<key>'
                  // , 'nexus config <key> <value> .. set config.<key> to <value>'
+                 , ''
+                 , 'the nexus-cli will create a `~/.nexus`-directory if it doesnt exist. you can'
+                 , 'create a `~/.nexus/config.js`-file which exposes a json-object, or pass a'
+                 , 'path to a `.js/.json`-file to the cli (`-c`) or to the nexus-constructor - it'
+                 , 'will be `require()`\'ed.'
+                 , ''
+                 , 'if no config is passed to the cli or constructor, the config is'
+                 , '`{socket:home+"/.nexus/config.js"}` - where `home` is either'
+                 , '`process.env.HOME` or `process.env.USERPROFILE` depending on `process.platform`.'
+                 , ''
+                 , 'your config may look like this:'
+                 , ''
+                 , '{ socket  : "/path/to/socket"    // if set, the nexus-server will listen on that UNIX-socket'
+                 , '                                 // local cli and monitor-servers will connect to it'
+                 , ', port    : 12345                // if set, the nexus-server will listen on that port'
+                 , '                                 // remote nexus-cli can connect (see -r option)'
+                 , ', host    : "0.0.0.0"'
+                 , ', key     : "/path/to/key.pem"   // if set, the nexus-server uses tls'
+                 , ', cert    : "/path/to/cert.pem"  // if set, the nexus-server uses tls'
+                 , ', ca      : "/path/to/ca"        // every file in that directory will be read into the ca'
+                 , ', remotes :                      // can be used with the cli: `nexus -r foo ps`'
+                 , '  { local : { port:12345, key:<key>, cert:<cert>, host:"0.0.0.0" }'
+                 , '  , foo   : { port:12346, key:<key>, cert:<cert>, host:"foo.com" }'
+                 , '  , bar   : { port:12347, key:<key>, cert:<cert>, host:"bar.com" }'
+                 , '  }'
+                 , '}'
                  ].join('\n')
 help.install   = [ 'nexus install <tarball url> [<package-name>]'
                  , 'nexus install <pkg> [<package-name>]'
@@ -198,7 +224,7 @@ help.runscript = [ 'nexus runscript [<appName> <scriptName>]'
                  , ''
                  , 'nexus runscript foo test .. will run the apps.foo.package.scripts.test -script'
                  ].join('\n')
-help.logs      = [ 'nexus logs       .. list available logs' 
+help.logs      = [ 'nexus logs       .. list available logs'
                  , 'nexus logs clean .. delete all log-files of not running apps'
                  , 'nexus logs stdout <id> [-n <number of lines>] .. -n is 20 per default'
                  , 'nexus logs stderr <id> [-n <number of lines>] .. -n is 20 per default'
@@ -340,7 +366,7 @@ function parseArgs() {
       var cmd = startOpts.cmd || null
       var script = argv._[0]
       var opts = {script:script, options:scriptOpts, env:env, max:max, cmd:cmd}
-      
+
       if (argv.debug) opts.env = {NODE_DEBUG:true}
       if (/^\//.test(script)) {
         nexus.start(opts, exit)
