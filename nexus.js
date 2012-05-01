@@ -458,13 +458,11 @@ function start(opts, cb) {
 
 function restart(id, cb) {
   debug('restarting',id)
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function(){}
+  cb = arguments[arguments.length - 1]
+  cb = _.isFunction(cb) ? cb : function(){}
 
   if (!id || !monitors[id])
-    return cb('there is no process with id: '+id)
+    return cb(new Error('there is no process with id: '+id))
 
   monitors[id].restart(cb)
 }
@@ -473,22 +471,22 @@ function restart(id, cb) {
 //                                               stop
 //------------------------------------------------------------------------------
 
-function stop(id, cb) {
-  debug('stopping',id)
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function(){}
-
-  if (!id || !monitors[id])
-    return cb(new Error('there is no process with id: '+id))
-
-  monitors[id].stop(function(err,data){
-    if (err) return cb(err)
-    ee2.once('monitor::'+id+'::disconnected',function(){
-      cb(null,data)
+function stop(ids, cb) {
+  ids = _.isString(ids) ? [ids] : _.isArray(ids) ? ids : null
+  cb = arguments[arguments.length - 1]
+  cb = _.isFunction(cb) ? cb : function(){}
+  if (!ids) return cb(new Error('invalid argument'))
+  new AA(ids).map(function(x,i,next){
+    ee2.emit('debug','stopping '+x)
+    if (!monitors[x]) 
+      return next(new Error('there is no process with id: '+x))
+    monitors[x].stop(function(err,data){
+      if (err) return next(err)
+      ee2.once('monitor::'+x+'::disconnected',function(){
+        next(null,data)
+      })
     })
-  })
+  }).done(cb).exec()
 }
 
 //------------------------------------------------------------------------------
@@ -496,9 +494,9 @@ function stop(id, cb) {
 //------------------------------------------------------------------------------
 
 function stopall(cb) {
-  if (!cb) cb = function() {}
+  cb = _.isFunction(cb) ? cb : function(){}
   var keys = Object.keys(monitors)
-  if (keys.length==0) return cb(null,[])
+  if (keys.length == 0) return cb(null,[])
   new AA(Object.keys(monitors)).map(function(x,i,next){
     ee2.emit('debug','stopping '+x)
     monitors[x].stop(function(err,data){
@@ -514,6 +512,7 @@ function stopall(cb) {
 //------------------------------------------------------------------------------
 
 function runscript(opts, stdout, stderr, cb) {
+  cb = _.isFunction(cb) ? cb : function(){}
   if (!opts || !opts.name || !opts.script)
     return cb(new Error('name or script not defined'))
   ls({name:opts.name},function(err, data){

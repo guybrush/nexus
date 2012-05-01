@@ -117,7 +117,7 @@ nexus.start(opts,cb)
 
 nexus.restart(opts,cb)
 
-nexus.stop(id,cb)
+nexus.stop([id1,id2,..,idN],cb)
 
 nexus.stopall(cb)
 

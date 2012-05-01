@@ -382,7 +382,8 @@ function parseArgs() {
       nexus.restart(argvCmd._[0], exit)
       break
     case 'stop':
-      nexus.stop(argvCmd._[0], exit)
+      //console.log(argvCmd._)
+      nexus.stop(argvCmd._, exit)
       break
     case 'stopall':
       nexus.stopall(exit)
