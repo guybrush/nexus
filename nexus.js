@@ -456,15 +456,16 @@ function start(opts, cb) {
 //                                               restart
 //------------------------------------------------------------------------------
 
-function restart(id, cb) {
-  debug('restarting',id)
+function restart(ids, cb) {
+  ids = _.isString(ids) ? [ids] : _.isArray(ids) ? ids : null
   cb = arguments[arguments.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
-
-  if (!id || !monitors[id])
-    return cb(new Error('there is no process with id: '+id))
-
-  monitors[id].restart(cb)
+  if (!ids) return cb(new Error('invalid argument'))
+  new AA(ids).map(function(x,i,next){
+    if (!monitors[x]) 
+      return next(new Error('there is no process with id: '+x))
+    monitors[x].restart(next)
+  }).done(cb).exec()
 }
 
 //------------------------------------------------------------------------------
@@ -477,7 +478,6 @@ function stop(ids, cb) {
   cb = _.isFunction(cb) ? cb : function(){}
   if (!ids) return cb(new Error('invalid argument'))
   new AA(ids).map(function(x,i,next){
-    ee2.emit('debug','stopping '+x)
     if (!monitors[x]) 
       return next(new Error('there is no process with id: '+x))
     monitors[x].stop(function(err,data){

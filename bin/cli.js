@@ -207,8 +207,12 @@ help.start     = [ 'nexus start [<startOptions>] <appName> [<appOptions>]'
                  , '            : invalid startScript'
                  , '        : invalid startScript'
                  ].join('\n')
-help.restart   =   'nexus restart <id> .. restarts the program (not the monitor)'
-help.stop      =   'nexus stop <id>    .. stops a running app (and the monitor)'
+help.restart   = [ 'nexus restart <id> .. restarts the program (not the monitor)'
+                 , 'nexus restart <id1> <id2>'
+                 ].join('\n')
+help.stop      = [ 'nexus stop <id>    .. stops a running app (and the monitor)'
+                 , 'nexus stop <id1> <id2>'
+                 ].join('\n')
 help.stopall   = [ 'nexus stopall      .. there are no parameters, stops all apps'
                  , '                      and their monitors'
                  ].join('\n')
@@ -379,10 +383,9 @@ function parseArgs() {
       }
       break
     case 'restart':
-      nexus.restart(argvCmd._[0], exit)
+      nexus.restart(argvCmd._, exit)
       break
     case 'stop':
-      //console.log(argvCmd._)
       nexus.stop(argvCmd._, exit)
       break
     case 'stopall':
