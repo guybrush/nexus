@@ -248,16 +248,15 @@ help.server    = [ 'nexus server .. (without any options) will print information
                  , 'nexus server version  .. print version of the current running nexus-server'
                  , ''
                  , 'note: the default-configFile-path is ~/.nexus/config.js'
-                 , 'note: starting the nexus-server will reset the reboot-database (see `nexus help reboot`)'
+                 , 'note: starting AND stopping the nexus-server will reset the reboot-database'
                  ].join('\n')
 help.reboot    = [ 'nexus reboot [<path to database>]'
                  , ''
-                 , 'the nexus-server (see `nexus help server`) will reset and then'
-                 , 'write information about running programs into a database (dirty).'
-                 , ''
-                 , '`nexus reboot` will stop all running nexus-apps/monitors and'
-                 , 'query the database for what programs have run before.'
-                 , 'these programs will get started again.'
+                 , '1) dump database into memory'
+                 , '2) stop all running apps (if any is running)'
+                 , '3) stop the nexus-server (if it is running)'
+                 , '4) start the nexus-server (this will reset the database)'
+                 , '5) start all programms stored in the memory-dump of the database'
                  , ''
                  , 'note: the default-path for the database is ~/.nexus/db.dirty'
                  ].join('\n')
@@ -397,16 +396,19 @@ function parseArgs() {
       opts.script = argv._[1]
       var stdout = function(data) {console.log('stdout →',data)}
       var stderr = function(data) {console.log('stderr →',data)}
-      nexus.runscript(opts, stdout, stderr, function(err, kill){
+      var cbKill = function(err,kill) {
         if (err) return exit(err)
         require('tty').setRawMode(true);
         var stdin = process.openStdin()
         stdin.on('keypress', function (chunk, key) {
+          console.log('KEYPRESS',chunk,key)
           if (key && key.ctrl && key.name == 'c') {
             kill(exit())
           }
         })
-      })
+      }
+      var cbDone = function(err) {exit(err)}
+      nexus.runscript(opts, stdout, stderr, cbKill, cbDone)
       break
     case 'logs':
       var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}
@@ -427,7 +429,7 @@ function parseArgs() {
 
 function exit(err,msg) {
   if (err) console.error({error:err})
-  else console.log(msg)
+  else msg && console.log(msg)
   _conn && _conn.end()
   process.exit(0)
 }

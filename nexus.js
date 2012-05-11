@@ -511,8 +511,9 @@ function stopall(cb) {
 //                                               runscript
 //------------------------------------------------------------------------------
 
-function runscript(opts, stdout, stderr, cb) {
-  cb = _.isFunction(cb) ? cb : function(){}
+function runscript(opts, stdout, stderr, cbKill, cbDone) {
+  cbDone = _.isFunction(cbDone) ? cbDone : function(){}
+  cbKill = _.isFunction(cbKill) ? cbKill : function(){}
   if (!opts || !opts.name || !opts.script)
     return cb(new Error('name or script not defined'))
   ls({name:opts.name},function(err, data){
@@ -527,15 +528,12 @@ function runscript(opts, stdout, stderr, cb) {
     var _config = config()
     var child = cp.exec
       ( data[opts.name].scripts[opts.script]
-      , { timeout : 1000*3600*10
+      , { timeout : 1000*60*30
         , cwd     : _config.apps+'/'+opts.name }
-      , function(err,stdout,stderr){
-          cb(err)
-        } )
-    cb(null,function(cb){
-      process.kill(child.pid, 'SIGHUP')
-      cb && cb()
-    })
+      , function(err,stdout,stderr){cbDone(err)} 
+      )
+    cbKill(null,function(){process.kill(child.pid, 'SIGHUP')})
+    child.on('exit',function(){cbDone()})
     stdout && child.stdout.on('data',function(d){stdout(d)})
     stderr && child.stderr.on('data',function(d){stderr(d)})
   })
