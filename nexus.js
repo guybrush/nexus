@@ -462,7 +462,7 @@ function restart(ids, cb) {
   cb = _.isFunction(cb) ? cb : function(){}
   if (!ids) return cb(new Error('invalid argument'))
   new AA(ids).map(function(x,i,next){
-    if (!monitors[x]) 
+    if (!monitors[x])
       return next(new Error('there is no process with id: '+x))
     monitors[x].restart(next)
   }).done(cb).exec()
@@ -478,7 +478,7 @@ function stop(ids, cb) {
   cb = _.isFunction(cb) ? cb : function(){}
   if (!ids) return cb(new Error('invalid argument'))
   new AA(ids).map(function(x,i,next){
-    if (!monitors[x]) 
+    if (!monitors[x])
       return next(new Error('there is no process with id: '+x))
     monitors[x].stop(function(err,data){
       if (err) return next(err)
@@ -497,7 +497,7 @@ function stopall(cb) {
   cb = _.isFunction(cb) ? cb : function(){}
   var keys = Object.keys(monitors)
   if (keys.length == 0) return cb(null,[])
-  new AA(Object.keys(monitors)).map(function(x,i,next){
+  new AA(keys).map(function(x,i,next){
     ee2.emit('debug','stopping '+x)
     monitors[x].stop(function(err,data){
       ee2.once('monitor::'+x+'::disconnected',function(){
@@ -530,7 +530,7 @@ function runscript(opts, stdout, stderr, cbKill, cbDone) {
       ( data[opts.name].scripts[opts.script]
       , { timeout : 1000*60*30
         , cwd     : _config.apps+'/'+opts.name }
-      , function(err,stdout,stderr){cbDone(err)} 
+      , function(err,stdout,stderr){cbDone(err)}
       )
     cbKill(null,function(){process.kill(child.pid, 'SIGHUP')})
     child.on('exit',function(){cbDone()})
