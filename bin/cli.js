@@ -297,12 +297,12 @@ else {
   client.connect(opts, function(remote, conn){
     _conn = conn
     nexus = remote
-    process.stdin.resume()
-    process.stdin.on('data',function(data) {
-      var cmd = data.toString().replace('\n','')
-      argv = opti(cmd.split(' ')).argv
-      parseArgs()
-    })
+    // process.stdin.resume()
+    // process.stdin.on('data',function(data) {
+    //   var cmd = data.toString().replace('\n','')
+    //   argv = opti(cmd.split(' ')).argv
+    //   parseArgs()
+    // })
     parseArgs()
     conn.on('end',function(){exit('disconnected from server')})
   })
@@ -394,21 +394,22 @@ function parseArgs() {
       var opts = {}
       opts.name = argv._[0]
       opts.script = argv._[1]
-      var stdout = function(data) {console.log('stdout →',data)}
-      var stderr = function(data) {console.log('stderr →',data)}
-      var cbKill = function(err,kill) {
-        if (err) return exit(err)
-        require('tty').setRawMode(true);
+      if (!opts.name || !opts.script)
+        return exit(new Error('no name or script defined'))
+      var stdout = function(data) {console.log('stdout →',data.replace(/\n$/, ''))}
+      var stderr = function(data) {console.log('stderr →',data.replace(/\n$/, ''))}
+      var kill = function(killIt) {
         var stdin = process.openStdin()
+        require('tty').setRawMode(true)
         stdin.on('keypress', function (chunk, key) {
-          console.log('KEYPRESS',chunk,key)
           if (key && key.ctrl && key.name == 'c') {
-            kill(exit())
+            console.log('killing processes')
+            killIt(exit())
           }
         })
       }
-      var cbDone = function(err) {exit(err)}
-      nexus.runscript(opts, stdout, stderr, cbKill, cbDone)
+      var done = function(err) {exit(err)}
+      nexus.runscript(opts, stdout, stderr, kill, done)
       break
     case 'logs':
       var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}
@@ -428,7 +429,7 @@ function parseArgs() {
 }
 
 function exit(err,msg) {
-  if (err) console.error({error:err})
+  if (err) console.error('error:',err)
   else msg && console.log(msg)
   _conn && _conn.end()
   process.exit(0)
