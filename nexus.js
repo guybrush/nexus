@@ -35,6 +35,10 @@ var fs      = require('fs')
   , subscriptionListeners = {}
   , userConfig = null
 
+// node@0.6.x compat
+fs.exists = fs.exists || path.exists
+fs.existsSync = fs.existsSync || path.existsSync
+  
 ee2.onAny(function(data){debug(this.event,'→',data)})
 
 //------------------------------------------------------------------------------
@@ -192,7 +196,7 @@ function config(cb) {
           , currConfig.apps
           , currConfig.tmp
           ] ).map(function(x, i, next){
-    path.exists(x, function(exists){
+    fs.exists(x, function(exists){
       if (!exists) mkdirp(x,0755,function(err){next(err)})
       else next()
     })
@@ -241,11 +245,11 @@ function install(opts, cb) {
     }
 
     var name = opts.name || package.name+'@'+package.version
-    path.exists(_config.apps+'/'+name,function(exists){
+    fs.exists(_config.apps+'/'+name,function(exists){
       if (exists) {
         var found = false, i = 0
         while (!found) {
-          if (!path.existsSync(_config.apps+'/'+name+'_'+(++i)))
+          if (!fs.existsSync(_config.apps+'/'+name+'_'+(++i)))
             found = true
         }
         name = name+'_'+i
@@ -316,7 +320,7 @@ function ls(opts, cb) {
 
   var _config = config()
   if (opts && opts.name) {
-    path.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
+    fs.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
       if (!exists) return cb(new Error('package is not installed: '+opts.name))
       readPackages([opts.name])
     })
@@ -760,7 +764,7 @@ function parseStart(opts, cb) {
   var _config = config()
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
-  if (path.existsSync(_config.apps+'/'+maybeApp)) {
+  if (fs.existsSync(_config.apps+'/'+maybeApp)) {
     // console.log('---- A')
     result.name = maybeApp.split('/')[0]
     appPath = _config.apps+'/'+maybeApp
@@ -774,7 +778,7 @@ function parseStart(opts, cb) {
 
   // handle `nexus start appName/path/to/script`
   if (!result.script && /\//.test(opts.script)) {
-    if (path.existsSync(_config.apps+'/'+opts.script)) {
+    if (fs.existsSync(_config.apps+'/'+opts.script)) {
       // console.log('---- B')
       result.name = opts.script.split('/')[0]
       result.script = _config.apps+'/'+opts.script
@@ -791,7 +795,7 @@ function parseStart(opts, cb) {
       if (/\w/.test(startScript)) {
         // parse options
         var split = startScript.split(' ')
-        var isScript = path.existsSync(appPath+'/'+split[0])
+        var isScript = fs.existsSync(appPath+'/'+split[0])
         if (isScript) {
           result.script = appPath+'/'+split[0]
           result.options = result.options || split.splice(1)
@@ -809,8 +813,8 @@ function parseStart(opts, cb) {
     }
     else if (appPath) {
       // console.log('---- D')
-      var serverJsExists = path.existsSync(appPath+'/server.js')
-      var appJsExists = path.existsSync(appPath+'/app.js')
+      var serverJsExists = fs.existsSync(appPath+'/server.js')
+      var appJsExists = fs.existsSync(appPath+'/app.js')
       if (serverJsExists) result.script = appPath+'/server.js'
       else if (appJsExists) result.script = appPath+'/app.js'
       else result.script = appPath
