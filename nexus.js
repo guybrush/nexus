@@ -225,6 +225,8 @@ function install(opts, cb) {
   var tmpPath = _config.tmp+'/'+Math.floor(Math.random()*Math.pow(2,32)).toString(16)
   mkdirp(tmpPath,0755,function(err){
     if (err) return cb(err)
+    // without checkDns the npm-childprocess will run, 
+    // print an error-msg and never exit
     if ((/:\/\//.test(opts.package)))
       return checkDns(opts.package, function(err){runNpm(err, installPackage)})
     runNpm(null, installPackage)
@@ -913,10 +915,6 @@ function genId(cb) {
 //------------------------------------------------------------------------------
 
 function checkDns(uri,cb) {
-  // this code sucks in general ..
-  // but ye .. without this, npm will throw on non-valid domains
-  // install via authed http? not implemented yet :D
-  // (on the cli ssh-agent might help with ssh-transport)
   var dns = require('dns')
   var domain = uri.split('://')[1]
   domain = domain.split('/')[0]
