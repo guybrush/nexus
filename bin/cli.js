@@ -420,7 +420,10 @@ function parseArgs() {
       break
     case 'sub':
     case 'subscribe':
-      var emit = function(event, data) {console.log(event,'→',data.replace(/\n$/, ''))}
+      var emit = function(event, data) {
+        var val = data ? data.toString().replace(/\n$/, '') : '•' 
+        console.log(event,'→',val)
+      }
       nexus.subscribe(argv._[0], emit)
       break
     default:

@@ -91,7 +91,7 @@ module.exports =
       var opts = {package:'http://321-foo-bar-123.com/package.tar.gz'}
       debug('installing',opts.package,'→',opts.name)
       nexus.install(opts, function(err,data){
-        assert.equal(err.code,1)
+        assert.equal(err.code,'ENOTFOUND')
         done()
       })
     }

@@ -225,13 +225,20 @@ function install(opts, cb) {
   var tmpPath = _config.tmp+'/'+Math.floor(Math.random()*Math.pow(2,32)).toString(16)
   mkdirp(tmpPath,0755,function(err){
     if (err) return cb(err)
+    if ((/:\/\//.test(opts.package)))
+      return checkDns(opts.package, function(err){runNpm(err, installPackage)})
+    runNpm(null, installPackage)
+  })
+  
+  function runNpm(err, cb){
+    if (err) return cb(err)
     var env = process.env
     env.npm_config_prefix = tmpPath
     cp.execFile( __dirname+'/node_modules/npm/cli.js'
                , [ 'install', '-p', '-g', opts.package ]
                , { cwd: tmpPath, env:env }
-               , installPackage )
-  })
+               , cb )
+  }
 
   function installPackage(err, stdout, stderr) {
     if (err) return cb(err)
@@ -739,9 +746,11 @@ function server(opts, cb) {
 // (C)         ? 'node foo.js -b ar' -> spawn( 'node'
 //                                           , ['/<pathToApp>/foo.js','-b','ar']
 //                                           , {cwd:'/<pathToApp>'} )
-//             : appPath+"/server.js" exists || appPath+"/app.js" exists
-// (D)           ? script = appName+"/server.js" || appName+"/app.js"
-//               : invalid startScript
+// (D)         : look for package.json-bin
+//               ? script = appName+"/"+package.json-bin
+//               : appPath+"/server.js" exists || appPath+"/app.js" exists
+// (E)             ? script = appName+"/server.js" || appName+"/app.js"
+//                 : invalid startScript
 //           : invalid startScript
 
 function parseStart(opts, cb) {
@@ -792,7 +801,6 @@ function parseStart(opts, cb) {
       // console.log('---- C')
       var startScript = result.package.scripts.start
       if (/\w/.test(startScript)) {
-        // parse options
         var split = startScript.split(' ')
         var isScript = fs.existsSync(appPath+'/'+split[0])
         if (isScript) {
@@ -806,12 +814,26 @@ function parseStart(opts, cb) {
         }
       }
       else {
-        // no options
         result.script = appPath+'/'+startScript
       }
     }
-    else if (appPath) {
+    else if (result.package
+             && result.package.bin) {
       // console.log('---- D')
+      var startScript
+      if (_.isString(result.package.bin)) {
+        if (!fs.existsSync(path.join(appPath,result.package.bin)))
+          cb('invalid script: '+path.join(appPath,result.package.bin))
+        result.script = path.join(appPath,result.package.bin)
+      }
+      if (_.isObject(result.package.bin) && result.package.bin[result.name]) {
+        if (!fs.existsSync(path.join(appPath,result.package.bin)))
+          cb('invalid script: '+path.join(appPath,result.package.bin))
+        result.script = path.join(appPath,result.package.bin[result.name])
+      }
+    }
+    else if (appPath) {
+      // console.log('---- E')
       var serverJsExists = fs.existsSync(appPath+'/server.js')
       var appJsExists = fs.existsSync(appPath+'/app.js')
       if (serverJsExists) result.script = appPath+'/server.js'
@@ -883,6 +905,28 @@ function genId(cb) {
       } while(currIds.indexOf(id) != -1)
       cb(null,id)
     })
+  })
+}
+
+//------------------------------------------------------------------------------
+//                                               checkDns
+//------------------------------------------------------------------------------
+
+function checkDns(uri,cb) {
+  // this code sucks in general ..
+  // but ye .. without this, npm will throw on non-valid domains
+  // install via authed http? not implemented yet :D
+  // (on the cli ssh-agent might help with ssh-transport)
+  var dns = require('dns')
+  var domain = uri.split('://')[1]
+  domain = domain.split('/')[0]
+  domain = domain.split(':')[0]
+  var split = domain.split('@')
+  domain = split[split.length - 1]
+  dns.lookup(domain,function(err,data,fam){
+    if (err && domain!='localhost' && domain!='127.0.0.1' && domain!='0.0.0.0')
+      return cb(err)
+    cb()
   })
 }
 
