@@ -39,13 +39,13 @@ var fs      = require('fs')
 // node@0.6.x compat
 fs.exists = fs.exists || path.exists
 fs.existsSync = fs.existsSync || path.existsSync
-  
+
 ee2.onAny(function(data){debug(this.event,'→',data)})
 
 /**
  * nexus
  *
- * @param {String|Object} config 
+ * @param {String|Object} config
  * @return {dnode-middleware}
  */
 function nexus(configParam, cb) {
@@ -146,7 +146,7 @@ function nexus(configParam, cb) {
   dnodeServer.version = version
   dnodeServer.config = config
   dnodeServer.ls = ls
-  dnodeServer.install = install       
+  dnodeServer.install = install
   dnodeServer.uninstall = uninstall
   dnodeServer.start = start
   dnodeServer.exec = exec
@@ -160,7 +160,7 @@ function nexus(configParam, cb) {
  * version
  *
  * @param {Function} callback - arguments: error, version-number
- * @return {String} version-number 
+ * @return {String} version-number
  */
 function version(cb) {
   cb && cb(null, _pkg.version)
@@ -171,7 +171,7 @@ function version(cb) {
  * config
  *
  * @param {Function} callback - arguments: error, config
- * @return {Object} config 
+ * @return {Object} config
  */
 function config(cb) {
 
@@ -203,8 +203,8 @@ function config(cb) {
   currConfig.port    = currConfig.port    || fileConfig.port    || 0xf00
   currConfig.remotes = currConfig.remotes || fileConfig.remotes || {}
 
-  // #TODO if key/cert/ca is set, check for validity 
-  
+  // #TODO if key/cert/ca is set, check for validity
+
   new AA( [ currConfig.logs
           , currConfig.apps
           , currConfig.tmp
@@ -225,7 +225,7 @@ function config(cb) {
  * install
  *
  * @param {Object} options
- * @param {Function} callback, 2 arguments: error, information about 
+ * @param {Function} callback, 2 arguments: error, information about
  *                   installed package
  */
 function install(opts, cb) {
@@ -242,13 +242,13 @@ function install(opts, cb) {
   var tmpPath = _config.tmp+'/'+Math.floor(Math.random()*Math.pow(2,32)).toString(16)
   mkdirp(tmpPath,0755,function(err){
     if (err) return cb(err)
-    // without checkDns the npm-childprocess will run, 
+    // without checkDns the npm-childprocess will run,
     // print an error-msg and never exit
     if ((/:\/\//.test(opts.package)))
       return checkDns(opts.package, function(err){runNpm(err, installPackage)})
     runNpm(null, installPackage)
   })
-  
+
   function runNpm(err, cb){
     if (err) return cb(err)
     var env = process.env
@@ -302,7 +302,7 @@ function install(opts, cb) {
  * uninstall
  *
  * @param {Object} options
- * @param {Function} callback, 2 arguments: error, information about 
+ * @param {Function} callback, 2 arguments: error, information about
  *                   uninstalled package
  */
 function uninstall(opts, cb) {

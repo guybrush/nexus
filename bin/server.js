@@ -16,7 +16,7 @@ process.title = title
 
 readKeys(function(err){
   startServer(function(err, remote){
-    var dbPath = config.socket 
+    var dbPath = config.socket
                  ? config.dbs+'/'+(config.socket.replace(/\//g,'_'))
                  : config.dbs+'/'+config.port
     initDb(dbPath,process.env.NEXUS_REBOOT,remote,function(err){
@@ -33,7 +33,7 @@ function readKeys(cb) {
       throw new Error('could not use key-file '+config.key)
     }
   }
-  
+
   if (config.cert) {
     try {
       opts.cert = fs.readFileSync(config.cert)
@@ -41,7 +41,7 @@ function readKeys(cb) {
       throw new Error('could not use cert-file '+config.cert)
     }
   }
-  
+
   if (config.ca) {
     fs.readdir(config.ca,function(err,data){
       if (data.length > 0) {
@@ -69,9 +69,9 @@ function initDb(dbPath,rebootFlag,remote,cb) {
   var db
   var todo = [unlinkDb,loadDb,subCon,subDis]
   if (rebootFlag) todo.unshift(reboot)
-    
+
   new AA(todo).forEachSerial(function(x,i,next){x(next)}).done(cb).exec()
-  
+
   function reboot(cb) {
     var db = dirty(dbPath).on('load',function(err){
       if (err) cb(err)
@@ -82,18 +82,18 @@ function initDb(dbPath,rebootFlag,remote,cb) {
       cb()
     })
   }
-  
+
   function unlinkDb(cb) {
     fs.exists(dbPath,function(exists){
       if (exists) return fs.unlink(dbPath,cb)
       cb()
     })
   }
-  
+
   function loadDb(cb) {
     db = dirty(dbPath).on('load',cb)
   }
-  
+
   function subCon(cb) {
     remote.subscribe('monitor::*::connected',function(ev){
       var id = ev.split('::')[1]
@@ -105,12 +105,12 @@ function initDb(dbPath,rebootFlag,remote,cb) {
                    , script  : d[id].script
                    , name    : d[id].name
                    , env     : d[id].env
-                   , command : d[id].command 
+                   , command : d[id].command
                    , max     : d[id].max } )
       })
     },cb)
   }
-  
+
   function subDis(cb) {
     remote.subscribe('monitor::*::disconnected',function(ev){
       var id = ev.split('::')[1]
@@ -132,7 +132,6 @@ function startServer(cb) {
           console.error(err)
         })
         server.on('ready',function(){
-          console.log('started server')
           cb(null,rem)
         })
       })

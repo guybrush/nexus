@@ -44,21 +44,22 @@ nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
 
 commands:
 
-    version   .. print version-number
-    config    .. print config
-    ls        .. list installed packages
-    install   .. install packages
-    uninstall .. uninstall packages
-    ps        .. list of current running (and crashed) programs
-    start     .. start a program
-    restart   .. restart a running (or max crashed) program
-    stop      .. stop a running program
-    stopall   .. stop all running programs
-    runscript .. execute a script, defined in a program's package.json
-    logs      .. access log-files
-    subscribe .. subscribe to events
-    server    .. start/stop/restart/reboot the nexus-server
-    help      .. try `nexus help <command>` for more info
+    version    .. print version-number
+    config     .. print config
+    ls         .. list installed packages
+    install    .. install packages
+    uninstall  .. uninstall packages
+    ps         .. list of current running (and crashed) programs
+    start      .. start a program
+    restart    .. restart a running (or max crashed) program
+    stop       .. stop a running program
+    stopall    .. stop all running programs
+    exec       .. execute a command with CWD = ~/.nexus/apps
+    execscript .. execute a script, defined in a package.json
+    logs       .. access log-files
+    subscribe  .. subscribe to events
+    server     .. start/stop/restart the nexus-server
+    help       .. try `nexus help <command>` for more info
 
 note: ps, restart, stop, stopall, subscribe and `logs clean`
       only work with a local or remote running nexus-server.
