@@ -19,15 +19,18 @@
   the nexus-server (dnode-server). the nexus-server is also a
   `require('child_process').spawn`'ed child-process of a monitor-server -
   which itself will connect (and reconnect) to its own child-process.
-* all the config, logs and programs live in `~/.nexus` by default.
 * nexus shells out into [npm], is built upon [dnode] and is inspired by
-  [forever].
+  [forever]. (currently nexus depends on a [fork] of npm, which caches 
+  git-remotes - so it has not to clone a fresh repository everytime, it will 
+  just fetch deltas)
+* all the config, logs and programs live in `~/.nexus` by default.
 * nexus is still *super-alpha*.
 
 [dnode]: https://github.com/substack/dnode
 [forever]: https://github.com/nodejitsu/forever
 [node]: http://nodejs.org
 [npm]: https://npmjs.org
+[fork]: https://github.com/guybrush/npm/tree/cacheGitRemotes
 
 ## install
 
@@ -51,10 +54,10 @@ commands:
     restart   .. restart a running (or max crashed) program
     stop      .. stop a running program
     stopall   .. stop all running programs
-    runscript .. execute a script, defined in the package.json
+    runscript .. execute a script, defined in a program's package.json
     logs      .. access log-files
     subscribe .. subscribe to events
-    server    .. start/stop/restart the nexus-server
+    server    .. start/stop/restart/reboot the nexus-server
     help      .. try `nexus help <command>` for more info
 
 note: ps, restart, stop, stopall, subscribe and `logs clean`
@@ -63,75 +66,59 @@ note: ps, restart, stop, stopall, subscribe and `logs clean`
 
 ## config
 
-the nexus-cli will create a `~/.nexus`-directory if it doesnt exist. you can
-create a `~/.nexus/config.js`-file which exposes a json-object, or pass a
-path to a `.js/.json`-file to the cli (`-c`) or to the nexus-constructor - it
-will be `require()`'ed.
+you can pass a string or an object to the nexus-constructor or use the (`-c`)
+option with the cli. if you pass a string it will will be `require(string)`'ed.
 
-if no config is passed to the cli or constructor, the config is
-`{socket:home+'/.nexus/socket'}` - where `home` is either
-`process.env.HOME` or `process.env.USERPROFILE` depending on `process.platform`.
+if you dont pass any config-option the nexus-cli will create a 
+`~/.nexus`-directory if it doesnt exist and put all the configs and logs there.
+it will try to `require('~/.nexus/config.js')` per default.
+
+the default config is (which gets overwritten by the config you pass to nexus):
+``` javascript
+{ apps    : prefix+'/apps'   // nexus will install apps into that directory
+, tmp     : prefix+'/tmp'    // apps will be installed here temporarily
+, logs    : prefix+'/logs'   // this is where log-files will be put
+, key     : null             // path to key-file - if set, the nexus-server uses tls
+, cert    : null             // path to cert-file - if set, the nexus-server uses tls
+, ca      : null             // every file in that directory will be read into the ca
+, dbs     : prefix+'/dbs'    // nexus will store information about running processes in
+                             // database-files (one per socket/port). these dbs will be
+                             // used by the `nexus server reboot` command
+, socket  : prefix+'/socket' // the nexus-server will listen on that UNIX-socket
+                             // local cli and monitor-servers will connect to it
+, port    : 0xf00            // the nexus-server will listen on that port
+                             // remote nexus-cli can connect (see -r option)
+, host    : '0.0.0.0'        // if a port is set the net/tls-server will be bound to it
+, remotes : {}               // can be used with the cli: `nexus -r`
+                             // a remote can contain the following keys:
+                             // socket or port (in combination with key, cert, host)
+}
+```
+where `prefix` is either `process.env.HOME+'/.nexus'` or
+`process.env.USERPROFILE+'/.nexus'` depending on `process.platform`. (note that
+nexus doesnt support win yet)
 
 your config may look like this:
 ``` javascript
-{ socket  : '/path/to/socket'    // if set, the nexus-server will listen on that UNIX-socket
-                                 // local cli and monitor-servers will connect to it
-, port    : 12345                // if set, the nexus-server will listen on that port
-                                 // remote nexus-cli can connect (see -r option)
+{ apps    : '/path/to/directory'
+, socket  : '/path/to/socket'
+, port    : 12345
 , host    : '0.0.0.0'
-, key     : '/path/to/key.pem'   // if set, the nexus-server uses tls
-, cert    : '/path/to/cert.pem'  // if set, the nexus-server uses tls
-, ca      : '/path/to/ca'        // every file in that directory will be read into the ca
-, remotes :                      // can be used with the cli: `nexus -r foo ps`
-  { local : { port:12345, key:<key>, cert:<cert>, host:'0.0.0.0' }
-  , foo   : { port:12346, key:<key>, cert:<cert>, host:'foo.com' }
+, key     : '/path/to/key.pem'
+, cert    : '/path/to/cert.pem'
+, ca      : '/path/to/ca'
+, remotes :
+  { foo   : { port:12346, key:<key>, cert:<cert>, host:'foo.com' }
   , bar   : { port:12347, key:<key>, cert:<cert>, host:'bar.com' }
   }
 }
 ```
-(at least `socket` or `port` (or both) must be set - everything else is
-optional.
+now you can access the remote nexus-server `foo` with `nexus -r foo <command>`
 
-## api
-
+or more simple - this will install all the things into `/var/nexus`:
 ```
-// var config = '/some/file.js'
-// var config = '/some/file.json'
-var config = { socket: '/path/to/unix-socket', port: 5656 }
-
-var nexus = require('nexus')(config)
-
-nexus.version(cb)
-
-nexus.config(cb)
-
-nexus.install(opts,cb)
-
-nexus.uninstall(name,cb)
-
-nexus.ls(opts,cb)
-
-nexus.ps(opts,cb)
-
-nexus.start(opts,cb)
-
-nexus.restart(opts,cb)
-
-nexus.stop([id1,id2,..,idN],cb)
-
-nexus.stopall(cb)
-
-nexus.runscript(opts,stdout,stderr,cb)
-
-nexus.logs(opts,cb)
-
-nexus.subscribe(opts,cb)
-
-nexus.server(opts,cb)
-
-// you can use nexus as dnode-middleware like that (optional):
-
-var dnode = require('dnode')
-dnode(nexus).listen(3000)
+{ prefix : '/var/nexus', port : 12345 }
 ```
+the nexus-server will then listen on port `0.0.0.0:12345` *and* on the
+unix-socket `/var/nexus/socket`.
 

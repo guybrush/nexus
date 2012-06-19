@@ -13,7 +13,6 @@ var common = require('./common')
 module.exports =
 { 'nexus.install()':
   { before: function(done){server.listen(port,done)}
-  , beforeEach: function(){debug('')}
   , after: function(done){server.close();common.cleanup(done)}
   , 'name:"<name>" package:"http://<url>/<path>.tar.gz"': function(done){
       var opts = { package : 'http://localhost:'+port+'/app-simple.tar.gz'

@@ -3,12 +3,14 @@ var nexus = require('../../')(__dirname+'/config')
   , dnode = require('dnode')
   , rimraf = require('rimraf')
   , debug = require('debug')('test')
+  , config = require(__dirname+'/config')
 
 module.exports =
 { scenario: scenario
 , plan: plan
 , cleanup: cleanup
 , ee2log: ee2log
+, config: config
 }
 
 // screnario()

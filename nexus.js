@@ -9,7 +9,8 @@ nexus.ls = ls
 nexus.install = install
 nexus.uninstall = uninstall
 nexus.start = start
-nexus.runscript = runscript
+nexus.exec = exec
+nexus.execscript = execscript
 nexus.logs = logs
 nexus.server = server
 
@@ -41,29 +42,33 @@ fs.existsSync = fs.existsSync || path.existsSync
   
 ee2.onAny(function(data){debug(this.event,'→',data)})
 
-//------------------------------------------------------------------------------
-//                                               constructor
-//------------------------------------------------------------------------------
-
-function nexus(configParam) {
+/**
+ * nexus
+ *
+ * @param {String|Object} config 
+ * @return {dnode-middleware}
+ */
+function nexus(configParam, cb) {
   userConfig = configParam
+  // userConfig = configParam
   function dnodeServer(remote, conn) {
     var self = this
-    this.version   = version
-    this.config    = config
-    this.ls        = ls
-    this.install   = install
-    this.uninstall = uninstall
-    this.ps        = ps
-    this.start     = start
-    this.restart   = restart
-    this.stop      = stop
-    this.stopall   = stopall
-    this.runscript = runscript
-    this.logs      = logs
-    this.remote    = remote
-    this.server    = server
-    this.subscribe = function(event, emit, cb) {
+    this.version    = version
+    this.config     = config
+    this.ls         = ls
+    this.install    = install
+    this.uninstall  = uninstall
+    this.ps         = ps
+    this.start      = start
+    this.restart    = restart
+    this.stop       = stop
+    this.stopall    = stopall
+    this.exec       = exec
+    this.execscript = execscript
+    this.logs       = logs
+    this.remote     = remote
+    this.server     = server
+    this.subscribe  = function(event, emit, cb) {
       if (event == '*' || event == 'all') event = '**'
       if (!subscriptions[event]) {
         subscriptions[event] = {}
@@ -141,28 +146,33 @@ function nexus(configParam) {
   dnodeServer.version = version
   dnodeServer.config = config
   dnodeServer.ls = ls
-  dnodeServer.install = install
+  dnodeServer.install = install       
   dnodeServer.uninstall = uninstall
   dnodeServer.start = start
-  dnodeServer.runscript = runscript
+  dnodeServer.exec = exec
+  dnodeServer.execscript = execscript
   dnodeServer.logs = logs
   dnodeServer.server = server
   return dnodeServer
 }
 
-//------------------------------------------------------------------------------
-//                                               version
-//------------------------------------------------------------------------------
-
+/**
+ * version
+ *
+ * @param {Function} callback - arguments: error, version-number
+ * @return {String} version-number 
+ */
 function version(cb) {
   cb && cb(null, _pkg.version)
   return _pkg.version
 }
 
-//------------------------------------------------------------------------------
-//                                               config
-//------------------------------------------------------------------------------
-
+/**
+ * config
+ *
+ * @param {Function} callback - arguments: error, config
+ * @return {Object} config 
+ */
 function config(cb) {
 
   var currConfig = {}
@@ -184,17 +194,21 @@ function config(cb) {
   currConfig.key     = currConfig.key     || fileConfig.key     || null
   currConfig.cert    = currConfig.cert    || fileConfig.cert    || null
   currConfig.ca      = currConfig.ca      || fileConfig.ca      || null
-  currConfig.socket  = currConfig.socket  || fileConfig.socket  || null
+  currConfig.socket  = currConfig.socket  || fileConfig.socket  || currConfig.prefix+'/socket'
   currConfig.tmp     = currConfig.tmp     || fileConfig.tmp     || currConfig.prefix+'/tmp'
   currConfig.apps    = currConfig.apps    || fileConfig.apps    || currConfig.prefix+'/apps'
   currConfig.logs    = currConfig.logs    || fileConfig.logs    || currConfig.prefix+'/logs'
+  currConfig.dbs     = currConfig.dbs     || fileConfig.dbs     || currConfig.prefix+'/dbs'
   currConfig.host    = currConfig.host    || fileConfig.host    || '0.0.0.0'
   currConfig.port    = currConfig.port    || fileConfig.port    || 0xf00
   currConfig.remotes = currConfig.remotes || fileConfig.remotes || {}
 
+  // #TODO if key/cert/ca is set, check for validity 
+  
   new AA( [ currConfig.logs
           , currConfig.apps
           , currConfig.tmp
+          , currConfig.dbs
           ] ).map(function(x, i, next){
     fs.exists(x, function(exists){
       if (!exists) mkdirp(x,0755,function(err){next(err)})
@@ -207,10 +221,13 @@ function config(cb) {
   return currConfig
 }
 
-//------------------------------------------------------------------------------
-//                                               install
-//------------------------------------------------------------------------------
-
+/**
+ * install
+ *
+ * @param {Object} options
+ * @param {Function} callback, 2 arguments: error, information about 
+ *                   installed package
+ */
 function install(opts, cb) {
   debug('installing',opts)
   if (typeof arguments[arguments.length - 1] === 'function')
@@ -281,10 +298,13 @@ function install(opts, cb) {
   }
 }
 
-//------------------------------------------------------------------------------
-//                                               uninstall
-//------------------------------------------------------------------------------
-
+/**
+ * uninstall
+ *
+ * @param {Object} options
+ * @param {Function} callback, 2 arguments: error, information about 
+ *                   uninstalled package
+ */
 function uninstall(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
@@ -319,10 +339,13 @@ function uninstall(opts, cb) {
   })
 }
 
-//------------------------------------------------------------------------------
-//                                               ls
-//------------------------------------------------------------------------------
-
+/**
+ * ls
+ *
+ * @param {Object} options
+ * @param {Function} callback, 2 arguments: error, array containing information
+ *                   about installed applications
+ */
 function ls(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
@@ -371,10 +394,13 @@ function ls(opts, cb) {
   }
 }
 
-//------------------------------------------------------------------------------
-//                                               ps
-//------------------------------------------------------------------------------
-
+/**
+ * ps
+ *
+ * @param {Object} options
+ * @param {Function} callback, 2 arguments: error, array containing information
+ *                   about running applications
+ */
 function ps(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
@@ -431,10 +457,13 @@ function ps(opts, cb) {
   }).exec()
 }
 
-//------------------------------------------------------------------------------
-//                                               start
-//------------------------------------------------------------------------------
-
+/**
+ * start
+ *
+ * @param {Object} options
+ * @param {Function} callback, 2 arguments: error, array containing information
+ *                   about started applications
+ */
 function start(opts, cb) {
   debug('starting',opts.script)
   cb = _.isFunction(arguments[arguments.length-1])
@@ -465,10 +494,13 @@ function start(opts, cb) {
   })
 }
 
-//------------------------------------------------------------------------------
-//                                               restart
-//------------------------------------------------------------------------------
-
+/**
+ * restart
+ *
+ * @param {Array|String} ids of application you want to restart
+ * @param {Function} callback, 2 arguments: error, array containing information
+ *                   about restarted applications
+ */
 function restart(ids, cb) {
   ids = _.isString(ids) ? [ids] : _.isArray(ids) ? ids : null
   cb = arguments[arguments.length - 1]
@@ -481,10 +513,13 @@ function restart(ids, cb) {
   }).done(cb).exec()
 }
 
-//------------------------------------------------------------------------------
-//                                               stop
-//------------------------------------------------------------------------------
-
+/**
+ * stop
+ *
+ * @param {Array|String} ids of application you want to stop
+ * @param {Function} callback, 2 arguments: error, array containing information
+ *                   about stopped applications
+ */
 function stop(ids, cb) {
   ids = _.isString(ids) ? [ids] : _.isArray(ids) ? ids : null
   cb = arguments[arguments.length - 1]
@@ -502,10 +537,12 @@ function stop(ids, cb) {
   }).done(cb).exec()
 }
 
-//------------------------------------------------------------------------------
-//                                               stopall
-//------------------------------------------------------------------------------
-
+/**
+ * stopall
+ *
+ * @param {Function} callback, 2 arguments: error, array containing information
+ *                   about stopped applications
+ */
 function stopall(cb) {
   cb = _.isFunction(cb) ? cb : function(){}
   var keys = Object.keys(monitors)
@@ -520,11 +557,27 @@ function stopall(cb) {
   }).done(cb).exec()
 }
 
-//------------------------------------------------------------------------------
-//                                               runscript
-//------------------------------------------------------------------------------
+/**
+ * exec
+ *
+ * @param {String}
+ * @param {Function}
+ * @param {Function}
+ * @param {Function}
+ * @param {Function} callback, 1 argument: error
+ */
+function exec(opts, stdout, stderr, kill, cb) {}
 
-function runscript(opts, stdout, stderr, kill, cb) {
+/**
+ * execscript
+ *
+ * @param {String}
+ * @param {Function}
+ * @param {Function}
+ * @param {Function}
+ * @param {Function} callback, 1 argument: error
+ */
+function execscript(opts, stdout, stderr, kill, cb) {
   cb = _.isFunction(cb) ? cb : function(){}
   kill = _.isFunction(kill) ? kill : function(){}
   if (!opts || !opts.name || !opts.script)
@@ -551,10 +604,12 @@ function runscript(opts, stdout, stderr, kill, cb) {
   })
 }
 
-//------------------------------------------------------------------------------
-//                                                logs
-//------------------------------------------------------------------------------
-
+/**
+ * logs
+ *
+ * @param {Object}
+ * @param {Function} callback, 2 arguments: error, logs (string)
+ */
 function logs(opts, cb) {
   if (typeof arguments[arguments.length - 1] === 'function')
     cb = arguments[arguments.length - 1]
@@ -642,10 +697,12 @@ function logs(opts, cb) {
   })
 }
 
-//------------------------------------------------------------------------------
-//                                               server
-//------------------------------------------------------------------------------
-
+/**
+ * server
+ *
+ * @param {Object}
+ * @param {Function} callback, 2 arguments: error, data
+ */
 function server(opts, cb) {
   cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
@@ -670,19 +727,19 @@ function server(opts, cb) {
     return
   }
 
-  if (opts.cmd && opts.cmd == 'start') {
+  if (opts.cmd && (opts.cmd == 'start' || opts.cmd == 'reboot')) {
     if (serverMonitor)
       return cb(new Error('server is already running'))
     var _config = config()
     delete _config.remotes
+    var env = { NEXUS_CONFIG : JSON.stringify(_config) }
+    if (opts.debug) env.NODE_DEBUG = opts.debug
+    if (opts.cmd == 'reboot') env.NEXUS_REBOOT = true
     var startOpts =
       { script: __dirname+'/bin/server.js'
       , command: 'node'
       , package: _pkg
-      , env:
-        { NEXUS_CONFIG : JSON.stringify(_config)
-        , NODE_DEBUG : !!opts.debug
-        }
+      , env: env
       }
 
     debug('server-start starting',startOpts.script)
@@ -733,28 +790,30 @@ function server(opts, cb) {
   else cb('invalid arguments')
 }
 
-//------------------------------------------------------------------------------
-//                                               parseStart
-//------------------------------------------------------------------------------
-
-//     : CWD+"/<appName>" exists
-// (A)   ? start CWD+"/<appName>"
-//       : /\\//.test(<appName>)
-//         ? <appName>.split("/")[0] is an installed app
-// (B)       ? script = nexusApps+"/"+<appName>
-//           : invalid startScript
-//         : <appName> an installed app
-//           ? look for package.json-startScript
-// (C)         ? 'node foo.js -b ar' -> spawn( 'node'
-//                                           , ['/<pathToApp>/foo.js','-b','ar']
-//                                           , {cwd:'/<pathToApp>'} )
-// (D)         : look for package.json-bin
-//               ? script = appName+"/"+package.json-bin
-//               : appPath+"/server.js" exists || appPath+"/app.js" exists
-// (E)             ? script = appName+"/server.js" || appName+"/app.js"
-//                 : invalid startScript
-//           : invalid startScript
-
+/**
+ * server
+ *
+ *         : CWD+"/<appName>" exists
+ *     (A)   ? start CWD+"/<appName>"
+ *           : /\\//.test(<appName>)
+ *             ? <appName>.split("/")[0] is an installed app
+ *     (B)       ? script = nexusApps+"/"+<appName>
+ *               : invalid startScript
+ *             : <appName> an installed app
+ *               ? look for package.json-startScript
+ *     (C)         ? 'node foo.js -b ar' -> spawn( 'node'
+ *                                               , ['/<pathToApp>/foo.js','-b','ar']
+ *                                               , {cwd:'/<pathToApp>'} )
+ *     (D)         : look for package.json-bin
+ *                   ? script = appName+"/"+package.json-bin
+ *                   : appPath+"/server.js" exists || appPath+"/app.js" exists
+ *     (E)             ? script = appName+"/server.js" || appName+"/app.js"
+ *                     : invalid startScript
+ *               : invalid startScript
+ *
+ * @param {Object}
+ * @param {Function} callback, 2 arguments: error, data
+ */
 function parseStart(opts, cb) {
   debug('parsing start-options',opts.script)
   var result = {}
@@ -852,10 +911,16 @@ function parseStart(opts, cb) {
   cb(null, result)
 }
 
-//------------------------------------------------------------------------------
-//                                               objPath
-//------------------------------------------------------------------------------
-
+/**
+ * objPath - create/access objects with a key-string
+ *
+ * @param {Object} scope
+ * @param {String} key-string (e.g. 'a.b.c.d')
+ * @param {Mixed} value to store in key (optional)
+ * @return {Mixed} if value-param is given it will return
+ *                 the object, otherwise it will return the value
+ *                 of the selected key
+ */
 function objPath(obj, keyString, value) {
   var keys = keyString.split('.')
   if (obj[keys[0]] === undefined) obj[keys[0]] = {}
@@ -888,10 +953,11 @@ function objPath(obj, keyString, value) {
   }
 }
 
-//------------------------------------------------------------------------------
-//                                               genId
-//------------------------------------------------------------------------------
-
+/**
+ * genId
+ *
+ * @param {Function} callback, 2 arguments: error, id (string)
+ */
 function genId(cb) {
   config(function(err,_config){
     if (err) return cb(err)
@@ -910,10 +976,12 @@ function genId(cb) {
   })
 }
 
-//------------------------------------------------------------------------------
-//                                               checkDns
-//------------------------------------------------------------------------------
-
+/**
+ * checkDns
+ *
+ * @param {String} uri
+ * @param {Function} callback, 1 argument: error
+ */
 function checkDns(uri,cb) {
   var dns = require('dns')
   var domain = uri.split('://')[1]
