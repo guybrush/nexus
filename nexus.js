@@ -558,30 +558,66 @@ function stopall(cb) {
 }
 
 /**
- * exec
+ * execute a command with CWD: $nexus.config.apps
  *
  * @param {String}
  * @param {Function}
  * @param {Function}
  * @param {Function}
- * @param {Function} callback, 1 argument: error
+ * @param {Function} callback, 1 argument: exit-code
  */
-function exec(opts, stdout, stderr, kill, cb) {}
+function exec(cmd, stdout, stderr, kill, cb) {
+  if (!_.isString(cmd))
+    return cb(new Error('invalid arguments, first arg must be string'))
+  kill = _.isFunction(kill) ? kill : function(){}
+  stdout = _.isFunction(stdout) ? stdout : function(){}
+  stderr = _.isFunction(stderr) ? stderr : function(){}
+  kill = _.isFunction(kill) ? kill : function(){}
+  cb = _.isFunction(arguments[arguments.length-1])
+       ? arguments[arguments.length-1]
+       : function() {}
+  var _config = config()
+  var sh = (process.platform === "win32") ? 'cmd' : 'sh'
+  var shFlag = (process.platform === "win32") ? '/c' : '-c'
+  console.log('spawning',sh, [shFlag, cmd])
+  var child = cp.spawn(sh, [shFlag, cmd], {cwd:_config.apps} )
+  kill(function(){child.kill('SIGHUP')})
+  child.stdout.on('data',function(d){stdout(d.toString().replace(/\n$/, ''))})
+  child.stderr.on('data',function(d){stderr(d.toString().replace(/\n$/, ''))})
+  child.on('exit',cb)
+  child.on('error',function(e){console.log('exec cp-error',opts,e)})
+}
 
 /**
- * execscript
+ * execscript - execute scripts which are defined in the app's package.json
  *
- * @param {String}
- * @param {Function}
- * @param {Function}
- * @param {Function}
- * @param {Function} callback, 1 argument: error
+ * the package.json of `myapp` looks like this:
+ *
+ *     { "name":"myapp", "version":"0.0.0", "scripts":{"test":"make test"} }
+ *
+ * then you can do:
+ *
+ *     execscript ( {name:'myapp',script:'test'}
+ *                , function(d){console.log('stdout:',d)}
+ *                , function(d){console.log('stderr:',d)}
+ *                , function(kill){kill()}
+ *                , function(err,stdout,stderr){} )
+ *
+ * @param {Object} has to contain fields: script and name
+ * @param {Function} 1 argument: a function which gets called on stdout-output
+ * @param {Function} 1 argument: a function which gets called on stderr-output
+ * @param {Function} 1 argument: a function which kills the process when it gets called
+ * @param {Function} callback, 1 argument: exit-code
  */
 function execscript(opts, stdout, stderr, kill, cb) {
-  cb = _.isFunction(cb) ? cb : function(){}
-  kill = _.isFunction(kill) ? kill : function(){}
   if (!opts || !opts.name || !opts.script)
-    return cb(new Error('name or script not defined'))
+    return cb(new Error('invalid arguments, name or script not defined'))
+  stdout = _.isFunction(stdout) ? stdout : function(){}
+  stderr = _.isFunction(stdout) ? stderr : function(){}
+  kill = _.isFunction(kill) ? kill : function(){}
+  cb = _.isFunction(arguments[arguments.length-1])
+       ? arguments[arguments.length-1]
+       : function() {}
   ls({name:opts.name},function(err, data){
     if (err) return cb(err)
     if ( !data[opts.name]
@@ -591,16 +627,17 @@ function execscript(opts, stdout, stderr, kill, cb) {
                          +'" has no script called "'+opts.script+'"'))
 
     var _config = config()
-    var child = cp.exec
-      ( data[opts.name].scripts[opts.script]
-      , { timeout : 1000*60*30
-        , cwd     : _config.apps+'/'+opts.name }
-      , function(err,stdout,stderr){cb(err)}
-      )
+    // yes! this is like npm is doing it
+    var sh = (process.platform === "win32") ? 'cmd' : 'sh'
+    var shFlag = (process.platform === "win32") ? '/c' : '-c'
+    var child = cp.spawn
+      ( sh, [shFlag, data[opts.name].scripts[opts.script] ]
+      , { cwd : _config.apps+'/'+opts.name } )
     kill(function(){process.kill(child.pid, 'SIGHUP')})
-    child.on('exit',function(){cb()})
-    stdout && child.stdout.on('data',function(d){stdout(d)})
-    stderr && child.stderr.on('data',function(d){stderr(d)})
+    child.stdout.on('data',function(d){stdout(d.toString().replace(/\n$/, ''))})
+    child.stderr.on('data',function(d){stderr(d.toString().replace(/\n$/, ''))})
+    child.on('exit',cb)
+    child.on('error',function(e){console.error('execscript cp-error',opts,e)})
   })
 }
 

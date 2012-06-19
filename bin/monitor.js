@@ -18,17 +18,17 @@ var nexus = require('../')
   , ee2 = new EE2({wildcard:true,delimiter:'::',maxListeners: 20})
   , fs = require('fs')
   , subscriptions = {}
-  
+
 delete _config.remotes
-  
+
 process.title = 'nexus-monitor-starter('+opti.argv.c+')'
 
 if (!process.env.NEXUS_MONITOR) {
   process.env.NEXUS_MONITOR = true
   var opts = [ __filename
              , '-c', opti.argv.c
-             , '-s', opti.argv.s 
-             , '-i', process.argv[process.argv.indexOf('-i')+1] 
+             , '-s', opti.argv.s
+             , '-i', process.argv[process.argv.indexOf('-i')+1]
              ]
   var child = spawn('node', opts, {env:process.env})
   process.exit(0)
@@ -40,11 +40,11 @@ else {
   else title = title+':'+_config.port
   process.title = title
   delete process.env.NEXUS_MONITOR
-  
+
   var startOpts = JSON.parse(opti.argv.s)
   var clientOpts = { port : _config.port
                    , host : _config.host
-                   , reconnect : 200 
+                   , reconnect : 200
                    }
   if (!_config.socket) {
     try {
@@ -98,18 +98,18 @@ function monitor(startOpts) {
   self.restartTimeout = 200
   self.env = startOpts.env
   self.env.NEXUS_MONITOR_ID = self.id
-  
+
   var logFile = self.script
-  
+
   if (logFile == __dirname+'/server.js') {
     logFile = 'nexus_server'
   }
   else if (logFile.slice(0,_config.apps.length) == _config.apps) {
     logFile = logFile.slice(_config.apps.length+1)
   }
-  
+
   logFile = logFile.replace(/[\/\s\.]/g,'_')+'.'+self.id
-  
+
   self.logScriptStdout = _config.logs+'/'+logFile+'.stdout.log'
   self.logScriptStderr = _config.logs+'/'+logFile+'.stderr.log'
   self.logMonitorStdout = _config.logs+'/'+logFile+'.monitor.stdout.log'
@@ -117,19 +117,19 @@ function monitor(startOpts) {
 
   process.stdout.pipe(fstream.Writer({path:self.logMonitorStdout,flags:'a'}))
   process.stderr.pipe(fstream.Writer({path:self.logMonitorStderr,flags:'a'}))
-  
+
   if (self.script == __dirname+'/server.js')
     self.type = 'NEXUS_SERVER_MONITOR'
   else
     self.type = 'NEXUS_MONITOR'
-  
+
   if (self.type == 'NEXUS_SERVER_MONITOR')
     start()
-  
+
   setTimeout(function(){
     if (!self.startedOnce) start()
   },500)
-  
+
   return client
 
 //------------------------------------------------------------------------------
@@ -160,7 +160,7 @@ function monitor(startOpts) {
 
   function start(cb) {
     self.startedOnce = true
-    if (self.child) 
+    if (self.child)
       return cb(new Error('is already running'))
     var env = process.env
     if (self.env) {
@@ -225,9 +225,9 @@ function monitor(startOpts) {
 //                                                        stop
 //------------------------------------------------------------------------------
 
-  function stop(cb) {                   
+  function stop(cb) {
     self.stopFlag = true
-    
+
     info(function(err,data){
       if (err) return cb(err)
       if (data.running) {
@@ -237,7 +237,7 @@ function monitor(startOpts) {
         self.child.once('exit',function(){
           self.stopFlag = false
           clearTimeout(timer)
-          info(function(err,data){    
+          info(function(err,data){
             cb && cb(err,data)
             if (!self.restartFlag) process.exit(0)
           })
@@ -286,6 +286,6 @@ function monitor(startOpts) {
         , max : self.max
         } )
   }
-  
+
 }
 

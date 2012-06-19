@@ -208,7 +208,7 @@ help.start      = [ 'nexus start [<startOptions>] <appName> [<appOptions>]'
                   , '               : appPath+"/server.js" exists || appPath+"/app.js" exists      '
                   , ' (E)             ? script = appName+"/server.js" || appName+"/app.js"         '
                   , '                 : invalid startScript                                        '
-                  , '           : invalid startScript                                              ' 
+                  , '           : invalid startScript                                              '
                   ].join('\n')
 help.restart    = [ 'nexus restart <id> .. restarts the program (not the monitor)'
                   , 'nexus restart <id1> <id2>'
@@ -223,14 +223,15 @@ help.exec       = [ 'nexus exec <cmd>'
                   , ''
                   , 'examples:'
                   , ''
-                  , '  nexus exec node -e "console.log(\'hello world\')"'
+                  , '  nexus exec whoami && pwd && ls'
+                  , '  nexus exec "node -e \\"setInterval(function(){console.log(\'hello world\')},500)\\""'
                   , '  nexus exec node appName/path/to/script.js'
                   , '  nexus exec ~/myScript.sh'
-                  , '  nexus -r foo exec cat ~/.nexus/nexus.db > ~/.nexus/nexus.db && nexus server reboot'
+                  , '  nexus exec ls'
                   , ''
                   , 'notes:'
                   , ''
-                  , '  * the process is started with require("child_process").exec()'
+                  , '  * cwd is set to nexus-apps-directory, so `nexus exec ls` will list all installed apps'
                   , '  * the process will not be restarted upon crash'
                   , '    `nexus exec foo start` is not like `nexus start foo`!'
                   , '  * you can kill the process with `^C`'
@@ -238,13 +239,21 @@ help.exec       = [ 'nexus exec <cmd>'
 help.execscript = [ 'nexus execscript [<appName> <scriptName>]'
                   , ''
                   , 'examples:'
+
+                  , ' the package.json of `myapp` looks like this:
+                  , '
+                  , '     { "name":"myapp", "version":"0.0.0", "scripts":{"test":"make test"} }
+                  , '
+                  , ' then you can do:
+                  , '
+                  , '     nexus execscript myapp test'
                   , ''
-                  , '  nexus execscript foo test .. will run the apps.foo.package.scripts.test -script'
+                  , ' and it will run `make test` in `myapp/.`'
                   , ''
                   , 'notes:'
                   , ''
+                  , '  * cwd is set to the apps directory
                   , '  * do `nexus ls --scripts` to list available scripts'
-                  , '  * the script is started with require("child_process").exec()'
                   , '  * the script will not be restarted upon crash'
                   , '    `nexus execscript foo start` is not like `nexus start foo`!'
                   , '  * you can kill the running script with `^C`'
@@ -329,6 +338,7 @@ else {
     if ((err.code == 'ECONNREFUSED' || err.code == 'ENOENT') && !argvNexus.r) {
       if (['version','config','ls','install','uninstall'
           ,'server','logs','start'
+          ,'exec2'
           ].indexOf(argv._[0]) != -1) {
         // no running server required
         parseArgs()
@@ -410,7 +420,24 @@ function parseArgs() {
       nexus.stopall(exit)
       break
     case 'exec':
-      exit('not implemented yet')
+      var opts = (process.argv.slice(process.argv.indexOf(cmd)+1)).join(' ')
+      var stdout = function(data) {console.log('stdout →',data)}
+      var stderr = function(data) {console.log('stderr →',data)}
+      var kill = function(killIt) {
+        var stdin = process.openStdin()
+        require('tty').setRawMode(true)
+        stdin.on('keypress', function (chunk, key) {
+          if (key && key.ctrl && key.name == 'c') {
+            console.log('killing processes')
+            killIt(exit())
+          }
+        })
+      }
+      var done = function(err) {exit(err)}
+      if (cmd=='exec2')
+        exec(opts, stdout, stderr, kill, done)
+      else
+        nexus.exec(opts, stdout, stderr, kill, done)
       break
     case 'execscript':
       var opts = {}
@@ -431,7 +458,7 @@ function parseArgs() {
         })
       }
       var done = function(err) {exit(err)}
-      nexus.runscript(opts, stdout, stderr, kill, done)
+      nexus.execscript(opts, stdout, stderr, kill, done)
       break
     case 'logs':
       var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}
@@ -443,7 +470,7 @@ function parseArgs() {
     case 'sub':
     case 'subscribe':
       var emit = function(event, data) {
-        var val = data ? data.toString().replace(/\n$/, '') : '•' 
+        var val = data ? data.toString().replace(/\n$/, '') : '•'
         console.log(event,'→',val)
       }
       nexus.subscribe(argv._[0], emit)
