@@ -50,6 +50,10 @@ var opti = require('optimist')
 
 process.title = 'nexus-v'+_pkg.version
 
+// node@0.6.x compat
+fs.exists = fs.exists || path.exists
+fs.existsSync = fs.existsSync || path.existsSync
+
 var help = {}
 help.version    = [ 'nexus version .. will print the version of installed nexus'
                   , '                 if the nexus-server is running it will'
@@ -364,7 +368,7 @@ function parseArgs() {
         nexus.install({package:pkg, name:argv._[1]}, exit)
       }
       else {
-        path.exists(process.cwd()+'/'+pkg,function(exists){
+        fs.exists(process.cwd()+'/'+pkg,function(exists){
           if (exists) pkg = process.cwd()+'/'+pkg
           nexus.install({package:pkg, name:argv._[1]}, exit)
         })
@@ -397,7 +401,7 @@ function parseArgs() {
         nexus.start(opts, exit)
       }
       else {
-        path.exists(process.cwd()+'/'+script,function(exists){
+        fs.exists(process.cwd()+'/'+script,function(exists){
           if (exists) script = process.cwd()+'/'+script
           nexus.start(opts, exit)
         })
