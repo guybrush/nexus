@@ -15,12 +15,14 @@ if (config.socket) title = title+':'+config.socket
 process.title = title
 
 readKeys(function(err){
+  if (err) throw new Error(err)
   startServer(function(err, remote){
+    if (err) throw new Error(err)
     var dbPath = config.socket
                  ? config.dbs+'/'+(config.socket.replace(/\//g,'_'))
                  : config.dbs+'/'+config.port
     initDb(dbPath,process.env.NEXUS_REBOOT,remote,function(err){
-      if (err) console.log('err:',err)
+      if (err) console.error(err)
     })
   })
 })
@@ -30,7 +32,7 @@ function readKeys(cb) {
     try {
       opts.key = fs.readFileSync(config.key)
     } catch(e) {
-      throw new Error('could not use key-file '+config.key)
+      return cb(new Error('could not use key-file '+config.key))
     }
   }
 
@@ -38,7 +40,7 @@ function readKeys(cb) {
     try {
       opts.cert = fs.readFileSync(config.cert)
     } catch(e) {
-      throw new Error('could not use cert-file '+config.cert)
+      return cb(new Error('could not use cert-file '+config.cert))
     }
   }
 
@@ -51,7 +53,7 @@ function readKeys(cb) {
           fs.readFile(config.ca+'/'+x,next)
         }).done(function(err, data){
           if (err)
-            throw new Error('could not add cert-files to ca',err)
+            return cb (new Error(err))
           opts.ca = data
           cb()
         }).exec()
@@ -73,8 +75,7 @@ function initDb(dbPath,rebootFlag,remote,cb) {
   new AA(todo).forEachSerial(function(x,i,next){x(next)}).done(cb).exec()
 
   function reboot(cb) {
-    var db = dirty(dbPath).on('load',function(err){
-      if (err) cb(err)
+    var db = dirty(dbPath).on('load',function(){
       db.forEach(function(k,v){
         console.log('rebooting',v)
         if (v) nexus.start(v)
@@ -122,7 +123,8 @@ function initDb(dbPath,rebootFlag,remote,cb) {
 
 function startServer(cb) {
   if (config.socket) {
-    checkSocket(config.socket,function(){
+    checkSocket(config.socket,function(err){
+      if (err) return cb(new Error(err))
       var unixServer = dnode(nexus).listen(config.socket)
       unixServer.on('ready',function(){
         console.log('started unix-server '+config.socket)
@@ -169,7 +171,7 @@ function checkSocket(path,cb) {
   fs.exists(path,function(exists){
     if (!exists) return cb()
     fs.unlink(config.socket,function(err){
-      if (err) return cb(err)
+      if (err) return cb(new Error(err))
       cb()
     })
   })
