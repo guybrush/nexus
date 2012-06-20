@@ -77,7 +77,7 @@ function initDb(dbPath,rebootFlag,remote,cb) {
       if (err) cb(err)
       db.forEach(function(k,v){
         console.log('rebooting',v)
-        nexus.start(v)
+        if (v) nexus.start(v)
       })
       cb()
     })

@@ -40,8 +40,6 @@ var fs      = require('fs')
 fs.exists = fs.exists || path.exists
 fs.existsSync = fs.existsSync || path.existsSync
 
-ee2.onAny(function(data){debug(this.event,'→',data)})
-
 /**
  * nexus
  *
@@ -68,7 +66,7 @@ function nexus(configParam, cb) {
     this.logs       = logs
     this.remote     = remote
     this.server     = server
-    this.subscribe  = function(event, emit, cb) {
+    this.subscribe  = function subscribe(event, emit, cb) {
       if (event == '*' || event == 'all') event = '**'
       if (!subscriptions[event]) {
         subscriptions[event] = {}
@@ -81,7 +79,7 @@ function nexus(configParam, cb) {
       subscriptions[event][conn.id] = emit
       cb && cb()
     }
-    this.unsubscribe = function(events, cb) {
+    this.unsubscribe = function unsubscribe(events, cb) {
       cb = _.isFunction(arguments.length-1) ? arguments.length-1 : function(){}
       events = _.isString(events)
                ? [events]
@@ -465,19 +463,17 @@ function ps(opts, cb) {
  *                   about started applications
  */
 function start(opts, cb) {
-  debug('starting',opts.script)
   cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
        : function() {}
-
   opts = (_.isObject(opts) && Object.keys(opts).length>0)
          ? opts : null
-
+  debug('starting',opts.script)
   if (!opts) return cb(new Error('no start-options defined'))
 
   parseStart(opts, function(err, data){
     if (err) return cb(err)
-    debug('parsedStart',data.script)
+    debug('parsedStart',data)
     genId(function(err,id){
       debug('starting monitor',id,data.script)
       ee2.on('monitor::'+id+'::connected',function(){
@@ -852,7 +848,7 @@ function server(opts, cb) {
  * @param {Function} callback, 2 arguments: error, data
  */
 function parseStart(opts, cb) {
-  debug('parsing start-options',opts.script)
+  debug('parsing start-options',opts)
   var result = {}
   opts = opts || {}
 
@@ -864,15 +860,15 @@ function parseStart(opts, cb) {
   result.env = opts.env || {}
   result.cwd = opts.cwd || process.cwd()
   result.max = opts.max
-  result.name = 'unnamed'
+  result.name = opts.name || null
   result.package = opts.package || null
 
   var _config = config()
   var maybeApp = opts.script.split('/')[0]
     , appPath = null
   if (fs.existsSync(_config.apps+'/'+maybeApp)) {
-    // console.log('---- A')
-    result.name = maybeApp.split('/')[0]
+    debug('===== A =====')
+    result.name = result.name || maybeApp.split('/')[0]
     appPath = _config.apps+'/'+maybeApp
     try {
       result.package = JSON.parse(fs.readFileSync(appPath+'/package.json','utf-8'))
@@ -880,13 +876,14 @@ function parseStart(opts, cb) {
   }
 
   // handle `nexus start /some/file`
-  result.script = /^\//.test(opts.script) ? opts.script : null
+  if (/^\//.test(opts.script) && fs.existsSync(opts.script))
+    result.script = opts.script
 
   // handle `nexus start appName/path/to/script`
   if (!result.script && /\//.test(opts.script)) {
     if (fs.existsSync(_config.apps+'/'+opts.script)) {
-      // console.log('---- B')
-      result.name = opts.script.split('/')[0]
+      debug('===== B =====')
+      result.name = result.name || opts.script.split('/')[0]
       result.script = _config.apps+'/'+opts.script
     }
   }
@@ -896,7 +893,7 @@ function parseStart(opts, cb) {
     if (result.package
         && result.package.scripts
         && result.package.scripts.start) {
-      // console.log('---- C')
+      debug('===== C =====')
       var startScript = result.package.scripts.start
       if (/\w/.test(startScript)) {
         var split = startScript.split(' ')
@@ -917,7 +914,7 @@ function parseStart(opts, cb) {
     }
     else if (result.package
              && result.package.bin) {
-      // console.log('---- D')
+      debug('===== D =====')
       var startScript
       if (_.isString(result.package.bin)) {
         if (!fs.existsSync(path.join(appPath,result.package.bin)))
@@ -931,7 +928,7 @@ function parseStart(opts, cb) {
       }
     }
     else if (appPath) {
-      // console.log('---- E')
+      debug('===== E =====')
       var serverJsExists = fs.existsSync(appPath+'/server.js')
       var appJsExists = fs.existsSync(appPath+'/app.js')
       if (serverJsExists) result.script = appPath+'/server.js'
