@@ -122,38 +122,55 @@ function initDb(dbPath,rebootFlag,remote,cb) {
 
 function startServer(cb) {
   if (config.socket) {
-    var unixServer = dnode(nexus).listen(config.socket)
-    unixServer.on('ready',function(){
-      console.log('started unix-server '+config.socket)
-      var client = dnode({type:'NEXUS_PROXY'})
-      client.connect(config.socket,function(rem,conn){
-        var server = dnode(rem).listen(opts)
-        server.on('error',function(err){
-          console.error(err)
+    checkSocket(config.socket,function(){
+      var unixServer = dnode(nexus).listen(config.socket)
+      unixServer.on('ready',function(){
+        console.log('started unix-server '+config.socket)
+        var client = dnode({type:'NEXUS_PROXY'})
+        client.connect(config.socket,function(rem,conn){
+          console.log('starting net-server',opts)
+          var server = dnode(rem).listen(opts)
+          server.on('error',function(err){
+            console.error('net-server error',err)
+          })
+          server.on('ready',function(){
+            cb(null,rem)
+          })
         })
-        server.on('ready',function(){
-          cb(null,rem)
+        client.on('error',function(e){
+          console.error('socket-client error',e)
         })
       })
-      client.on('error',function(e){
-        console.error(e)
+      unixServer.on('error',function(err){
+        console.error('unix-server error',err)
       })
-    })
-    unixServer.on('error',function(err){
-      console.error(err)
     })
     return
   }
+  console.log('starting net-server',opts)
   var server = dnode(nexus).listen(opts)
   server.on('error',function(err){
-    console.error(err)
+    console.error('net-server error',err)
   })
   server.on('ready',function(){
-    console.log('started server',opts)
+    console.log('started net-server',opts)
     var client = dnode({type:'NEXUS_PROXY'})
     var clientOpts = {port:opts.port,host:opts.host,key:opts.key,cert:opts.cert}
     client.connect(clientOpts,function(rem,conn){
       cb(null,rem)
+    })
+    client.on('error',function(e){
+      console.error('net-client error',e)
+    })
+  })
+}
+
+function checkSocket(path,cb) {
+  fs.exists(path,function(exists){
+    if (!exists) return cb()
+    fs.unlink(config.socket,function(err){
+      if (err) return cb(err)
+      cb()
     })
   })
 }

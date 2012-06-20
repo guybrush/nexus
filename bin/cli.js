@@ -239,20 +239,20 @@ help.exec       = [ 'nexus exec <cmd>'
 help.execscript = [ 'nexus execscript [<appName> <scriptName>]'
                   , ''
                   , 'examples:'
-
-                  , ' the package.json of `myapp` looks like this:
-                  , '
-                  , '     { "name":"myapp", "version":"0.0.0", "scripts":{"test":"make test"} }
-                  , '
-                  , ' then you can do:
-                  , '
+                  , ''
+                  , ' the package.json of `myapp` looks like this:'
+                  , ''
+                  , '     { "name":"myapp", "version":"0.0.0", "scripts":{"test":"make test"} }'
+                  , ''
+                  , ' then you can do:'
+                  , ''
                   , '     nexus execscript myapp test'
                   , ''
                   , ' and it will run `make test` in `myapp/.`'
                   , ''
                   , 'notes:'
                   , ''
-                  , '  * cwd is set to the apps directory
+                  , '  * cwd is set to the apps directory'
                   , '  * do `nexus ls --scripts` to list available scripts'
                   , '  * the script will not be restarted upon crash'
                   , '    `nexus execscript foo start` is not like `nexus start foo`!'
@@ -325,12 +325,6 @@ else {
   client.connect(opts, function(remote, conn){
     _conn = conn
     nexus = remote
-    // process.stdin.resume()
-    // process.stdin.on('data',function(data) {
-    //   var cmd = data.toString().replace('\n','')
-    //   argv = opti(cmd.split(' ')).argv
-    //   parseArgs()
-    // })
     parseArgs()
     conn.on('end',function(){exit('disconnected from server')})
   })
@@ -338,7 +332,6 @@ else {
     if ((err.code == 'ECONNREFUSED' || err.code == 'ENOENT') && !argvNexus.r) {
       if (['version','config','ls','install','uninstall'
           ,'server','logs','start'
-          ,'exec2'
           ].indexOf(argv._[0]) != -1) {
         // no running server required
         parseArgs()
@@ -433,11 +426,7 @@ function parseArgs() {
           }
         })
       }
-      var done = function(err) {exit(err)}
-      if (cmd=='exec2')
-        exec(opts, stdout, stderr, kill, done)
-      else
-        nexus.exec(opts, stdout, stderr, kill, done)
+      nexus.exec(opts, stdout, stderr, kill, exit)
       break
     case 'execscript':
       var opts = {}
@@ -445,8 +434,8 @@ function parseArgs() {
       opts.script = argv._[1]
       if (!opts.name || !opts.script)
         return exit(new Error('no name or script defined'))
-      var stdout = function(data) {console.log('stdout →',data.replace(/\n$/, ''))}
-      var stderr = function(data) {console.log('stderr →',data.replace(/\n$/, ''))}
+      var stdout = function(data) {console.log('stdout →',data)}
+      var stderr = function(data) {console.log('stderr →',data)}
       var kill = function(killIt) {
         var stdin = process.openStdin()
         require('tty').setRawMode(true)
@@ -457,8 +446,7 @@ function parseArgs() {
           }
         })
       }
-      var done = function(err) {exit(err)}
-      nexus.execscript(opts, stdout, stderr, kill, done)
+      nexus.execscript(opts, stdout, stderr, kill, exit)
       break
     case 'logs':
       var opts = {cmd:argvCmd._[0], id:argvCmd._[1], lines:argvCmd.n}

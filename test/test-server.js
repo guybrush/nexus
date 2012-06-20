@@ -61,7 +61,7 @@ module.exports =
       var client = dnode().connect(common.config.socket,{reconnect:100},function(r,c){
         remote = r
         conn = c
-        c.on('remote',function(){ee.emit('remote')})
+        ee.emit('remote')
         c.on('end',function(){remote = null; conn = null})
       })
       client.on('error',function(er){console.log('client-error',er)})
