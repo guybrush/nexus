@@ -378,7 +378,9 @@ function parseArgs() {
       break
     case 'rm':
     case 'uninstall':
-      nexus.uninstall(argv._[0], exit)
+      new AA(argv._).forEach(function(x,i,next){
+        nexus.uninstall(x,next)
+      }).done(exit).exec()
       break
     case 'ps':
       var opts = {}
