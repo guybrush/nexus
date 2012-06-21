@@ -29,6 +29,7 @@ var fs      = require('fs')
   , ncp     = require('ncp')
   , _pkg    = require('./package.json')
   , debug   = require('debug')('nexus')
+  , pstree  = require('ps-tree')
   , apps = {}
   , monitors = {}
   , serverMonitor = null
@@ -577,7 +578,18 @@ function exec(cmd, stdout, stderr, kill, cb) {
   var shFlag = (process.platform === "win32") ? '/c' : '-c'
   console.log('spawning',sh, [shFlag, cmd])
   var child = cp.spawn(sh, [shFlag, cmd], {cwd:_config.apps} )
-  kill(function(){child.kill('SIGHUP')})
+  kill(function(){
+    var tokill = []
+    pstree(child.pid, function(err, children){
+      children.map(function(p){
+        tokill.push(p.PID)
+      })
+      tokill.unshift(child.pid)
+      tokill.forEach(function(x){
+        process.kill(x)
+      })
+    })
+  })
   child.stdout.on('data',function(d){stdout(d.toString().replace(/\n$/, ''))})
   child.stderr.on('data',function(d){stderr(d.toString().replace(/\n$/, ''))})
   child.on('exit',cb)
@@ -629,7 +641,18 @@ function execscript(opts, stdout, stderr, kill, cb) {
     var child = cp.spawn
       ( sh, [shFlag, data[opts.name].scripts[opts.script] ]
       , { cwd : _config.apps+'/'+opts.name } )
-    kill(function(){process.kill(child.pid, 'SIGHUP')})
+    kill(function(){
+      var tokill = []
+      pstree(child.pid, function(err, children){
+        children.map(function(p){
+          tokill.push(p.PID)
+        })
+        tokill.unshift(child.pid)
+        tokill.forEach(function(x){
+          process.kill(x)
+        })
+      })
+    })
     child.stdout.on('data',function(d){stdout(d.toString().replace(/\n$/, ''))})
     child.stderr.on('data',function(d){stderr(d.toString().replace(/\n$/, ''))})
     child.on('exit',cb)

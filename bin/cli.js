@@ -11,11 +11,12 @@ var opti = require('optimist')
   , nexus = require('../')(argvNexus.c)
   , _config = nexus.config()
   , _pkg = require('../package.json')
-  , opti = require('optimist')
+  , readline = require('readline')
   , dnode = require('dnode')
   , fs = require('fs')
   , path = require('path')
   , _ = require('underscore')
+  , nodeMinorVersion = parseInt(process.versions.node.split('.')[1])
   , _conn
   , usage =
     [ ' ___  ___  _ _  _ _  ___'
@@ -53,6 +54,7 @@ process.title = 'nexus-v'+_pkg.version
 // node@0.6.x compat
 fs.exists = fs.exists || path.exists
 fs.existsSync = fs.existsSync || path.existsSync
+process.stdin.setRawMode = process.stdin.setRawMode || require('tty').setRawMode 
 
 var help = {}
 help.version    = [ 'nexus version .. will print the version of installed nexus'
@@ -420,15 +422,24 @@ function parseArgs() {
       var opts = (process.argv.slice(process.argv.indexOf(cmd)+1)).join(' ')
       var stdout = function(data) {console.log('stdout →',data)}
       var stderr = function(data) {console.log('stderr →',data)}
-      var kill = function(killIt) {
-        var stdin = process.openStdin()
-        require('tty').setRawMode(true)
-        stdin.on('keypress', function (chunk, key) {
-          if (key && key.ctrl && key.name == 'c') {
+      var kill = function(killIt) { 
+        if (nodeMinorVersion >= 7) {
+          var rl = readline.createInterface({input:process.stdin,output:process.stdout})
+          rl.on('SIGINT',function(){
             console.log('killing processes')
-            killIt(exit())
-          }
-        })
+            killIt()
+          })
+        }
+        else {
+          var stdin = process.openStdin()
+          require('tty').setRawMode(true)
+          stdin.on('keypress', function (chunk, key) {
+            if (key && key.ctrl && key.name == 'c') {
+              console.log('killing processes')
+              killIt(exit())
+            }
+          })
+        }
       }
       nexus.exec(opts, stdout, stderr, kill, exit)
       break
@@ -437,18 +448,27 @@ function parseArgs() {
       opts.name = argv._[0]
       opts.script = argv._[1]
       if (!opts.name || !opts.script)
-        return exit(new Error('no name or script defined'))
+        return exit('no name or script defined')
       var stdout = function(data) {console.log('stdout →',data)}
       var stderr = function(data) {console.log('stderr →',data)}
       var kill = function(killIt) {
-        var stdin = process.openStdin()
-        require('tty').setRawMode(true)
-        stdin.on('keypress', function (chunk, key) {
-          if (key && key.ctrl && key.name == 'c') {
+        if (nodeMinorVersion >= 7) {
+          var rl = readline.createInterface({input:process.stdin,output:process.stdout})
+          rl.on('SIGINT',function(){
             console.log('killing processes')
-            killIt(exit())
-          }
-        })
+            killIt()
+          })
+        }
+        else {
+          var stdin = process.openStdin()
+          require('tty').setRawMode(true)
+          stdin.on('keypress', function (chunk, key) {
+            if (key && key.ctrl && key.name == 'c') {
+              console.log('killing processes')
+              killIt(exit())
+            }
+          })
+        }
       }
       nexus.execscript(opts, stdout, stderr, kill, exit)
       break
