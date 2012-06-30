@@ -91,7 +91,11 @@ function plan(todo,cb) {
 }
 
 function cleanup(cb) {
-  rimraf(__dirname+'/root',cb)
+  try {
+    rimraf(__dirname+'/root',cb)
+  } catch(e) {
+    cb()
+  }
 }
 
 function ee2log(name){

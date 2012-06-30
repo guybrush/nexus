@@ -21,21 +21,22 @@ var fs      = require('fs')
   , _       = require('underscore')
   , fstream = require('fstream')
   , AA      = require('async-array')
-  , EE2     = require('eventemitter2').EventEmitter2
-  , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners:20})
   , rimraf  = require('rimraf')
   , npm     = require('npm')
   , mkdirp  = require('mkdirp')
   , ncp     = require('ncp')
-  , _pkg    = require('./package.json')
   , debug   = require('debug')('nexus')
   , pstree  = require('ps-tree')
+  , EE2     = require('eventemitter2').EventEmitter2
+  , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners:20})
+  , _pkg    = require('./package.json')
+  , _config = null
+  , userConfig = null
   , apps = {}
   , monitors = {}
   , serverMonitor = null
   , subscriptions = {}
   , subscriptionListeners = {}
-  , userConfig = null
 
 // node@0.6.x compat
 fs.exists = fs.exists || path.exists
@@ -173,7 +174,10 @@ function version(cb) {
  * @return {Object} config
  */
 function config(cb) {
-
+  if (_config) {
+    cb && cb(null, _config)
+    return _config
+  }
   var currConfig = {}
     , fileConfig = {}
     , home = ( process.platform === "win32"
