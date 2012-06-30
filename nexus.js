@@ -792,12 +792,19 @@ function server(opts, cb) {
       return cb(new Error('server is already running'))
     var _config = config()
     delete _config.remotes
-    var env = { NEXUS_CONFIG : JSON.stringify(_config) }
-    if (opts.debug) env.NODE_DEBUG = opts.debug
-    if (opts.cmd == 'reboot') env.NEXUS_REBOOT = true
+    var env = {}
+    var options = []
+    if (userConfig) 
+      options = options.concat(['-c',JSON.stringify(userConfig)])
+    if (opts.cmd == 'reboot')
+      options.push('-r')
+    if (opts.debug) 
+      env.NODE_DEBUG = opts.debug
+    
     var startOpts =
       { script: __dirname+'/bin/server.js'
       , command: 'node'
+      , options: options
       , package: _pkg
       , env: env
       }

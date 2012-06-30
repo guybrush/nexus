@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 
+// cli-options:
+//
+// -c <JSON.stringified config or path to conf-file>
+// -r  .. reboot-flag
+
 var fs = require('fs')
   , dnode = require('dnode')
   , AA = require('async-array')
   , dirty = require('dirty')
-  , config = JSON.parse(process.env.NEXUS_CONFIG)
-  , nexus = require('../nexus')(config)
+  , opti = require('optimist')
+  , _reboot = opti.argv.r
+  , _config = opti.argv.c ? JSON.parse(opti.argv.c) : {}
+  , nexus = require('../nexus')(_config)
+  , config = nexus.config()
   , opts = { port : config.port
            , host : config.host }
 
@@ -21,7 +29,7 @@ readKeys(function(err){
     var dbPath = config.socket
                  ? config.dbs+'/'+(config.socket.replace(/\//g,'_'))
                  : config.dbs+'/'+config.port
-    initDb(dbPath,process.env.NEXUS_REBOOT,remote,function(err){
+    initDb(dbPath,_reboot,remote,function(err){
       if (err) console.error(err)
     })
   })
