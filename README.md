@@ -20,17 +20,19 @@
   `require('child_process').spawn`'ed child-process of a monitor-server -
   which itself will connect (and reconnect) to its own child-process.
 * nexus shells out into [npm], is built upon [dnode] and is inspired by
-  [forever]. (currently nexus depends on a [fork] of npm, which caches 
-  git-remotes - so it has not to clone a fresh repository everytime, it will 
-  just fetch deltas)
+  [forever]. (currently nexus depends on a [fork] of npm, which caches
+  git-remotes - so it has not to clone a fresh repository everytime, it will
+  just fetch deltas).
 * all the config, logs and programs live in `~/.nexus` by default.
-* nexus is still *super-alpha*.
+* nexus is still *super-alpha*. you may want to checkout [fleet] which does
+  similiar things differently and is maybe what you are looking for!
 
 [dnode]: https://github.com/substack/dnode
 [forever]: https://github.com/nodejitsu/forever
 [node]: http://nodejs.org
 [npm]: https://npmjs.org
 [fork]: https://github.com/guybrush/npm/tree/cacheGitRemotes
+[fleet]: https://github.com/substack/fleet
 
 ## install
 
@@ -70,7 +72,7 @@ note: ps, restart, stop, stopall, subscribe and `logs clean`
 you can pass a string or an object to the nexus-constructor or use the (`-c`)
 option with the cli. if you pass a string it will will be `require(string)`'ed.
 
-if you dont pass any config-option the nexus-cli will create a 
+if you dont pass any config-option the nexus-cli will create a
 `~/.nexus`-directory if it doesnt exist and put all the configs and logs there.
 it will try to `require('~/.nexus/config.js')` per default.
 
