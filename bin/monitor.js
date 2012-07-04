@@ -97,7 +97,7 @@ function monitor(startOpts) {
   self.env = startOpts.env
   self.restartTimeout = 200
   self.env = startOpts.env
-  self.env.NEXUS_MONITOR_ID = self.id
+  self.env.NEXUS_ID = self.id
 
   var logFile = self.script
 
