@@ -38,8 +38,8 @@ var fs      = require('fs')
   , userConfig = null
 
 // node@0.6.x compat
-fs.exists = fs.exists || path.exists
-fs.existsSync = fs.existsSync || path.existsSync
+fs.exists = fs.exists || fs.exists
+fs.existsSync = fs.existsSync || fs.existsSync
 
 /**
  * nexus
