@@ -53,7 +53,7 @@ process.title = 'nexus-v'+_pkg.version
 
 // node@0.6.x compat
 fs.exists = fs.exists || fs.exists
-fs.existsSync = fs.existsSync || path.existsSync
+fs.existsSync = fs.existsSync || fs.existsSync
 process.stdin.setRawMode = process.stdin.setRawMode || require('tty').setRawMode 
 
 var help = {}
