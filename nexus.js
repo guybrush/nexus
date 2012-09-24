@@ -686,11 +686,11 @@ N.connect = function connect(opts,cb) {
     return client
   }
   function onError(err) {
-    if (!opts.reconnect && err) return cb(err)
+    if (!opts.reconnect && err) return
     setTimeout(connect,opts.reconnect)
   }
   
-  connect()
+  return connect()
 }
 
 /**

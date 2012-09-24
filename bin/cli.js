@@ -82,6 +82,7 @@ else {
     N = remote
     parseArgs('remote')
   })
+  client.on('error',exit)
 }
 
 function parseArgs(type) {
