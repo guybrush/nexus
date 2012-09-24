@@ -1,993 +1,853 @@
-  //
- // nexus (remote program installation and control)
-//
+exports = module.exports = function(opts){
+  var n = new Nexus(opts)
+  return n
+}
 
-module.exports = nexus
-nexus.version = version
-nexus.config = config
-nexus.ls = ls
-nexus.install = install
-nexus.uninstall = uninstall
-nexus.start = start
-nexus.exec = exec
-nexus.execscript = execscript
-nexus.logs = logs
-nexus.server = server
+exports.Nexus = Nexus
+exports.config = config
+exports.objPath = objPath
+exports.objFilter = objFilter
+exports.genId = genId
+exports.readTlsKeys = readTlsKeys
+exports.readNexus = readNexus
+exports.readPackage = readPackage
+exports.readGit = readGit
+exports.monStatus = monStatus
+exports.monRestart = monRestart
+exports.monStop = monStop
 
 var fs      = require('fs')
   , path    = require('path')
   , cp      = require('child_process')
+  , util    = require('util')
+  , opti    = require('optimist')
   , dnode   = require('dnode')
   , _       = require('underscore')
-  , fstream = require('fstream')
-  , AA      = require('async-array')
+  , net     = require('net')
+  , tls     = require('tls')
   , rimraf  = require('rimraf')
-  , npm     = require('npm')
+  , dirty   = require('dirty')
   , mkdirp  = require('mkdirp')
-  , ncp     = require('ncp')
-  , debug   = require('debug')('nexus')
   , pstree  = require('ps-tree')
+  , async   = require('async')
   , EE2     = require('eventemitter2').EventEmitter2
-  , ee2     = new EE2({wildcard:true,delimiter:'::',maxListeners:20})
-  , _pkg    = require('./package.json')
-  , _config = null
-  , userConfig = null
-  , apps = {}
-  , monitors = {}
-  , serverMonitor = null
-  , subscriptions = {}
-  , subscriptionListeners = {}
+  , crypto  = require('crypto')
+  , debug   = require('debug')('nexus')
+  , _config, _configStringified
 
 // node@0.6.x compat
 fs.exists = fs.exists || path.exists
 fs.existsSync = fs.existsSync || path.existsSync
 
 /**
- * nexus
- *
- * @param {String|Object} config
- * @return {dnode-middleware}
+ * @param {Object} options
  */
-function nexus(configParam, cb) {
-  userConfig = configParam
-  // userConfig = configParam
-  function dnodeServer(remote, conn) {
-    var self = this
-    this.version    = version
-    this.config     = config
-    this.ls         = ls
-    this.install    = install
-    this.uninstall  = uninstall
-    this.ps         = ps
-    this.start      = start
-    this.restart    = restart
-    this.stop       = stop
-    this.stopall    = stopall
-    this.exec       = exec
-    this.execscript = execscript
-    this.logs       = logs
-    this.remote     = remote
-    this.server     = server
-    this.subscribe  = function subscribe(event, emit, cb) {
-      if (event == '*' || event == 'all') event = '**'
-      if (!subscriptions[event]) {
-        subscriptions[event] = {}
-        subscriptionListeners[event] = function(data){
-          var self = this
-          _.each(subscriptions[event],function(x,i){x(self.event,data)})
-        }
-        ee2.on(event,subscriptionListeners[event])
-      }
-      subscriptions[event][conn.id] = emit
-      cb && cb()
-    }
-    this.unsubscribe = function unsubscribe(events, cb) {
-      cb = _.isFunction(arguments.length-1) ? arguments.length-1 : function(){}
-      events = _.isString(events)
-               ? [events]
-               : (_.isArray(events) && events.length>0)
-                 ? events
-                 : Object.keys(subscriptions)
+function Nexus(opts) {
+  var self = this
+  EE2.call(self,{wildcard:true,delimiter:'::',maxListeners:20})
+  try { self.package = require('./package.json') } catch(e) {}
+  self.servers = {}
+  self.monitors = {}
+  _config = self._config = config(opts)
+  _configStringified = JSON.stringify(_config)
+  self.initDb()
+  return self
+}
 
-      var remaining = []
-      _.each(subscriptions,function(x,i){
-        if (!x[conn.id]) return
-        if (!~events.indexOf(i)) return remaining.push(i)
-        delete x[conn.id]
-        if (Object.keys(x).length == 0) {
-          ee2.removeListener(subscriptionListeners[i])
-          delete subscriptionListeners[i]
-        }
-      })
-      cb(null, remaining)
-    }
-    conn.on('remote',function(rem){
-      if (!rem.type || !rem.id) return
-      if (rem.type == 'NEXUS_MONITOR') {
-        monitors[rem.id+''] = rem
-        rem.subscribe(function(event,data){
-          ee2.emit('monitor::'+rem.id+'::'+event,data)
-        },function(){
-          ee2.emit('monitor::'+rem.id+'::connected')
-        })
-        conn.on('end',function(){
-          ee2.emit('monitor::'+rem.id+'::disconnected')
-          delete monitors[rem.id]
-          self.unsubscribe()
-        })
-      }
-      if (rem.type == 'NEXUS_SERVER_MONITOR') {
-        if (serverMonitor) return rem.stop()
-        serverMonitor = rem
-        rem.subscribe(function(event,data){
-          ee2.emit('server::'+rem.id+'::'+event,data)
-        },function(){
-          ee2.emit('server::'+rem.id+'::connected')
-        })
-        conn.on('end',function(){
-          ee2.emit('server::'+rem.id+'::disconnected')
-          self.unsubscribe()
-        })
-      }
-      if (rem.type == 'NEXUS_APP') {
-        if (!monitors[rem.id+''] || apps[rem.id+'']) {
-          conn.end()
-          return
-        }
-        apps[rem.id+''] = rem
-        ee2.emit('app::'+rem.id+'::connected')
-        conn.on('end',function(){
-          ee2.emit('app::'+rem.id+'::disconnected')
-          delete apps[rem.id+'']
-        })
-      }
-    })
-  }
-  dnodeServer.version = version
-  dnodeServer.config = config
-  dnodeServer.ls = ls
-  dnodeServer.install = install
-  dnodeServer.uninstall = uninstall
-  dnodeServer.start = start
-  dnodeServer.exec = exec
-  dnodeServer.execscript = execscript
-  dnodeServer.logs = logs
-  dnodeServer.server = server
-  return dnodeServer
+var N = Nexus.prototype = new EE2
+
+/**
+ * @param {Function} cb with 2 args: err, version
+ */
+N.config = function config(cb) {
+  cb(null, this._config)
 }
 
 /**
- * version
+ * install an application
  *
- * @param {Function} callback - arguments: error, version-number
- * @return {String} version-number
- */
-function version(cb) {
-  cb && cb(null, _pkg.version)
-  return _pkg.version
-}
-
-/**
- * config
- *
- * @param {Function} callback - arguments: error, config
- * @return {Object} config
- */
-function config(cb) {
-  if (_config) {
-    cb && cb(null, _config)
-    return _config
-  }
-  var currConfig = {}
-    , fileConfig = {}
-    , home = ( process.platform === "win32"
-             ? process.env.USERPROFILE
-             : process.env.HOME )
-    , configPath = home+'/.nexus/config.js'
-
-  if (userConfig && _.isString(userConfig))
-    configPath = userConfig
-  if (userConfig && _.isObject(userConfig))
-    currConfig = userConfig
-
-  try { fileConfig = require(configPath) }
-  catch (e) {} // no config-file, so we use currConfig or hardcoded defaults
-
-  currConfig.prefix  = currConfig.prefix  || fileConfig.prefix  || home+'/.nexus'
-  currConfig.key     = currConfig.key     || fileConfig.key     || null
-  currConfig.cert    = currConfig.cert    || fileConfig.cert    || null
-  currConfig.ca      = currConfig.ca      || fileConfig.ca      || null
-  currConfig.socket  = currConfig.socket  || fileConfig.socket  || currConfig.prefix+'/socket'
-  currConfig.tmp     = currConfig.tmp     || fileConfig.tmp     || currConfig.prefix+'/tmp'
-  currConfig.apps    = currConfig.apps    || fileConfig.apps    || currConfig.prefix+'/apps'
-  currConfig.logs    = currConfig.logs    || fileConfig.logs    || currConfig.prefix+'/logs'
-  currConfig.dbs     = currConfig.dbs     || fileConfig.dbs     || currConfig.prefix+'/dbs'
-  currConfig.host    = currConfig.host    || fileConfig.host    || '0.0.0.0'
-  currConfig.port    = currConfig.port    || fileConfig.port    || 0xf00
-  currConfig.remotes = currConfig.remotes || fileConfig.remotes || {}
-
-  // #TODO if key/cert/ca is set, check for validity
-
-  new AA( [ currConfig.logs
-          , currConfig.apps
-          , currConfig.tmp
-          , currConfig.dbs
-          ] ).map(function(x, i, next){
-    fs.exists(x, function(exists){
-      if (!exists) mkdirp(x,0755,function(err){next(err)})
-      else next()
-    })
-  }).done(function(err, data){
-    cb && cb(err, currConfig)
-  }).exec()
-
-  return currConfig
-}
-
-/**
- * install
+ *     install({url:<path or uri>,ref:<gitref>,name:<some name>},cb)
  *
  * @param {Object} options
- * @param {Function} callback, 2 arguments: error, information about
- *                   installed package
+ * @param {Function} cb with 2 args: err, result
  */
-function install(opts, cb) {
-  debug('installing',opts)
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function() {}
-
+N.install = function install(opts, cb) {
   opts = opts || {}
-  if (!opts.package) return cb('no package given to install')
-
-  var _config = config()
-  var tmpPath = _config.tmp+'/'+Math.floor(Math.random()*Math.pow(2,32)).toString(16)
-  mkdirp(tmpPath,0755,function(err){
-    if (err) return cb(err)
-    // without checkDns the npm-childprocess will run,
-    // print an error-msg and never exit
-    if ((/:\/\//.test(opts.package)))
-      return checkDns(opts.package, function(err){runNpm(err, installPackage)})
-    runNpm(null, installPackage)
-  })
-
-  function runNpm(err, cb){
-    if (err) return cb(err)
-    var env = process.env
-    env.npm_config_prefix = tmpPath
-    cp.execFile( __dirname+'/node_modules/npm/cli.js'
-               , [ 'install', '-p', '-g', opts.package ]
-               , { cwd: tmpPath, env:env }
-               , cb )
-  }
-
-  function installPackage(err, stdout, stderr) {
-    if (err) return cb(err)
-    var stdoutLines = stdout.split('\n')
-    var tmpPathPkg = stdoutLines[stdoutLines.length-2]
-    var package
-    try {
-      package = require(tmpPathPkg+'/package.json')
-    } catch(e) {
-      return cb(e)
-    }
-
-    var name = opts.name || package.name+'@'+package.version
-    fs.exists(_config.apps+'/'+name,function(exists){
-      if (exists) {
-        var found = false, i = 0
-        while (!found) {
-          if (!fs.existsSync(_config.apps+'/'+name+'_'+(++i)))
-            found = true
-        }
-        name = name+'_'+i
-      }
-      debug('copying',tmpPathPkg,'→',_config.apps+'/'+name)
-      ncp.ncp(tmpPathPkg,_config.apps+'/'+name,function(err){
-        if (err) return cb(err)
-        debug('deleting',tmpPath)
-        rimraf(tmpPath,function(err){
-          if (err) return cb(err)
-          debug('installed',name)
-          if (serverMonitor)
-            ee2.emit('server::'+serverMonitor.id+'::installed',name)
-          var result = {}
-          result[name] = package
-          cb(null, result)
-        })
-      })
-    })
-  }
-}
-
-/**
- * uninstall
- *
- * @param {Object} options
- * @param {Function} callback, 2 arguments: error, information about
- *                   uninstalled package
- */
-function uninstall(opts, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-
-  if (typeof arguments[0] === 'string')
-    opts = arguments[0]
-  else
-    return cb('not sure how to handle the parameter')
+  cb = arguments[arguments.length-1]
+  cb = _.isFunction(cb) ? cb : function() {}
 
   var self = this
-  var _config = config()
-  var path = _config.apps+'/'+opts
-
-  fs.stat(path,function(err,stat){
-    if (err) return cb(opts+' not installed')
-    ps(function(err,res){
-      if (err) return cb(err)
-      var running = []
-      _.each(res,function(x,i){
-        if (x.name == opts) running.push(i)
+  opts.type = opts.type || 'git'
+    
+  if (opts.type == 'git') {
+    if (!opts.url && !_.isString(opts.url))
+      return cb(new Error('invalid options, no git-url defined'))
+    var url = opts.url
+    var ref = opts.ref || url.split('#').slice(1)
+    var urlSplit = url.split('/')
+    var name = opts.name || urlSplit[urlSplit.length-1].replace(/#.*$/,'')
+    var dir = path.join(self._config.apps, name)
+    var cacheHash = crypto.createHash("sha1").update(url).digest("hex")
+    var cachePath = path.join(self._config.cache, cacheHash)
+      
+    async.series([checkDir, checkCache], function(err){
+       if (err) return cb(err)
+       var todo =
+        [ exec('git fetch', cachePath)
+        , exec('git clone '+cachePath+' '+dir, self._config.apps)
+        , exec('git checkout '+ref, dir)
+        , exec('git remote rm origin', dir)
+        , exec('git remote add origin '+url, dir)
+        , checkNexus
+        ]
+      async.series(todo, function(err, data){
+        if (err) return cb(err)
+        self.ls({name:name}, function(err,data){
+          if (err) return cb(err)
+          cb(null,data[0])
+        })
       })
-      if (running.length > 0)
-        return cb('cant uninstall "'+opts+'", '
-                 +'monitors are running: '
-                 +JSON.stringify(running))
-      rimraf(_config.apps+'/'+opts,function(){
-        if (serverMonitor)
-          ee2.emit('server::'+serverMonitor.id+'::uninstalled',opts)
-        cb(null,opts)
+    })
+
+    function exec(cmd, cwd) {
+      return function(next) {
+        cp.exec(cmd, {cwd:cwd,timeout:self._config.execTimeout}, next)
+      }
+    }
+
+    function checkDir(next) {
+      var origName = name
+      var i = 0
+      ;(function check() {
+        fs.exists(dir, function(exists){
+          if (!exists) return next()
+          name = origName+'_'+(++i)
+          dir = path.join(self._config.apps, name)
+          check()
+        })
+      })()
+    }
+
+    function checkCache(next) {
+      fs.exists(cachePath, function(exists){
+        if (exists) return exec('git fetch', cachePath)(next)
+        exec( 'git clone --mirror '+url+' '+cachePath
+            , self._config.cache
+            )(next)
+      })
+    }
+    
+    function checkNexus(next) {
+      readNexus(dir, function(err, data) {
+        if (err || !data.install) return next()
+        exec(data.install, dir)(next)
+      })
+    }
+    
+    return
+  }
+  cb(new Error('invalid options, unknown type'))
+}
+
+/**
+ * uninstall an app
+ *
+ * @param {String} app-name
+ * @param {Function} cb with 2 args: err, result
+ */
+N.uninstall = function uninstall(name, cb) {
+  cb = arguments[arguments.length-1]
+  cb = _.isFunction(cb) ? cb : function() {}
+  if (!name || !_.isString(name))
+    return cb(new Error('invalid options, invalid name: '+name))
+  var self = this
+  var rmPath = path.join(self._config.apps, name)
+  fs.exists(rmPath, function(e){
+    if (!e) return cb(new Error('cant uninstall '+path+' it doesnt exist'))
+    self.ps({name:name,pid:true,command:true},function(err,data){
+      if (err) return cb(err)
+      if (data.length > 0)
+        return cb(new Error( 'cant uninstall '+name
+                           + ' there are running processes: '
+                           + JSON.stringify(data)
+                           ) )
+      self.ls({name:name},function(err,data){
+        if (err) return cb(err)
+        rimraf(rmPath, function(err){
+          if (err) return cb(err)
+          self.emit('server::uninstall',name)
+          cb(err, data[0])
+        })
       })
     })
   })
 }
 
 /**
- * ls
+ * list installed apps
  *
- * @param {Object} options
- * @param {Function} callback, 2 arguments: error, array containing information
- *                   about installed applications
- */
-function ls(opts, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-
-  var _config = config()
-  if (opts && opts.name) {
-    fs.exists(_config.apps+'/'+opts.name+'/package.json',function(exists){
-      if (!exists) return cb(new Error('package is not installed: '+opts.name))
-      readPackages([opts.name])
-    })
-  }
-  else {
-    fs.readdir(_config.apps,function(e,d){
-      if (e) return cb(e)
-      readPackages(d)
-    })
-  }
-
-  function readPackages(arr) {
-    var result = {}
-    new AA(arr).map(function(x,i,next){
-      fs.readFile(_config.apps+'/'+x+'/package.json','utf-8',function(e,d){
-        try {d = JSON.parse(d)}
-        catch(e) {}
-        if (e) {
-          result[x] = 'UNDEFINED'
-          return next()
-        }
-        if (!opts.filter || opts.filter.length == 0) {
-          result[x] = d
-        }
-        else {
-          result[x] = {}
-          _.each(opts.filter, function(y,j){
-            var info = objPath(d,y)
-            if (info !== undefined) result[x][y] = info
-            else result[x][y] = 'UNDEFINED'
-          })
-        }
-        next()
-      })
-    }).done(function(err,data){
-      if (err) return cb(err)
-      cb && cb(err,result)
-    }).exec()
-  }
-}
-
-/**
- * ps
+ *     ls({'package.name':'foo'},cb)
  *
- * @param {Object} options
- * @param {Function} callback, 2 arguments: error, array containing information
- *                   about running applications
+ * @param {Object} filter (optional)
+ * @param {Function} cb with 2 args: err, result (array)
  */
-function ps(opts, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
+N.ls = function ls(filter, cb) {
+  var self = this
+  cb = arguments[arguments.length-1]
+  cb = _.isFunction(cb) ? cb : function() {}
 
-  if (arguments.length < 2)
-    opts = {}
+  if ( arguments.length < 2
+       || !_.isObject(filter)
+       || Object.keys(filter).length==0)
+    filter = null
 
-  opts = opts || {}
-  if (!opts.filter || !Array.isArray(opts.filter) || opts.filter.length==0)
-    opts.filter = null
+  fs.readdir(self._config.apps, function(err, dirs){
+    if (err) return cb(err)
+    async.map(dirs, function(x, next){
+      var app = {}
+      app.name = x
+      var appPath = path.join(self._config.apps,x)
+      var pkgPath = path.join(appPath, 'package.json')
+      var gitPath = path.join(appPath, '.git')
 
-  var result = {}
-
-  if (Object.keys(monitors).length == 0)
-    return cb(null,result)
-
-  if (opts.id && monitors[opts.id]) {
-    if (!monitors[opts.id])
-      return cb('monitor with id: "'+opts.id+'" is not connected')
-    if (!opts.filter) {
-      monitors[opts.id].info(function(err,data){
-        cb(err,data)
+      async.series([checkPackage, checkGit, checkNexus], function(err, data){
+        if (err) return cb(err)
+        next(err, app)
       })
-      return
-    }
-    monitors[opts.id].info(function(err,data){
-      _.each(opts.filter, function(x,i){
-        var info = objPath(data,x)
-        if (info !== undefined) result[x] = info
-        else result[x] = 'UNDEFINED'
-      })
-      cb(err,result)
-    })
-    return
-  }
 
-  new AA(Object.keys(monitors)).map(function(x,i,next){
-    monitors[x].info(function(err,data){
-      if (!opts.filter)
-        result[x] = data
-      else {
-        result[x] = {}
-        _.each(opts.filter,function(y,j){
-          var info = objPath(data,y)
-          if (info !== undefined) result[x][y] = info
-          else result[x][y] = 'UNDEFINED'
+      function checkPackage(next){
+        readPackage(appPath,function(err,data){
+          if (err) return next() // ignore
+          app.package = data
+          next()
         })
       }
-      next(err,data)
+
+      function checkGit(next){
+        readGit(appPath,function(err,data){
+          if (err) return next() // ignore
+          app.git = data
+          next()
+        })
+      }
+      
+      function checkNexus(next){
+        readNexus(appPath,function(err,data){
+          if (err) return next()
+          app.nexus = data
+          next()
+        })
+      }
+    }, function(err, d){
+      var result = []
+      _.each(d,function(data){
+        if (!filter)
+          return result.push(data)
+        filter.name = filter.name || true
+        var filteredData = objFilter(filter, data)
+        if (filteredData) result.push(filteredData)
+      })
+      cb(null, result)
     })
-  }).done(function(err,data){
-    if (err) return cb(err)
-    cb && cb(err,result)
-  }).exec()
+  })
 }
 
 /**
- * start
+ * get information about running apps
  *
- * @param {Object} options
- * @param {Function} callback, 2 arguments: error, array containing information
- *                   about started applications
+ * filter all apps with name "foo" and also show the id:
+ *
+ *     ps( { name : 'foo', id : true, env: true }, cb )
+ *
+ * @param {Object} filter
+ * @param {Function} cb with 2 args: err, an array containing infos about apps
  */
-function start(opts, cb) {
+N.ps = function ps(filter, cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.ps.apply(this,args)})
+  
+  var self = this
+
   cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
        : function() {}
-  opts = (_.isObject(opts) && Object.keys(opts).length>0)
-         ? opts : null
-  debug('starting',opts.script)
-  if (!opts) return cb(new Error('no start-options defined'))
 
-  parseStart(opts, function(err, data){
-    if (err) return cb(err)
-    debug('parsedStart',data)
-    genId(function(err,id){
-      debug('starting monitor',id,data.script)
-      ee2.on('monitor::'+id+'::connected',function(){
-        monitors[id].start(cb)
+  if ( arguments.length < 2
+       || !_.isObject(filter)
+       || !Object.keys(filter).length )
+    filter = null
+
+  var monPath = path.join(__dirname,'bin','mon')
+  var result = []
+  var mons = []
+  self.db.forEach(function(key,val){
+    if (!val) return  
+    mons.push(val)
+  })
+  async.map(mons,function(mon,next){
+    monStatus(mon.id,function(err,data){
+      if (err) return cb(err)
+      mon.status = data.status
+      if (data.monStatus == 'dead' && data.status == 'dead')
+        mon.status = 'ghost'
+      mon.pid = data.pid
+      mon.monPid = data.monPid
+      mon.uptime = data.uptime
+      delete mon.env.NEXUS_CONFIG
+      delete mon.env.NEXUS_ID
+      if (!filter) {
+        result.push(mon)
+        return next()
+      }
+      filter.id = filter.id || true
+      var filtered = objFilter(filter, mon)
+      if (filtered) result.push(filtered)
+      next()
+    })
+  },function(){cb(null,result)})
+}
+
+/**
+ * start an application
+ *
+ *     start({name:'someInstalledApp',env:{},command:'node foo'},cb)
+ *
+ * @param {Object} options
+ * @param {Function} cb with 2 args: err, result
+ */
+N.start = function start(opts, cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.start.apply(self,args)})
+  
+  opts = _.isObject(opts) ? opts : {}
+  cb = arguments[arguments.length - 1]
+  cb = _.isFunction(cb) ? cb : function(){}
+
+  if (!opts.name || !_.isString(opts.name))
+    return cb(new Error('invalid options, no name defined'))
+  
+  opts.cwd = opts.cwd || path.join(self._config.apps, opts.name)
+  
+  fs.exists(opts.cwd, function(e){
+    if (!e)
+      return cb(new Error('invalid options, the cwd doesnt exist: '+opts.cwd))
+    
+    if (!opts.id) {
+      var ids = []
+      self.db.forEach(function(k){ids.push(k)})
+      opts.id = genId(10)
+      while (!!~ids.indexOf(opts.id)) opts.id = genId()
+    }
+    
+    var monitor = {}
+    monitor.id = opts.id
+    monitor.name = opts.name || 'UNNAMED'
+    monitor.cwd = opts.cwd
+    monitor.crashed = 0
+    monitor.env = opts.env || {}
+    monitor.env.NEXUS_ID = opts.id
+    if (opts.NEXUS_SERVER) monitor.NEXUS_SERVER = true
+      
+    readNexus(opts.cwd,function(err,data){
+      if (opts.command)
+        monitor.command = opts.command
+      else if (!err && data.start)
+        monitor.command = data.start
+      
+      if (!err) monitor.nexus = data
+      
+      if (!monitor.command) 
+        return cb(new Error('invalid options, no command defined'))
+      
+      var monPath = path.join(__dirname,'bin','mon')
+      var pidPath = path.join(self._config.pids,monitor.id+'.pid')
+      var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
+      var monErrorPath = path.join(__dirname,'bin','mon-error.js')
+      var logPath = path.join(self._config.logs,monitor.name+'_'+monitor.id+'.log')
+      var spawnOpts = {cwd:monitor.cwd,env:process.env}
+      Object.keys(monitor.env).forEach(function(x){
+        spawnOpts.env[x] = monitor.env[x] 
+        spawnOpts.env.NEXUS_CONFIG = _configStringified
       })
       var child = cp.spawn
-        ( 'node'
-        , [ __dirname+'/bin/monitor.js'
-          , '-c', JSON.stringify(config())
-          , '-s', JSON.stringify(data)
-          , '-i', id ]
-        )
+        ( monPath
+        , [ '-d', monitor.command
+          , '-p', pidPath
+          , '-m', monPidPath
+          , '-l', logPath 
+          , '-e', monErrorPath ]
+        , spawnOpts )
+      child.on('exit',function(code){
+        if (code !== 0) 
+          return cb(new Error( 'could not start the monitor: '
+                             + JSON.stringify(monitor))) 
+        self.db.set(monitor.id,monitor)
+        self.ps({id:monitor.id},function(err,data){
+          if (err) return cb(err)
+          cb(null,data[0])
+        })
+      })
     })
   })
 }
 
 /**
- * restart
- *
- * @param {Array|String} ids of application you want to restart
- * @param {Function} callback, 2 arguments: error, array containing information
- *                   about restarted applications
+ * @param {String} id of app
+ * @param {Function} cb with 2 args: err, result
  */
-function restart(ids, cb) {
-  ids = _.isString(ids) ? [ids] : _.isArray(ids) ? ids : null
+N.restart = function restart(id, cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.restart.apply(self,args)})
+  id = _.isString(id) ? id : null
   cb = arguments[arguments.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
-  if (!ids) return cb(new Error('invalid argument'))
-  new AA(ids).map(function(x,i,next){
-    if (!monitors[x])
-      return next(new Error('there is no process with id: '+x))
-    monitors[x].restart(next)
-  }).done(cb).exec()
+  if (!id) return cb(new Error('invalid options, missing id'))
+  monStatus(id,function(err,data){
+    if (err) return cb(err)
+    var oldPid = data.pid
+    monRestart(id,function(err){
+      if (err) return cb(err)
+      ;(function check(){
+        // check if pid changed.. so we know the new process is up
+        setTimeout(function(){
+          monStatus(id,function(err,res){
+            var dat = self.db.get(id)
+            dat.crashed = 0
+            self.db.set(id,dat)
+            if (res.pid == oldPid) return check()
+            self.ps({id:id},function(err,res){cb(null,res[0])})
+          })
+        },500)
+      })()
+    })
+  })
 }
 
 /**
- * stop
- *
- * @param {Array|String} ids of application you want to stop
- * @param {Function} callback, 2 arguments: error, array containing information
- *                   about stopped applications
+ * @param {Function} cb with 2 args: err, result
  */
-function stop(ids, cb) {
-  ids = _.isString(ids) ? [ids] : _.isArray(ids) ? ids : null
+N.restartall = function restarall(cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.restartall.apply(self,args)})
   cb = arguments[arguments.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
-  if (!ids) return cb(new Error('invalid argument'))
-  new AA(ids).map(function(x,i,next){
-    if (!monitors[x])
-      return next(new Error('there is no process with id: '+x))
-    monitors[x].stop(function(err,data){
-      if (err) return next(err)
-      ee2.once('monitor::'+x+'::disconnected',function(){
-        next(null,data)
-      })
-    })
-  }).done(cb).exec()
+  var self = this
+  var ids = []
+  self.db.forEach(function(k,v){
+    if (v) ids.push(k)
+  })
+  async.map(ids,function(id,next){
+    self.restart(id,next)
+  }, cb)
 }
 
 /**
- * stopall
- *
- * @param {Function} callback, 2 arguments: error, array containing information
- *                   about stopped applications
+ * @param {Function} cb with 2 args: err, result
  */
-function stopall(cb) {
+N.reboot = function reboot(cb) {
+  cb = arguments[arguments.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
-  var keys = Object.keys(monitors)
-  if (keys.length == 0) return cb(null,[])
-  new AA(keys).map(function(x,i,next){
-    ee2.emit('debug','stopping '+x)
-    monitors[x].stop(function(err,data){
-      ee2.once('monitor::'+x+'::disconnected',function(){
-        next(null,data)
-      })
-    })
-  }).done(cb).exec()
-}
-
-/**
- * execute a command with CWD: $nexus.config.apps
- *
- * @param {String}
- * @param {Function}
- * @param {Function}
- * @param {Function}
- * @param {Function} callback, 1 argument: exit-code
- */
-function exec(cmd, stdout, stderr, kill, cb) {
-  if (!_.isString(cmd))
-    return cb(new Error('invalid arguments, first arg must be string'))
-  kill = _.isFunction(kill) ? kill : function(){}
-  stdout = _.isFunction(stdout) ? stdout : function(){}
-  stderr = _.isFunction(stderr) ? stderr : function(){}
-  kill = _.isFunction(kill) ? kill : function(){}
-  cb = _.isFunction(arguments[arguments.length-1])
-       ? arguments[arguments.length-1]
-       : function() {}
-  var _config = config()
-  var sh = (process.platform === "win32") ? 'cmd' : 'sh'
-  var shFlag = (process.platform === "win32") ? '/c' : '-c'
-  console.log('spawning',sh, [shFlag, cmd])
-  var child = cp.spawn(sh, [shFlag, cmd], {cwd:_config.apps} )
-  kill(function(){
-    var tokill = []
-    pstree(child.pid, function(err, children){
-      children.map(function(p){
-        tokill.push(p.PID)
-      })
-      tokill.unshift(child.pid)
-      tokill.forEach(function(x){
-        process.kill(x)
-      })
-    })
-  })
-  child.stdout.on('data',function(d){stdout(d.toString().replace(/\n$/, ''))})
-  child.stderr.on('data',function(d){stderr(d.toString().replace(/\n$/, ''))})
-  child.on('exit',cb)
-  child.on('error',function(e){console.log('exec cp-error',opts,e)})
-}
-
-/**
- * execscript - execute scripts which are defined in the app's package.json
- *
- * the package.json of `myapp` looks like this:
- *
- *     { "name":"myapp", "version":"0.0.0", "scripts":{"test":"make test"} }
- *
- * then you can do:
- *
- *     execscript ( {name:'myapp',script:'test'}
- *                , function(d){console.log('stdout:',d)}
- *                , function(d){console.log('stderr:',d)}
- *                , function(kill){kill()}
- *                , function(err,stdout,stderr){} )
- *
- * @param {Object} has to contain fields: script and name
- * @param {Function} 1 argument: a function which gets called on stdout-output
- * @param {Function} 1 argument: a function which gets called on stderr-output
- * @param {Function} 1 argument: a function which kills the process when it gets called
- * @param {Function} callback, 1 argument: exit-code
- */
-function execscript(opts, stdout, stderr, kill, cb) {
-  if (!opts || !opts.name || !opts.script)
-    return cb(new Error('invalid arguments, name or script not defined'))
-  stdout = _.isFunction(stdout) ? stdout : function(){}
-  stderr = _.isFunction(stdout) ? stderr : function(){}
-  kill = _.isFunction(kill) ? kill : function(){}
-  cb = _.isFunction(arguments[arguments.length-1])
-       ? arguments[arguments.length-1]
-       : function() {}
-  ls({name:opts.name},function(err, data){
+  var self = this
+  self.ps(function(err,data){
     if (err) return cb(err)
-    if ( !data[opts.name]
-         || !data[opts.name].scripts
-         || !data[opts.name].scripts[opts.script] )
-      return cb(new Error('the app "'+opts.name
-                         +'" has no script called "'+opts.script+'"'))
-
-    var _config = config()
-    // yes! this is like npm is doing it
-    var sh = (process.platform === "win32") ? 'cmd' : 'sh'
-    var shFlag = (process.platform === "win32") ? '/c' : '-c'
-    var child = cp.spawn
-      ( sh, [shFlag, data[opts.name].scripts[opts.script] ]
-      , { cwd : _config.apps+'/'+opts.name } )
-    kill(function(){
-      var tokill = []
-      pstree(child.pid, function(err, children){
-        children.map(function(p){
-          tokill.push(p.PID)
-        })
-        tokill.unshift(child.pid)
-        tokill.forEach(function(x){
-          process.kill(x)
-        })
+    var result = []
+    async.map(data,function(x,next){
+      if (x.status != 'ghost') return next()
+      var opts = {}
+      opts.id = x.id
+      opts.command = x.command
+      opts.cwd = x.cwd
+      opts.name = x.name
+      self.start(opts, function(err,data){
+        result.push(data)
+        next()
       })
-    })
-    child.stdout.on('data',function(d){stdout(d.toString().replace(/\n$/, ''))})
-    child.stderr.on('data',function(d){stderr(d.toString().replace(/\n$/, ''))})
-    child.on('exit',cb)
-    child.on('error',function(e){console.error('execscript cp-error',opts,e)})
+    },function(){cb(null,result)})
   })
 }
 
 /**
- * logs
- *
- * @param {Object}
- * @param {Function} callback, 2 arguments: error, logs (string)
+ * @param {String} id of app
+ * @param {Function} cb with 2 args: err, result
  */
-function logs(opts, cb) {
-  if (typeof arguments[arguments.length - 1] === 'function')
-    cb = arguments[arguments.length - 1]
-  else
-    cb = function(){}
-
-  opts = opts === Object(opts) ? opts : {}
-
-  if ( opts.cmd !== undefined
-       && ( !~['stdout','stderr','clean'].indexOf(opts.cmd)
-            || ( !!~['stdout','stderr'].indexOf(opts.cmd) && !opts.id ) ) )
-    return cb(new Error('invalid arguments'))
-
-  config(function(err, _config){
+N.stop = function stop(id, cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.stop.apply(self,args)})
+  id = _.isString(id) ? id : null
+  cb = args[args.length - 1]
+  cb = _.isFunction(cb) ? cb : function(){}
+  if (!id) return cb(new Error('invalid options, missing id'))
+  self.ps({id:id},function(err,old){
     if (err) return cb(err)
-    if (!opts.cmd) return listLogs(cb)
-    switch (opts.cmd) {
-      case 'stdout':
-      case 'stderr':
-        readFile(opts.id, opts.cmd, cb)
-        break
-      case 'clean':
-        clean(cb)
-        break
-      default:
-        return cb(new Error('invalid first argument (unknown)'))
+    if (old[0].status == 'ghost') {
+      self.db.rm(id)
+      return cb(null,old)
     }
-
-    function listLogs(_cb) {
-      fs.readdir(_config.logs,function(err,dataDir){
-        if (err) return _cb(err)
-        var result = {}
-        _.each(dataDir,function(x,i){
-          var id = x.split('.')[1]
-          result[id] = {running:false}
-          result[id].script = x.split('.')[0]
-          if (serverMonitor && serverMonitor.id == id)
-            result[id].running = true
-        })
-        _cb(null, result)
-      })
-    }
-
-    function readFile(id, type, _cb) {
-      fs.readdir(_config.logs,function(err,dataDir){
-        if (err) return _cb(err)
-        var file
-        _.each(dataDir,function(x,i){
-          if ( x.split('.')[1] == id && x.split('.')[2] == type )
-            file = x
-        })
-        if (!file) return _cb(new Error('log-file not found'))
-        fs.readFile(_config.logs+'/'+file, 'utf8', function(err, dataFile){
-          if (err) return _cb(err)
-          var lines = dataFile.split('\n')
-          if (!opts.lines)
-            return _cb(null, lines.splice(lines.length-20).join('\n'))
-          if (opts.lines >= lines.length)
-            opts.lines = lines.length
-          _cb(null, lines.splice(lines.length - opts.lines).join('\n'))
-        })
-      })
-    }
-
-    function clean(_cb) {
-      fs.readdir(_config.logs,function(err,data){
-        if (err) return _cb(err)
-        var toDel = []
-        _.each(data,function(x,i){
-          var split = x.split('.')
-            , id = split[1]
-          if (!monitors[id] && (!serverMonitor || (serverMonitor.id != id)))
-            toDel.push(x)
-        })
-        new AA(toDel).map(function(x,i,next){
-          fs.unlink(_config.logs+'/'+x,next)
-        }).done(function(err,data){
-          if (err) return _cb(err)
-          if (serverMonitor)
-            ee2.emit('server::'+serverMonitor.id+'::cleanedlogs',data)
-          _cb(null, data.length)
-        }).exec()
-      })
-    }
+    monStop(id,function(err){
+      if (err) return cb(err)
+      self.db.rm(id)
+      cb(null,old[0])
+    })
   })
+  // monStatus(id,function(err,data){
+  //   if (err) return cb(err)
+  //   if (data.monStatus == 'dead') {
+  //     var old = self.db.get(id)
+  //     self.db.rm(id)
+  //     return cb(null,old)
+  //   }
+  //   monStop(id,function(err){
+  //     if (err) return cb(err)
+  //     var old = self.db.get(id)
+  //     self.db.rm(id)
+  //     cb(null,old)
+  //   })
+  // })
 }
 
 /**
- * server
- *
- * @param {Object}
- * @param {Function} callback, 2 arguments: error, data
+ * @param {Function} cb with 2 args: err, result
  */
-function server(opts, cb) {
+N.stopall = function stopall(cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.stopall.apply(self,args)})
+  var toStop = []
+  self.db.forEach(function(k,v){
+    if (v && !v.env.NEXUS_SERVER) toStop.push(k)
+  })
+  async.map(toStop,function(id,next){self.stop(id,next)},cb)
+}
+
+/**
+ * @param {Object} options
+ * @param {Function} cb with 2 args: err, result
+ */
+N.log = function log(opts, cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.log.apply(self,args)})
   cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
        : function() {}
-
-  var optsKeys = Object.keys(opts)
-  opts = (_.isObject(opts) && opts.cmd)
-         ? opts : null
-
-  if (!opts && !serverMonitor)
-    return cb('server is not running')
-
-  if (!opts && serverMonitor)
-    return serverMonitor.info(cb)
-    // return cb(null,serverMonitor)
-
-  if (opts.cmd && opts.cmd == 'version') {
-    if (!serverMonitor) return cb('server is not running')
-    serverMonitor.info(function(err,data){
-      cb(err,data.package.version)
-    })
-    return
-  }
-
-  if (opts.cmd && (opts.cmd == 'start' || opts.cmd == 'reboot')) {
-    if (serverMonitor)
-      return cb(new Error('server is already running'))
-    var _config = config()
-    delete _config.remotes
-    var env = {}
-    var options = []
-    if (userConfig) 
-      options = options.concat(['-c',JSON.stringify(userConfig)])
-    if (opts.cmd == 'reboot')
-      options.push('-r')
-    if (opts.debug) 
-      env.NODE_DEBUG = opts.debug
-    
-    var startOpts =
-      { script: __dirname+'/bin/server.js'
-      , command: 'node'
-      , options: options
-      , package: _pkg
-      , env: env
-      }
-
-    debug('server-start starting',startOpts.script)
-    start(startOpts)
-
-    var client
-
-    var clientOpts = _config.socket
-    if (!_config.socket) {
-      clientOpts = { port : _config.port
-                   , host : _config.host }
-      try {
-        if (_config.key)
-          clientOpts.key = fs.readFileSync(_config.key)
-        if (_config.cert)
-          clientOpts.cert = fs.readFileSync(_config.cert)
-      }
-      catch (e) {
-        cb(e)
-      }
-    }
-    ;(function check(){
-      var client = dnode.connect(clientOpts,function(r,c){
-        r.server(function(err, data){
-          client.end()
-          if (err) return setTimeout(check,20)
-          cb(err,data)
-        })
-      })
-      client.on('error',function(e){
-        client.end()
-        if (e.code === 'ENOENT' || e.code === 'ECONNREFUSED')
-          setTimeout(check,20)
-      })
-    })()
-  }
-  else if (opts.cmd && opts.cmd == 'stop') {
-    if (serverMonitor) {
-      cb(null,'will try to stop the server, check with `nexus server`')
-      return serverMonitor.stop(cb)
-    }
-    else return cb('cant stop, server is not running')
-  }
-  else if (opts.cmd && opts.cmd == 'restart') {
-    cb(null,'will try to restart the server, check with `nexus server`')
-    return serverMonitor.restart(cb)
-  }
-  else cb('invalid arguments')
-}
-
-/**
- * server
- *
- *         : CWD+"/<appName>" exists
- *     (A)   ? start CWD+"/<appName>"
- *           : /\\//.test(<appName>)
- *             ? <appName>.split("/")[0] is an installed app
- *     (B)       ? script = nexusApps+"/"+<appName>
- *               : invalid startScript
- *             : <appName> an installed app
- *               ? look for package.json-startScript
- *     (C)         ? 'node foo.js -b ar' -> spawn( 'node'
- *                                               , ['/<pathToApp>/foo.js','-b','ar']
- *                                               , {cwd:'/<pathToApp>'} )
- *     (D)         : look for package.json-bin
- *                   ? script = appName+"/"+package.json-bin
- *                   : appPath+"/server.js" exists || appPath+"/app.js" exists
- *     (E)             ? script = appName+"/server.js" || appName+"/app.js"
- *                     : invalid startScript
- *               : invalid startScript
- *
- * @param {Object}
- * @param {Function} callback, 2 arguments: error, data
- */
-function parseStart(opts, cb) {
-  debug('parsing start-options',opts)
-  var result = {}
+  
   opts = opts || {}
 
-  if (!opts.script) return cb('no script defined')
-
-  result.script = null
-  result.command = opts.command || 'node'
-  result.options = opts.options || []
-  result.env = opts.env || {}
-  result.cwd = opts.cwd || process.cwd()
-  result.max = opts.max
-  result.name = opts.name || null
-  result.package = opts.package || null
-
-  var _config = config()
-  var maybeApp = opts.script.split('/')[0]
-    , appPath = null
-  if (fs.existsSync(_config.apps+'/'+maybeApp)) {
-    debug('===== A =====')
-    result.name = result.name || maybeApp.split('/')[0]
-    appPath = _config.apps+'/'+maybeApp
-    try {
-      result.package = JSON.parse(fs.readFileSync(appPath+'/package.json','utf-8'))
-    } catch(e) {}
-  }
-
-  // handle `nexus start /some/file`
-  if (/^\//.test(opts.script) && fs.existsSync(opts.script))
-    result.script = opts.script
-
-  // handle `nexus start appName/path/to/script`
-  if (!result.script && /\//.test(opts.script)) {
-    if (fs.existsSync(_config.apps+'/'+opts.script)) {
-      debug('===== B =====')
-      result.name = result.name || opts.script.split('/')[0]
-      result.script = _config.apps+'/'+opts.script
-    }
-  }
-
-  // handle `nexus start appName`
-  if (!result.script) {
-    if (result.package
-        && result.package.scripts
-        && result.package.scripts.start) {
-      debug('===== C =====')
-      var startScript = result.package.scripts.start
-      if (/\w/.test(startScript)) {
-        var split = startScript.split(' ')
-        var isScript = fs.existsSync(appPath+'/'+split[0])
-        if (isScript) {
-          result.script = appPath+'/'+split[0]
-          result.options = result.options || split.splice(1)
-        }
-        else {
-          result.command = split[0]
-          result.script = appPath+'/'+split[1]
-          result.options = result.options || split.splice(2)
-        }
-      }
-      else {
-        result.script = appPath+'/'+startScript
-      }
-    }
-    else if (result.package
-             && result.package.bin) {
-      debug('===== D =====')
-      var startScript
-      if (_.isString(result.package.bin)) {
-        if (!fs.existsSync(path.join(appPath,result.package.bin)))
-          cb('invalid script: '+path.join(appPath,result.package.bin))
-        result.script = path.join(appPath,result.package.bin)
-      }
-      if (_.isObject(result.package.bin) && result.package.bin[result.name]) {
-        if (!fs.existsSync(path.join(appPath,result.package.bin)))
-          cb('invalid script: '+path.join(appPath,result.package.bin))
-        result.script = path.join(appPath,result.package.bin[result.name])
-      }
-    }
-    else if (appPath) {
-      debug('===== E =====')
-      var serverJsExists = fs.existsSync(appPath+'/server.js')
-      var appJsExists = fs.existsSync(appPath+'/app.js')
-      if (serverJsExists) result.script = appPath+'/server.js'
-      else if (appJsExists) result.script = appPath+'/app.js'
-      else result.script = appPath
-    }
-    else
-      return cb('invalid script')
-  }
-
-  var split = result.script.split('/')
-  split.pop()
-  result.cwd = split.join('/')
-  cb(null, result)
+  if (!opts.id) return cb(new Error('invalid options, no id'))
+  var mon = self.db.get(opts.id)
+  var logPath = path.join(_config.logs,mon.name+'_'+opts.id+'.log')
+  opts.command = 'tail '+logPath
+  if (opts.follow) opts.command += ' -f'
+  self.exec(opts, cb)
 }
 
 /**
- * objPath - create/access objects with a key-string
+ * @param {Object} options
+ * @param {Function} cb with 2 args: err, result
+ */
+N.exec = function exec(opts, cb) {
+  var self = this
+  opts = opts || {}
+  cb = _.isFunction(arguments[arguments.length-1])
+       ? arguments[arguments.length-1]
+       : function() {}
+
+  if (!opts.command)
+    return cb(new Error('invalid arguments, missing command'))
+
+  if (_.isArray(opts.command))
+    opts.command = opts.command.join(' ')
+
+  if (!_.isString(opts.command))
+    return cb(new Error('invalid arguments, invalid command (must be array or string)'))
+
+  ;['kill','killService','stdout','stderr'].forEach(function(x){
+    opts[x] = opts[x] && _.isFunction(opts[x]) ? opts[x] : function(){}
+  })
+
+  
+  var sh = (process.platform === "win32") ? 'cmd' : 'sh'
+  var shFlag = (process.platform === "win32") ? '/c' : '-c'
+  var cwd = opts.name ? path.join(self._config.apps,opts.name) : self._config.apps
+  fs.exists(cwd,function(exists){
+    if (!exists)
+      return cb(new Error('invalid arguments, cwd does not exist: '+cwd))
+    var child = cp.spawn(sh, [shFlag, opts.command], {cwd:cwd})
+    opts.kill(kill)
+    opts.killService(kill)
+    setTimeout(kill, self._config.execTimeout)
+    child.stdout.on('data',function(d){
+      opts.stdout(d.toString().replace(/\n$/, ''))
+    })
+    child.stderr.on('data',function(d){
+      opts.stderr(d.toString().replace(/\n$/, ''))
+    })
+    child.once('close',cb)
+    child.on('error',function(e){console.log('exec cp-error',opts,e)})
+    function kill(cb) {
+      pstree(child.pid, function(err, children){
+        var tokill = []
+        children.map(function(p){tokill.push(p.PID)})
+        tokill.unshift(child.pid)
+        cp.exec('kill -9 '+tokill.join(' '),cb)
+      })
+    }
+  })
+}
+
+/**
+ * @param {Function} cb
+ */
+N.initDb = function initDb(cb) {
+  cb = _.isFunction(cb) ? cb : function() {}
+  var self = this
+  if (!self._config.db) 
+    return cb(new Error('invalid config, no database-path defined'))
+  self.db = dirty(self._config.db).on('load',function(){
+    self._dbLoaded = true
+    self.emit('db::load')
+    cb()
+  })
+}
+
+/**
+ * @param {Function} end, 1 param: function to destroy the api (subscribtions)
+ * @return {Object} api
+ */
+N.createService = function createService() {
+  var self = this
+  return function(remote, conn){
+    var service = this
+    ;[ 'install', 'uninstall', 'ls', 'ps', 'start', 'restart', 'restartall'
+     , 'reboot', 'server', 'stop', 'stopall', 'config'
+     ].forEach(function(x){ service[x] = Nexus.prototype[x].bind(self) })
+    service.exec = function(opts, cb){
+      opts.killService = function(killIt){
+        conn.once('end',function(){killIt()})
+      }
+      self.exec(opts,cb)
+    }
+    service.log = function(opts, cb){
+      opts.killService = function(killIt){
+        conn.once('end',function(){killIt()})
+      }
+      self.log(opts,cb)
+    }
+  }
+}
+
+/**
+ * connect to a remote nexus-server
+ */
+N.connect = function connect(opts,cb) {
+
+  var self = this
+  cb = arguments[arguments.length-1]
+  cb = _.isFunction(cb) ? cb : function(){}
+  opts = opts || {}
+  opts.port = opts.port || self._config.port
+  opts.key = opts.key || self._config.key
+  opts.cert = opts.cert || self._config.cert
+  opts.socket = opts.socket || self._config.socket
+  opts.reconnect = opts.reconnect || null
+  
+  if (opts.remote && self._config.remotes[opts.remote]) {
+    Object.keys(self._config.remotes[opts.remote]).forEach(function(x){
+      opts[x] = self._config.remotes[opts.remote][x]
+    })
+  }
+
+  function connect() {
+    var client
+    if (!opts.socket && opts.port && opts.key) {
+      var tlsOpts = readTlsKeys(opts)
+      client = tls.connect(opts.port, opts.host, tlsOpts)
+    } else {
+      client = net.connect(opts.port, opts.host)
+    }
+    client.on('error',onError)
+    var d = dnode()
+    d.on('remote',cb)
+    d.on('error',onError)
+    d.on('fail',onError)
+    d.pipe(client).pipe(d)
+    return client
+  }
+  function onError(err) {
+    if (!opts.reconnect && err) return cb(err)
+    setTimeout(connect,opts.reconnect)
+  }
+  
+  connect()
+}
+
+/**
+ * start the nexus-server
+ */
+N.listen = function listen(opts, cb) {
+  cb = arguments[arguments.length-1]
+  cb = _.isFunction(cb) ? cb : function(){}
+  opts = _.isObject(opts) ? opts : {}
+
+  var self = this
+  var servers = {}
+  var cfg = self._config
+  _.each(opts,function(x,i){cfg[i] = x !== undefined ? x : cfg[i]})
+
+  var todo = []
+  if (cfg.socket) todo.push(listenUnix)
+  if (cfg.key && cfg.port) todo.push(listenTls)
+  else if (cfg.port) todo.push(listenNet)
+
+  // console.log(cfg, todo)
+  
+  async.parallel(todo,function(err){
+    if (err) return cb(err)
+    cb(null, self.servers)
+  })
+
+  function listenUnix(cb) {
+    checkSocket(cfg.socket, function(err){
+      if (err) return cb(err)
+      var name = 'unix://'+cfg.socket
+      debug('starting unix-server', name)
+      self.servers[name] = net.createServer(handler).listen(cfg.socket, cb)
+    })
+    function checkSocket(path, cb) {
+      fs.exists(path,function(exists){
+        if (!exists) return cb()
+        fs.unlink(path,cb)
+      })
+    }
+  }
+
+  function listenNet(cb) {
+    var name = 'net://'+cfg.host+':'+cfg.port
+    debug('starting net-server', name)
+    self.servers[name] = net.createServer(handler)
+    self.servers[name].listen(cfg.port, cfg.host, cb)
+  }
+
+  function listenTls(cb) {
+    var name = 'tls://'+cfg.host+':'+cfg.port
+    debug('starting tls-server', name, cfg)
+    var tlsOpts = readTlsKeys(cfg)
+    self.servers[name] = tls.createServer(tlsOpts,handler)
+    self.servers[name].listen(cfg.port, cfg.host, cb)
+  }
+
+  function handler(s){
+    var d = dnode(self.createService())
+    s.pipe(d).pipe(s)
+    s.on('error',function(){s.destroy()})
+  }
+}
+
+/**
+ * control the nexus-server
+ *
+ *     server( { command: ..
+ *             , options: ..
+ *             } )
+ *
+ * @param {Object} options - possible keys: command, options; command can be
+ *                 'restart', 'start', 'stop' or 'info'; every command
+ * @param {Function} callback
+ */
+N.server = function server(opts, cb) {
+  var self = this
+  var args = arguments
+  if (!this._dbLoaded) 
+    return this.once('db::load',function(){N.server.apply(self,args)})
+  
+  opts = _.isObject(opts) ? opts : {}
+  cb = arguments[arguments.length-1]
+  cb = _.isFunction(cb) ? cb : function(){}
+  if (!opts.command) {
+    self.ps(function(err,data){
+      if (err) return cb(err)
+      var result = []
+      data.forEach(function(x){
+        if (x.env && x.env.NEXUS_SERVER) result.push(x)
+      })
+      cb(null,result)
+    })
+  }
+  else if (opts.command == 'start') {
+    var startOpts = {}
+    startOpts.cwd = path.join(__dirname,'bin')
+    startOpts.command = 'node server.js'
+    startOpts.name = 'NEXUS_SERVER'
+    startOpts.env = {NEXUS_SERVER:true}
+    
+    if (opts.port) startOpts.command += ' -p '+opts.port
+    if (opts.key)  startOpts.command += ' --key '+opts.key
+    if (opts.cert) startOpts.command += ' --cert '+opts.cert
+    if (opts.ca)   startOpts.command += ' --ca '+opts.ca
+
+    if (opts.config)
+      startOpts.command += ' -c '+opts.config
+    else if (_config.configFile)
+      startOpts.command += ' -c '+_config.configFile
+    else
+      startOpts.env.NEXUS_CONFIG = JSON.stringify(_config)
+    
+    self.start(startOpts,cb)
+  }
+}
+
+/**
+ * filter object-properties
+ * 
+ * @param {Object} filter
+ * @param {Object} data
+ * @return {Object|false} filtered data or false
+ */
+function objFilter(filter, data) {
+  var result = {}
+  var all = true
+
+  _.each(filter,function(y,j){
+    if (!result) return
+    if (_.isBoolean(y)) {
+      all = false
+      var info = objPath(data,j)
+      if (info !== undefined) result[j] = info
+      else result[j] = 'UNDEFINED'
+    }
+    else {
+      y = y.toString()
+      var info = objPath(data,j)
+      if (info != y) result = false
+      else result[j] = info
+    }
+  })
+
+  if (result && all) return data
+  return result
+}
+
+/**
+ * create/access objects with a key-string
  *
  * @param {Object} scope
  * @param {String} key-string (e.g. 'a.b.c.d')
  * @param {Mixed} value to store in key (optional)
- * @return {Mixed} if value-param is given it will return
- *                 the object, otherwise it will return the value
- *                 of the selected key
+ * @return {Mixed} if value-param is given it will return the object,
+ *                 otherwise it will return the value of the selected key,
+ *                 undefined values will get false..
  */
 function objPath(obj, keyString, value) {
   var keys = keyString.split('.')
@@ -1002,7 +862,8 @@ function objPath(obj, keyString, value) {
       value = value[keys[i]]
     }
     return value
-  } else { // set data
+  }
+  else { // set data
     var temp = data
     if (keys.length==0) {
       obj[keyString] = value
@@ -1012,7 +873,8 @@ function objPath(obj, keyString, value) {
     for (var i=0, len=keys.length; i<len; i++) {
       if (i==(len-1)) {
         temp[keys[i]] = value
-      } else {
+      }
+      else {
         temp[keys[i]] = temp[keys[i]] || {}
         temp = temp[keys[i]]
       }
@@ -1022,45 +884,174 @@ function objPath(obj, keyString, value) {
 }
 
 /**
- * genId
- *
- * @param {Function} callback, 2 arguments: error, id (string)
+ * @param {Integer} length
+ * @return {String} random id with requested length
  */
-function genId(cb) {
-  config(function(err,_config){
+function genId(len) {
+  len = len ? parseInt(len) : 8
+  var ret = ''
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWYXZabcdefghijklmnopqrstuvwyxz0123456789'
+  while (len--)
+    ret += chars[Math.round(Math.random() * (chars.length-1))]
+  return ret
+}
+
+/**
+ * initialize config (synchron - it throws when something goes wrong)
+ *
+ * @param {Object} options
+ * @return {Object} config
+ */
+function config(opts) {
+  var cfg = {}
+    , cfgFile = {}
+    , home = ( process.platform === "win32"
+             ? process.env.USERPROFILE
+             : process.env.HOME )
+    , cfgPath = path.join(home,'.nexus','config.js')
+
+  if (!opts || opts && _.isString(opts)) {
+    if (opts) cfgPath = opts
+    cfg.configFile = cfgPath
+    try { cfgFile = require(cfgPath) }
+    catch (e) {
+      delete cfg.configFile 
+    }
+  }
+  else if (opts && _.isObject(opts)) cfg = opts
+    
+  cfg.prefix  = cfg.prefix  || cfgFile.prefix  || path.dirname(cfgPath)
+  cfg.apps    = cfg.apps    || cfgFile.apps    || path.join(cfg.prefix,'apps')
+  cfg.cache   = cfg.cache   || cfgFile.cache   || path.join(cfg.prefix,'cache')
+  cfg.db      = cfg.db      || cfgFile.db      || path.join(cfg.prefix,'nexus.db')
+  cfg.logs    = cfg.logs    || cfgFile.logs    || path.join(cfg.prefix,'logs')
+  cfg.pids    = cfg.pids    || cfgFile.pids    || path.join(cfg.prefix,'pids')
+  cfg.remotes = cfg.remotes || cfgFile.remotes || {}
+  cfg.sleep   = cfg.sleep   || cfgFile.sleep   || 1
+  cfg.execTimeout = cfg.execTimeout || cfgFile.execTimeout || 1000*60*30
+  
+  // client
+  cfg.key     = cfg.key     || cfgFile.key     || null
+  cfg.cert    = cfg.cert    || cfgFile.cert    || null
+
+  // server
+  cfg.ca      = cfg.ca      || cfgFile.ca      || null
+  cfg.host    = cfg.host    || cfgFile.host    || '0.0.0.0'
+  cfg.port    = cfg.port    || cfgFile.port    || 0xf00
+  cfg.socket  = cfg.socket  || cfgFile.socket  || null
+
+  var ensureDirs = [cfg.apps, cfg.cache, path.dirname(cfg.db), cfg.logs, cfg.pids]
+  if (cfg.ca) ensureDirs.push(cfg.ca)
+
+  ensureDirs.forEach(function(x){
+    if (!fs.existsSync(x)) mkdirp.sync(x, 0755)
+  })
+
+  // console.log(cfg)
+  return cfg
+}
+
+/**
+ *     var tlsOpts = readTlsKeys
+ *       ( { key  : '/path/to/key.pem'   // key-file
+ *         , cert : '/path/to/cert.pem'  // cert-file
+ *         , ca   : '/path/to/ca-dir'    // every file in that dir will be read
+ *                                       // into the ca
+ *         } )
+ */
+function readTlsKeys(opts) {
+  opts = opts || {}
+  var result = {}
+  if (opts.key)
+    result.key = fs.readFileSync(opts.key)
+  if (opts.cert)
+    result.cert = fs.readFileSync(opts.cert)
+  if (opts.ca) {
+    result.ca = []
+    fs.readdirSync(opts.ca).forEach(function(x){
+      result.ca.push(fs.readFileSync(path.join(opts.ca,x)))
+    })
+  }
+  return result
+}
+
+function readNexus(appPath, cb) {
+  var filePath = path.join(appPath,'nexus.json')
+  fs.readFile(filePath,function(err,data){
     if (err) return cb(err)
-    fs.readdir(_config.logs, function(err,data){
-      if (err) return cb(err)
-      var currIds = [], id
-      _.each(data,function(x,i){
-        var split = x.split('.')
-        currIds.push(split[split.length-3])
-      })
-      do {
-        id = Math.floor(Math.random()*Math.pow(2,32)).toString(16)+''
-      } while(currIds.indexOf(id) != -1)
-      cb(null,id)
+    var data
+    try { data = JSON.parse(data) }
+    catch(e) { err = e }
+    if (err) return cb(err)
+    cb(null, data)
+  })
+}
+
+function readPackage(appPath, cb){
+  var filePath = path.join(appPath,'package.json')
+  fs.readFile(filePath,function(err,data){
+    if (err) return cb(err)
+    var data
+    try { data = JSON.parse(data) }
+    catch(e) { err = e }
+    if (err) return cb(err)
+    cb(null, data)
+  })
+}
+
+function readGit(appPath, cb){
+  var result = {}
+  var getCommit = 'git log --no-color | head -n1'
+  var getRemote = 'git remote show origin | head -n2'
+  cp.exec(getCommit, {cwd:appPath}, function(err, stdout, stderr){
+    if (err || stderr) return cb(err || stderr)
+    result.commit = stdout.trim().split(/\s+/)[1]
+    cp.exec(getRemote, {cwd:appPath}, function(err, stdout, stderr){
+      if (err || stderr) return cb(err || stderr)
+      result.remote = stdout.split('\n')[1].split(/\s+/)[3]
+      cb(null, result)
     })
   })
 }
 
-/**
- * checkDns
- *
- * @param {String} uri
- * @param {Function} callback, 1 argument: error
- */
-function checkDns(uri,cb) {
-  var dns = require('dns')
-  var domain = uri.split('://')[1]
-  domain = domain.split('/')[0]
-  domain = domain.split(':')[0]
-  var split = domain.split('@')
-  domain = split[split.length - 1]
-  dns.lookup(domain,function(err,data,fam){
-    if (err && domain!='localhost' && domain!='127.0.0.1' && domain!='0.0.0.0')
-      return cb(err)
-    cb()
+function monStatus(id, cb) {
+  var monPath = path.join(__dirname,'bin','mon')
+  var pidPath = path.join(_config.pids,id+'.pid')
+  var monPidPath = path.join(_config.pids,id+'.mon.pid')
+  var result = {}
+  result.pidPath = pidPath
+  result.monPidPath = monPidPath
+  cp.exec(monPath+' -p '+monPidPath+' -S',function(err,stdout,stderr){
+    if (err) return cb(err)
+    var split = stdout.split(':')
+    result.monPid = split[0]
+    result.monStatus = split[1]
+    result.monUptime = split[2] || 0
+    cp.exec(monPath+' -p '+pidPath+' -S',function(err,stdout,stderr){
+      if (err) return cb(err)
+      var split = stdout.split(':')
+      result.pid = split[0]
+      result.status = split[1]
+      result.uptime = split[2] || 0
+      cb(null,result)
+    })
+  })
+}
+
+function monRestart(id, cb) {
+  var pidPath = path.join(_config.pids,id+'.pid')
+  cp.exec('kill -3 $(cat '+pidPath+')',cb)
+}
+
+function monStop(id, cb) {
+  var pidPath = path.join(_config.pids,id+'.pid')
+  var monPidPath = path.join(_config.pids,id+'.mon.pid')
+  cp.exec('kill -3 $(cat '+monPidPath+')',function(err){
+    if (err) return cb(err)
+    fs.unlink(pidPath,function(err){
+      if (err) return cb(err)
+      fs.unlink(monPidPath,cb)
+    })
   })
 }
 

@@ -1,0 +1,4 @@
+{ "install" : "touch INSTALLHOOK && npm install"
+, "start" : "node server"
+, "error" : "echo `date` >> ERRORHOOK"
+}

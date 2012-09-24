@@ -1,8 +1,0 @@
-{ "name" : "app-complex"
-, "version" : "0.0.0"
-, "dependencies" : { "jade" : "0.22.0" }
-, "config" : { "port" : "48976" }
-, "scripts" : { 
-    "buildAssets" : "node_modules/.bin/jade < index.jade > index.html" 
-  }
-}
