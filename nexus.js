@@ -929,6 +929,7 @@ function config(opts) {
   cfg.remotes = cfg.remotes || cfgFile.remotes || {}
   cfg.sleep   = cfg.sleep   || cfgFile.sleep   || 1
   cfg.execTimeout = cfg.execTimeout || cfgFile.execTimeout || 1000*60*30
+  cfg.error   = cfg.error   || cfgFile.error   || null
   
   // client
   cfg.key     = cfg.key     || cfgFile.key     || null
