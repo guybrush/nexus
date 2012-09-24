@@ -547,6 +547,7 @@ N.log = function log(opts, cb) {
 
   if (!opts.id) return cb(new Error('invalid options, no id'))
   var mon = self.db.get(opts.id)
+  if (!mon) return cb(new Error('invalid options, invalid id'))
   var logPath = path.join(_config.logs,mon.name+'_'+opts.id+'.log')
   opts.command = 'tail '+logPath
   if (opts.follow) opts.command += ' -f'
