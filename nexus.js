@@ -78,7 +78,7 @@ N.install = function install(opts, cb) {
 
   var self = this
   opts.type = opts.type || 'git'
-    
+
   if (opts.type == 'git') {
     if (!opts.url && !_.isString(opts.url))
       return cb(new Error('invalid options, no git-url defined'))
@@ -89,7 +89,7 @@ N.install = function install(opts, cb) {
     var dir = path.join(self._config.apps, name)
     var cacheHash = crypto.createHash("sha1").update(url).digest("hex")
     var cachePath = path.join(self._config.cache, cacheHash)
-      
+
     async.series([checkDir, checkCache], function(err){
        if (err) return cb(err)
        var todo =
@@ -136,14 +136,14 @@ N.install = function install(opts, cb) {
             )(next)
       })
     }
-    
+
     function checkNexus(next) {
       readNexus(dir, function(err, data) {
         if (err || !data.install) return next()
         exec(data.install, dir)(next)
       })
     }
-    
+
     return
   }
   cb(new Error('invalid options, unknown type'))
@@ -230,7 +230,7 @@ N.ls = function ls(filter, cb) {
           next()
         })
       }
-      
+
       function checkNexus(next){
         readNexus(appPath,function(err,data){
           if (err) return next()
@@ -265,9 +265,9 @@ N.ls = function ls(filter, cb) {
 N.ps = function ps(filter, cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.ps.apply(this,args)})
-  
+
   var self = this
 
   cb = _.isFunction(arguments[arguments.length-1])
@@ -283,7 +283,7 @@ N.ps = function ps(filter, cb) {
   var result = []
   var mons = []
   self.db.forEach(function(key,val){
-    if (!val) return  
+    if (!val) return
     mons.push(val)
   })
   async.map(mons,function(mon,next){
@@ -320,29 +320,29 @@ N.ps = function ps(filter, cb) {
 N.start = function start(opts, cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.start.apply(self,args)})
-  
+
   opts = _.isObject(opts) ? opts : {}
   cb = arguments[arguments.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
 
   if (!opts.name || !_.isString(opts.name))
     return cb(new Error('invalid options, no name defined'))
-  
+
   opts.cwd = opts.cwd || path.join(self._config.apps, opts.name)
-  
+
   fs.exists(opts.cwd, function(e){
     if (!e)
       return cb(new Error('invalid options, the cwd doesnt exist: '+opts.cwd))
-    
+
     if (!opts.id) {
       var ids = []
       self.db.forEach(function(k){ids.push(k)})
       opts.id = genId(10)
       while (!!~ids.indexOf(opts.id)) opts.id = genId()
     }
-    
+
     var monitor = {}
     monitor.id = opts.id
     monitor.name = opts.name || 'UNNAMED'
@@ -351,18 +351,18 @@ N.start = function start(opts, cb) {
     monitor.env = opts.env || {}
     monitor.env.NEXUS_ID = opts.id
     if (opts.NEXUS_SERVER) monitor.NEXUS_SERVER = true
-      
+
     readNexus(opts.cwd,function(err,data){
       if (opts.command)
         monitor.command = opts.command
       else if (!err && data.start)
         monitor.command = data.start
-      
+
       if (!err) monitor.nexus = data
-      
-      if (!monitor.command) 
+
+      if (!monitor.command)
         return cb(new Error('invalid options, no command defined'))
-      
+
       var monPath = path.join(__dirname,'bin','mon')
       var pidPath = path.join(self._config.pids,monitor.id+'.pid')
       var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
@@ -370,7 +370,7 @@ N.start = function start(opts, cb) {
       var logPath = path.join(self._config.logs,monitor.name+'_'+monitor.id+'.log')
       var spawnOpts = {cwd:monitor.cwd,env:process.env}
       Object.keys(monitor.env).forEach(function(x){
-        spawnOpts.env[x] = monitor.env[x] 
+        spawnOpts.env[x] = monitor.env[x]
         spawnOpts.env.NEXUS_CONFIG = _configStringified
       })
       var child = cp.spawn
@@ -378,13 +378,13 @@ N.start = function start(opts, cb) {
         , [ '-d', monitor.command
           , '-p', pidPath
           , '-m', monPidPath
-          , '-l', logPath 
+          , '-l', logPath
           , '-e', monErrorPath ]
         , spawnOpts )
       child.on('exit',function(code){
-        if (code !== 0) 
+        if (code !== 0)
           return cb(new Error( 'could not start the monitor: '
-                             + JSON.stringify(monitor))) 
+                             + JSON.stringify(monitor)))
         self.db.set(monitor.id,monitor)
         self.ps({id:monitor.id},function(err,data){
           if (err) return cb(err)
@@ -402,7 +402,7 @@ N.start = function start(opts, cb) {
 N.restart = function restart(id, cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.restart.apply(self,args)})
   id = _.isString(id) ? id : null
   cb = arguments[arguments.length - 1]
@@ -435,7 +435,7 @@ N.restart = function restart(id, cb) {
 N.restartall = function restarall(cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.restartall.apply(self,args)})
   cb = arguments[arguments.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
@@ -481,7 +481,7 @@ N.reboot = function reboot(cb) {
 N.stop = function stop(id, cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.stop.apply(self,args)})
   id = _.isString(id) ? id : null
   cb = args[args.length - 1]
@@ -521,7 +521,7 @@ N.stop = function stop(id, cb) {
 N.stopall = function stopall(cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.stopall.apply(self,args)})
   var toStop = []
   self.db.forEach(function(k,v){
@@ -537,12 +537,12 @@ N.stopall = function stopall(cb) {
 N.log = function log(opts, cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.log.apply(self,args)})
   cb = _.isFunction(arguments[arguments.length-1])
        ? arguments[arguments.length-1]
        : function() {}
-  
+
   opts = opts || {}
 
   if (!opts.id) return cb(new Error('invalid options, no id'))
@@ -578,7 +578,7 @@ N.exec = function exec(opts, cb) {
     opts[x] = opts[x] && _.isFunction(opts[x]) ? opts[x] : function(){}
   })
 
-  
+
   var sh = (process.platform === "win32") ? 'cmd' : 'sh'
   var shFlag = (process.platform === "win32") ? '/c' : '-c'
   var cwd = opts.name ? path.join(self._config.apps,opts.name) : self._config.apps
@@ -614,7 +614,7 @@ N.exec = function exec(opts, cb) {
 N.initDb = function initDb(cb) {
   cb = _.isFunction(cb) ? cb : function() {}
   var self = this
-  if (!self._config.db) 
+  if (!self._config.db)
     return cb(new Error('invalid config, no database-path defined'))
   self.db = dirty(self._config.db).on('load',function(){
     self._dbLoaded = true
@@ -663,7 +663,7 @@ N.connect = function connect(opts,cb) {
   opts.cert = opts.cert || self._config.cert
   opts.socket = opts.socket || self._config.socket
   opts.reconnect = opts.reconnect || null
-  
+
   if (opts.remote && self._config.remotes[opts.remote]) {
     Object.keys(self._config.remotes[opts.remote]).forEach(function(x){
       opts[x] = self._config.remotes[opts.remote][x]
@@ -690,7 +690,7 @@ N.connect = function connect(opts,cb) {
     if (!opts.reconnect && err) return
     setTimeout(connect,opts.reconnect)
   }
-  
+
   return connect()
 }
 
@@ -713,7 +713,7 @@ N.listen = function listen(opts, cb) {
   else if (cfg.port) todo.push(listenNet)
 
   // console.log(cfg, todo)
-  
+
   async.parallel(todo,function(err){
     if (err) return cb(err)
     cb(null, self.servers)
@@ -770,9 +770,9 @@ N.listen = function listen(opts, cb) {
 N.server = function server(opts, cb) {
   var self = this
   var args = arguments
-  if (!this._dbLoaded) 
+  if (!this._dbLoaded)
     return this.once('db::load',function(){N.server.apply(self,args)})
-  
+
   opts = _.isObject(opts) ? opts : {}
   cb = arguments[arguments.length-1]
   cb = _.isFunction(cb) ? cb : function(){}
@@ -792,7 +792,7 @@ N.server = function server(opts, cb) {
     startOpts.command = 'node server.js'
     startOpts.name = 'NEXUS_SERVER'
     startOpts.env = {NEXUS_SERVER:true}
-    
+
     if (opts.port) startOpts.command += ' -p '+opts.port
     if (opts.key)  startOpts.command += ' --key '+opts.key
     if (opts.cert) startOpts.command += ' --cert '+opts.cert
@@ -804,14 +804,14 @@ N.server = function server(opts, cb) {
       startOpts.command += ' -c '+_config.configFile
     else
       startOpts.env.NEXUS_CONFIG = JSON.stringify(_config)
-    
+
     self.start(startOpts,cb)
   }
 }
 
 /**
  * filter object-properties
- * 
+ *
  * @param {Object} filter
  * @param {Object} data
  * @return {Object|false} filtered data or false
@@ -916,11 +916,11 @@ function config(opts) {
     cfg.configFile = cfgPath
     try { cfgFile = require(cfgPath) }
     catch (e) {
-      delete cfg.configFile 
+      delete cfg.configFile
     }
   }
   else if (opts && _.isObject(opts)) cfg = opts
-    
+
   cfg.prefix  = cfg.prefix  || cfgFile.prefix  || path.dirname(cfgPath)
   cfg.apps    = cfg.apps    || cfgFile.apps    || path.join(cfg.prefix,'apps')
   cfg.cache   = cfg.cache   || cfgFile.cache   || path.join(cfg.prefix,'cache')
@@ -931,7 +931,7 @@ function config(opts) {
   cfg.sleep   = cfg.sleep   || cfgFile.sleep   || 1
   cfg.execTimeout = cfg.execTimeout || cfgFile.execTimeout || 1000*60*30
   cfg.error   = cfg.error   || cfgFile.error   || null
-  
+
   // client
   cfg.key     = cfg.key     || cfgFile.key     || null
   cfg.cert    = cfg.cert    || cfgFile.cert    || null
@@ -1008,11 +1008,11 @@ function readGit(appPath, cb){
   cp.exec(getCommit, {cwd:appPath}, function(err, stdout, stderr){
     if (err || stderr) return cb(err || stderr)
     result.commit = stdout.trim().split(/\s+/)[1]
-    cp.exec(getRemote, {cwd:appPath}, function(err, stdout, stderr){
-      if (err || stderr) return cb(err || stderr)
-      result.remote = stdout.split('\n')[1].split(/\s+/)[3]
+    // cp.exec(getRemote, {cwd:appPath}, function(err, stdout, stderr){
+    //   if (err || stderr) return cb(err || stderr)
+    //   result.remote = stdout.split('\n')[1].split(/\s+/)[3]
       cb(null, result)
-    })
+    // })
   })
 }
 
