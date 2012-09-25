@@ -13,8 +13,6 @@ exports.readNexus = readNexus
 exports.readPackage = readPackage
 exports.readGit = readGit
 exports.monStatus = monStatus
-exports.monRestart = monRestart
-exports.monStop = monStop
 
 var fs      = require('fs')
   , path    = require('path')
@@ -149,7 +147,7 @@ N.install = function install(opts, cb) {
   cb(new Error('invalid options, unknown type'))
 }
 
-/**                            
+/**
  * uninstall an app
  *
  * @param {String} app-name
@@ -351,7 +349,7 @@ N.start = function start(opts, cb) {
     monitor.env = opts.env || {}
     monitor.env.NEXUS_ID = opts.id
     if (opts.NEXUS_SERVER) monitor.NEXUS_SERVER = true
-            
+
     readNexus(opts.cwd,function(err,data){
       if (opts.command)
         monitor.command = opts.command
@@ -414,20 +412,27 @@ N.restart = function restart(id, cb) {
   monStatus(id,function(err,data){
     if (err) return cb(err)
     var oldPid = data.pid
-    monRestart(id,function(err){
-      if (err) return cb(err)
-      ;(function check(){
-        // check if pid changed.. so we know the new process is up
-        setTimeout(function(){
-          monStatus(id,function(err,res){
-            var dat = self.db.get(id)
-            dat.crashed = 0
-            self.db.set(id,dat)
-            if (res.pid == oldPid) return check()
-            self.ps({id:id},function(err,res){cb(null,res[0])})
-          })
-        },500)
-      })()
+    pstree(data.pid,function(err,children){
+      var pidPath = path.join(_config.pids,id+'.pid')
+      var monPidPath = path.join(_config.pids,id+'.mon.pid')
+      var childPids = children.map(function (p) {return p.PID})
+      var pidsToKill = [data.pid].concat(childPids)
+      var cmd = 'kill -3 '+pidsToKill.join(' ')
+      cp.exec(cmd,function(err){
+        if (err) return cb(err)
+        ;(function check(){
+          // check if pid changed.. so we know the new process is up
+          setTimeout(function(){
+            monStatus(id,function(err,res){
+              var dat = self.db.get(id)
+              dat.crashed = 0
+              self.db.set(id,dat)
+              if (res.pid == oldPid) return check()
+              self.ps({id:id},function(err,res){cb(null,res[0])})
+            })
+          },500)
+        })()
+      })
     })
   })
 }
@@ -490,32 +495,30 @@ N.stop = function stop(id, cb) {
   cb = args[args.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
   if (!id) return cb(new Error('invalid options, missing id'))
-  self.ps({id:id},function(err,old){
+  self.ps({id:id},function(err,data){
     if (err) return cb(err)
-    if (old[0].status == 'ghost') {
+    var old = data[0]
+    if (old.status == 'ghost') {
       self.db.rm(id)
       return cb(null,old)
     }
-    monStop(id,function(err){
-      if (err) return cb(err)
-      self.db.rm(id)
-      cb(null,old[0])
+    pstree(old.pid,function(err,children){
+      var pidPath = path.join(_config.pids,id+'.pid')
+      var monPidPath = path.join(_config.pids,id+'.mon.pid')
+      var childPids = children.map(function (p) {return p.PID})
+      var pidsToKill = [old.monPid].concat(childPids)
+      var cmd = 'kill -3 '+pidsToKill.join(' ')
+      cp.exec(cmd,function(err){
+        if (err) return cb(err)
+        fs.unlink(pidPath,function(err){
+          fs.unlink(monPidPath,function(err){
+            self.db.rm(id)
+            cb(null,old)
+          })
+        })
+      })
     })
   })
-  // monStatus(id,function(err,data){
-  //   if (err) return cb(err)
-  //   if (data.monStatus == 'dead') {
-  //     var old = self.db.get(id)
-  //     self.db.rm(id)
-  //     return cb(null,old)
-  //   }
-  //   monStop(id,function(err){
-  //     if (err) return cb(err)
-  //     var old = self.db.get(id)
-  //     self.db.rm(id)
-  //     cb(null,old)
-  //   })
-  // })
 }
 
 /**
@@ -1039,23 +1042,6 @@ function monStatus(id, cb) {
       result.status = split[1]
       result.uptime = split[2] || 0
       cb(null,result)
-    })
-  })
-}
-
-function monRestart(id, cb) {
-  var pidPath = path.join(_config.pids,id+'.pid')
-  cp.exec('kill -3 $(cat '+pidPath+')',cb)
-}
-
-function monStop(id, cb) {
-  var pidPath = path.join(_config.pids,id+'.pid')
-  var monPidPath = path.join(_config.pids,id+'.mon.pid')
-  cp.exec('kill -3 $(cat '+monPidPath+')',function(err){
-    if (err) return cb(err)
-    fs.unlink(pidPath,function(err){
-      if (err) return cb(err)
-      fs.unlink(monPidPath,cb)
     })
   })
 }
