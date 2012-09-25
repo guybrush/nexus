@@ -361,34 +361,38 @@ N.start = function start(opts, cb) {
       if (!monitor.command)
         return cb(new Error('invalid options, no command defined'))
 
-      readGit(opts.cwd,function(err,data){
-        if (!err) monitor.commit = data.commit
-        var monPath = path.join(__dirname,'bin','mon')
-        var pidPath = path.join(self._config.pids,monitor.id+'.pid')
-        var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
-        var monErrorPath = path.join(__dirname,'bin','mon-error.js')
-        var logPath = path.join(self._config.logs,monitor.name+'_'+monitor.id+'.log')
-        var spawnOpts = {cwd:monitor.cwd,env:process.env}
-        Object.keys(monitor.env).forEach(function(x){
-          spawnOpts.env[x] = monitor.env[x]
-          spawnOpts.env.NEXUS_CONFIG = _configStringified
-        })
-        var child = cp.spawn
-          ( monPath
-          , [ '-d', monitor.command
-            , '-p', pidPath
-            , '-m', monPidPath
-            , '-l', logPath
-            , '-e', monErrorPath ]
-          , spawnOpts )
-        child.on('exit',function(code){
-          if (code !== 0)
-            return cb(new Error( 'could not start the monitor: '
-                               + JSON.stringify(monitor)))
-          self.db.set(monitor.id,monitor)
-          self.ps({id:monitor.id},function(err,data){
-            if (err) return cb(err)
-            cb(null,data[0])
+      readPackage(opts.cwd,function(err,data){
+        if (!err) monitor.package = {name:data.name,version:data.version}
+      
+        readGit(opts.cwd,function(err,data){
+          if (!err) monitor.commit = data.commit
+          var monPath = path.join(__dirname,'bin','mon')
+          var pidPath = path.join(self._config.pids,monitor.id+'.pid')
+          var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
+          var monErrorPath = path.join(__dirname,'bin','mon-error.js')
+          var logPath = path.join(self._config.logs,monitor.name+'_'+monitor.id+'.log')
+          var spawnOpts = {cwd:monitor.cwd,env:process.env}
+          Object.keys(monitor.env).forEach(function(x){
+            spawnOpts.env[x] = monitor.env[x]
+            spawnOpts.env.NEXUS_CONFIG = _configStringified
+          })
+          var child = cp.spawn
+            ( monPath
+            , [ '-d', monitor.command
+              , '-p', pidPath
+              , '-m', monPidPath
+              , '-l', logPath
+              , '-e', monErrorPath ]
+            , spawnOpts )
+          child.on('exit',function(code){
+            if (code !== 0)
+              return cb(new Error( 'could not start the monitor: '
+                                 + JSON.stringify(monitor)))
+            self.db.set(monitor.id,monitor)
+            self.ps({id:monitor.id},function(err,data){
+              if (err) return cb(err)
+              cb(null,data[0])
+            })
           })
         })
       })
