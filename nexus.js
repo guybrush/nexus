@@ -149,7 +149,7 @@ N.install = function install(opts, cb) {
   cb(new Error('invalid options, unknown type'))
 }
 
-/**
+/**                            
  * uninstall an app
  *
  * @param {String} app-name
@@ -226,7 +226,7 @@ N.ls = function ls(filter, cb) {
       function checkGit(next){
         readGit(appPath,function(err,data){
           if (err) return next() // ignore
-          app.git = data
+          app.commit = data.commit
           next()
         })
       }
@@ -351,44 +351,47 @@ N.start = function start(opts, cb) {
     monitor.env = opts.env || {}
     monitor.env.NEXUS_ID = opts.id
     if (opts.NEXUS_SERVER) monitor.NEXUS_SERVER = true
-
+            
     readNexus(opts.cwd,function(err,data){
       if (opts.command)
         monitor.command = opts.command
       else if (!err && data.start)
         monitor.command = data.start
 
-      if (!err) monitor.nexus = data
+      // if (!err) monitor.nexus = data
 
       if (!monitor.command)
         return cb(new Error('invalid options, no command defined'))
 
-      var monPath = path.join(__dirname,'bin','mon')
-      var pidPath = path.join(self._config.pids,monitor.id+'.pid')
-      var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
-      var monErrorPath = path.join(__dirname,'bin','mon-error.js')
-      var logPath = path.join(self._config.logs,monitor.name+'_'+monitor.id+'.log')
-      var spawnOpts = {cwd:monitor.cwd,env:process.env}
-      Object.keys(monitor.env).forEach(function(x){
-        spawnOpts.env[x] = monitor.env[x]
-        spawnOpts.env.NEXUS_CONFIG = _configStringified
-      })
-      var child = cp.spawn
-        ( monPath
-        , [ '-d', monitor.command
-          , '-p', pidPath
-          , '-m', monPidPath
-          , '-l', logPath
-          , '-e', monErrorPath ]
-        , spawnOpts )
-      child.on('exit',function(code){
-        if (code !== 0)
-          return cb(new Error( 'could not start the monitor: '
-                             + JSON.stringify(monitor)))
-        self.db.set(monitor.id,monitor)
-        self.ps({id:monitor.id},function(err,data){
-          if (err) return cb(err)
-          cb(null,data[0])
+      readGit(opts.cwd,function(err,data){
+        if (!err) monitor.commit = data.commit
+        var monPath = path.join(__dirname,'bin','mon')
+        var pidPath = path.join(self._config.pids,monitor.id+'.pid')
+        var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
+        var monErrorPath = path.join(__dirname,'bin','mon-error.js')
+        var logPath = path.join(self._config.logs,monitor.name+'_'+monitor.id+'.log')
+        var spawnOpts = {cwd:monitor.cwd,env:process.env}
+        Object.keys(monitor.env).forEach(function(x){
+          spawnOpts.env[x] = monitor.env[x]
+          spawnOpts.env.NEXUS_CONFIG = _configStringified
+        })
+        var child = cp.spawn
+          ( monPath
+          , [ '-d', monitor.command
+            , '-p', pidPath
+            , '-m', monPidPath
+            , '-l', logPath
+            , '-e', monErrorPath ]
+          , spawnOpts )
+        child.on('exit',function(code){
+          if (code !== 0)
+            return cb(new Error( 'could not start the monitor: '
+                               + JSON.stringify(monitor)))
+          self.db.set(monitor.id,monitor)
+          self.ps({id:monitor.id},function(err,data){
+            if (err) return cb(err)
+            cb(null,data[0])
+          })
         })
       })
     })
