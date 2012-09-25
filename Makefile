@@ -7,6 +7,7 @@ test: test-prepare
 	node_modules/.bin/mocha
 	
 test-prepare:
+	rm -rf test/tmp/* ^.gitignore
 	cp -r test/fixtures/app test/tmp/app
 	cd test/tmp/app && git init . && git add . && git commit -am"foo"
 	

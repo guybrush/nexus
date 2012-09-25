@@ -26,11 +26,11 @@ var fs      = require('fs')
   , rimraf  = require('rimraf')
   , dirty   = require('dirty')
   , mkdirp  = require('mkdirp')
-  , pstree  = require('ps-tree')
   , async   = require('async')
   , EE2     = require('eventemitter2').EventEmitter2
   , crypto  = require('crypto')
   , debug   = require('debug')('nexus')
+  , parseTable = require('parse-table')
   , _config, _configStringified
 
 // node@0.6.x compat
@@ -356,7 +356,7 @@ N.start = function start(opts, cb) {
       else if (!err && data.start)
         monitor.command = data.start
 
-      // if (!err) monitor.nexus = data
+      if (!err) monitor.nexus = data
 
       if (!monitor.command)
         return cb(new Error('invalid options, no command defined'))
@@ -1048,5 +1048,30 @@ function monStatus(id, cb) {
       cb(null,result)
     })
   })
+}
+
+// this is actually ps-tree@0.0.2 from npm - which leaks the `child` variable
+// couldnt find the repo, so here we go..
+function pstree(pid, callback) {
+  var headers = null
+
+  if('function' !== typeof callback) 
+    throw new Error('pstree(pid, callback) expects callback')
+  if('number' == typeof pid)
+    pid = pid.toString()
+  
+  var child = cp.spawn('ps', ['-A', '-o', 'ppid,pid,cmd'])
+
+  child.stdout.pipe(parseTable(function (err, ps) {
+      var parents = [pid], children = []
+      ps.forEach(function (proc) {
+        if(-1 != parents.indexOf(proc.PPID)) {
+          parents.push(proc.PID)
+          children.push(proc)
+        }
+      })
+      callback(null, children)    
+    }))
+  child.on('error', callback)
 }
 
