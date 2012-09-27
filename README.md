@@ -12,7 +12,7 @@
 
 [![build status](https://secure.travis-ci.org/guybrush/nexus.png)](http://travis-ci.org/guybrush/nexus)
 
-* nexus provides a cli and a server with [dnode]-interface to install, 
+* nexus provides a cli and a server with [dnode]-interface to install,
   uninstall, start, stop and observe local and remote programs.
 * right now only git-repos can be installed.
 * running programs are monitored with [mon].
@@ -40,21 +40,22 @@ nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
 
 commands:
 
-    version   .. print version-number
-    config    .. print config
-    ls        .. list installed packages
-    install   .. install programs
-    uninstall .. uninstall programs
-    ps        .. list of current running (and crashed) programs
-    start     .. start a program
-    restart   .. restart a running (or max crashed) program
-    stop      .. stop a running program
-    stopall   .. stop all running programs
-    exec      .. execute a command
-    subscribe .. subscribe to events
-    logs      .. access logs
-    server    .. start the nexus-server
-    help      .. try `nexus help <command>` for more info
+    version    .. print version-number
+    config     .. print config
+    ls         .. list installed packages
+    install    .. install packages
+    uninstall  .. uninstall packages
+    ps         .. list of current running (and crashed) programs
+    start      .. start a program
+    restart    .. restart a running (or max crashed) program
+    restartall .. restart all running programs
+    reboot     .. reboot ghost-programs
+    stop       .. stop a running program
+    stopall    .. stop all running programs
+    exec       .. execute a command
+    log        .. access log-files
+    server     .. control nexus-servers
+    help       .. try `nexus help <command>` for more info
 ```
 
 ## config
@@ -88,6 +89,8 @@ the default config is (which gets overwritten by the config you pass to nexus):
 , remotes : {}                 // can be used with the cli: `nexus -r`
                                // a remote is either a socket or a port
                                // (optional in combination with key, cert, host)
+, error   : null               // if set (a string) it will be executed with cwd = prefix
+                               // when a program exits
 }
 ```
 
