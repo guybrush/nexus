@@ -58,6 +58,7 @@ var N = Nexus.prototype = new EE2
  * @param {Function} cb with 2 args: err, version
  */
 N.config = function config(cb) {
+  cb = _.isFunction(cb) ? cb : function() {}
   cb(null, this._config)
 }
 
