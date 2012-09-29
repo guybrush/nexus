@@ -18,15 +18,14 @@
 * running programs are monitored with [mon].
 * information about running programms is stored in a [dirty]-database.
 * all the config, logs and programs live in `~/.nexus` by default.
-* nexus is still *super-alpha*. you may want to checkout [fleet] or [haibu]
-  which do similiar things differently.
+* nexus is still *super-alpha*. you may want to checkout [fleet]
+  which does similiar things differently.
 
 [node]: http://nodejs.org
 [dnode]: https://github.com/substack/dnode
 [mon]: https://github.com/visionmedia/mon
 [dirty]: https://github.com/felixge/node-dirty
 [fleet]: https://github.com/substack/fleet
-[haibu]: https://github.com/nodejitsu/haibu
 
 ## install
 
@@ -89,8 +88,9 @@ the default config is (which gets overwritten by the config you pass to nexus):
 , remotes : {}                 // can be used with the cli: `nexus -r`
                                // a remote is either a socket or a port
                                // (optional in combination with key, cert, host)
-, error   : null               // if set (a string) it will be executed with cwd = prefix
-                               // when a program exits
+, error   : null               // if set (a string) it will be executed when a program exits
+                               // CWD will be set to prefix, and ENV.NEXUS_MONITOR contains
+                               // JSON.stringify'ed information about the chrashed program
 }
 ```
 
@@ -104,6 +104,7 @@ your config may look like this:
 , key     : '/path/to/key.pem'
 , cert    : '/path/to/cert.pem'
 , ca      : '/path/to/ca'
+, error   : 'echo "it crashed" > email'
 , remotes :
   { foo   : { port:12346, key:<key>, cert:<cert>, host:'foo.com' }
   , bar   : { port:12347, key:<key>, cert:<cert>, host:'bar.com' }

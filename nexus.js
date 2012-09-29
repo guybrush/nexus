@@ -216,7 +216,8 @@ N.ls = function ls(filter, cb) {
       function checkPackage(next){
         readPackage(appPath,function(err,data){
           if (err) return next() // ignore
-          app.package = data
+          // app.package = data
+          app.package = {name:data.name,version:data.version}
           next()
         })
       }
@@ -224,7 +225,8 @@ N.ls = function ls(filter, cb) {
       function checkGit(next){
         readGit(appPath,function(err,data){
           if (err) return next() // ignore
-          app.commit = data.commit
+          // app.commit = data.commit
+          app.git = data
           next()
         })
       }
@@ -363,9 +365,9 @@ N.start = function start(opts, cb) {
 
       readPackage(opts.cwd,function(err,data){
         if (!err) monitor.package = {name:data.name,version:data.version}
-      
+
         readGit(opts.cwd,function(err,data){
-          if (!err) monitor.commit = data.commit
+          if (!err) monitor.git = data
           var monPath = path.join(__dirname,'bin','mon')
           var pidPath = path.join(self._config.pids,monitor.id+'.pid')
           var monPidPath = path.join(self._config.pids,monitor.id+'.mon.pid')
@@ -911,7 +913,7 @@ function genId(len) {
  * initialize config (synchron - it throws when something goes wrong)
  *
  * @param {Object} options
- * @return {Object} config
+ * @return {Object} c onfig
  */
 function config(opts) {
   var cfg = {}
@@ -1013,16 +1015,16 @@ function readPackage(appPath, cb){
 
 function readGit(appPath, cb){
   var result = {}
-  var getCommit = 'git log --no-color | head -n1'
-  var getRemote = 'git remote show origin | head -n2'
-  cp.exec(getCommit, {cwd:appPath}, function(err, stdout, stderr){
+  var getCommit = 'git rev-parse HEAD'
+  var getRemote = 'git config remote.origin.url'
+  // 1 command instead of 2 separate is just faster (not much, but ye..)
+  var execCmd = getCommit+' && '+getRemote
+  cp.exec(execCmd, {cwd:appPath}, function(err, stdout, stderr){
     if (err || stderr) return cb(err || stderr)
-    result.commit = stdout.trim().split(/\s+/)[1]
-    // cp.exec(getRemote, {cwd:appPath}, function(err, stdout, stderr){
-    //   if (err || stderr) return cb(err || stderr)
-    //   result.remote = stdout.split('\n')[1].split(/\s+/)[3]
-      cb(null, result)
-    // })
+    var split = stdout.split('\n')
+    result.commit = split[0]
+    result.remote = split[1]
+    cb(null, result)
   })
 }
 
@@ -1055,11 +1057,11 @@ function monStatus(id, cb) {
 function pstree(pid, callback) {
   var headers = null
 
-  if('function' !== typeof callback) 
+  if('function' !== typeof callback)
     throw new Error('pstree(pid, callback) expects callback')
   if('number' == typeof pid)
     pid = pid.toString()
-  
+
   var child = cp.spawn('ps', ['-A', '-o', 'ppid,pid,cmd'])
 
   child.stdout.pipe(parseTable(function (err, ps) {
@@ -1070,7 +1072,7 @@ function pstree(pid, callback) {
           children.push(proc)
         }
       })
-      callback(null, children)    
+      callback(null, children)
     }))
   child.on('error', callback)
 }
