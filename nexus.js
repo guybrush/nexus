@@ -520,6 +520,7 @@ N.stop = function stop(id, cb) {
         fs.unlink(pidPath,function(err){
           fs.unlink(monPidPath,function(err){
             self.db.rm(id)
+            old.status = 'stopped'
             cb(null,old)
           })
         })
