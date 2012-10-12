@@ -81,14 +81,15 @@ N.install = function install(opts, cb) {
   if (opts.type == 'git') {
     if (!opts.url && !_.isString(opts.url))
       return cb(new Error('invalid options, no git-url defined'))
-    var url = opts.url
-    var ref = opts.ref || url.split('#').slice(1)
+    var urlSplit = opts.url.split('#') 
+    var url = urlSplit[0]
+    var ref = opts.ref || urlSplit[1] || 'master'
     var urlSplit = url.split('/')
     var name = opts.name || urlSplit[urlSplit.length-1].replace(/#.*$/,'')
     var dir = path.join(self._config.apps, name)
     var cacheHash = crypto.createHash("sha1").update(url).digest("hex")
     var cachePath = path.join(self._config.cache, cacheHash)
-
+    
     async.series([checkDir, checkCache], function(err){
        if (err) return cb(err)
        var todo =
