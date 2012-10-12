@@ -18,8 +18,8 @@
 * running programs are monitored with [mon].
 * information about running programms is stored in a [dirty]-database.
 * all the config, logs and programs live in `~/.nexus` by default.
-* nexus is still *super-alpha*. you may want to checkout [fleet]
-  which does similiar things differently.
+* nexus is still *super-alpha* (and may change a lot). you may want to 
+  checkout [fleet] which does similiar things differently.
 
 [node]: http://nodejs.org
 [dnode]: https://github.com/substack/dnode
@@ -120,6 +120,5 @@ or more simple - this will install all the things into `/var/nexus`:
 { prefix : '/var/nexus', port : 12345 }
 ```
 
-the nexus-server will then listen on port `0.0.0.0:12345` *and* on the
-unix-socket `/var/nexus/socket`.
+the nexus-server will then listen on port `0.0.0.0:12345`.
 
