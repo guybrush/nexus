@@ -93,7 +93,7 @@ N.install = function install(opts, cb) {
        if (err) return cb(err)
        var todo =
         [ exec('git fetch', cachePath)
-        , exec('git clone '+cachePath+' '+dir, self._config.apps)
+        , exec('git clone --recursive '+cachePath+' '+dir, self._config.apps)
         , exec('git checkout '+ref, dir)
         , exec('git remote rm origin', dir)
         , exec('git remote add origin '+url, dir)
@@ -667,7 +667,6 @@ N.createService = function createService() {
  * connect to a remote nexus-server
  */
 N.connect = function connect(opts,cb) {
-
   var self = this
   cb = arguments[arguments.length-1]
   cb = _.isFunction(cb) ? cb : function(){}
@@ -700,6 +699,7 @@ N.connect = function connect(opts,cb) {
     d.pipe(client).pipe(d)
     return client
   }
+
   function onError(err) {
     if (!opts.reconnect && err) return
     setTimeout(connect,opts.reconnect)
@@ -725,8 +725,6 @@ N.listen = function listen(opts, cb) {
   if (cfg.socket) todo.push(listenUnix)
   if (cfg.key && cfg.port) todo.push(listenTls)
   else if (cfg.port) todo.push(listenNet)
-
-  // console.log(cfg, todo)
 
   async.parallel(todo,function(err){
     if (err) return cb(err)
