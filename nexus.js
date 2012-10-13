@@ -505,6 +505,7 @@ N.stop = function stop(id, cb) {
   if (!id) return cb(new Error('invalid options, missing id'))
   self.ps({id:id},function(err,data){
     if (err) return cb(err)
+    if (!data.length) return cb(new Error('invalid options, invalid id'))
     var old = data[0]
     if (old.status == 'ghost') {
       self.db.rm(id)
