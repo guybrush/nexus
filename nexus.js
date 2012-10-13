@@ -517,13 +517,13 @@ N.stop = function stop(id, cb) {
       var childPids = children.map(function (p) {return p.PID})
       var pidsToKill = [old.monPid].concat(childPids)
       var cmd = 'kill -3 '+pidsToKill.join(' ')
-      cp.exec(cmd,function(err){
-        if (err) return cb(err)
+      cp.exec(cmd,function(cmdErr){
+        // if (cmdErr) return cb(cmdErr)
         fs.unlink(pidPath,function(err){
           fs.unlink(monPidPath,function(err){
             self.db.rm(id)
             old.status = 'stopped'
-            cb(null,old)
+            cb(cmdErr,old)
           })
         })
       })
@@ -1038,17 +1038,21 @@ function monStatus(id, cb) {
   result.pidPath = pidPath
   result.monPidPath = monPidPath
   cp.exec(monPath+' -p '+monPidPath+' -S',function(err,stdout,stderr){
-    if (err) return cb(err)
-    var split = stdout.split(':')
-    result.monPid = split[0]
-    result.monStatus = split[1]
-    result.monUptime = split[2] || 0
-    cp.exec(monPath+' -p '+pidPath+' -S',function(err,stdout,stderr){
-      if (err) return cb(err)
+    if (err) result.monStatus = err
+    else {
       var split = stdout.split(':')
-      result.pid = split[0]
-      result.status = split[1]
-      result.uptime = split[2] || 0
+      result.monPid = split[0]
+      result.monStatus = split[1]
+      result.monUptime = split[2] || 0
+    }
+    cp.exec(monPath+' -p '+pidPath+' -S',function(err,stdout,stderr){
+      if (err) result.status = err
+      else {
+        var split = stdout.split(':')
+        result.pid = split[0]
+        result.status = split[1]
+        result.uptime = split[2] || 0
+      }
       cb(null,result)
     })
   })
