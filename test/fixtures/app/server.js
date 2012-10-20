@@ -1,6 +1,8 @@
-var idx = process.argv.indexOf('-p')
-var port = !!~idx && process.argv[idx+1] ? process.argv[idx+1] : 8004
 var http = require('http')
+var idx = process.argv.indexOf('-p')
+var port = !!~idx && process.argv[idx+1] 
+           ? process.argv[idx+1] 
+           : ~~(Math.random()*50000)+10000
 
 http.createServer(function(req,res){
   res.end(process.env.NEXUS_ID)

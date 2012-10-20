@@ -35,7 +35,8 @@ ME['start error'] = function(done){
   n.install({url:common.appPath,name:name},function(err,data){
     assert.ok(!err)
     assert.equal(data.name,name)
-    n.start({name:name},function(err,data){ 
+    var port = ~~(Math.random()*50000)+10000
+    n.start({name:name,command:'node server -p '+port},function(err,data){ 
       assert.ok(!err)
       assert.equal(data.name,name)
       var id = data.id
@@ -56,7 +57,7 @@ ME['start error'] = function(done){
         })
       })()
       function sendRequest(cb) {
-        http.get({host:'localhost',port:8004,path:'/'},function(res){
+        http.get({host:'localhost',port:port,path:'/'},function(res){
           assert.equal(res.statusCode,200)
           res.setEncoding('utf8')
           res.on('data', function(d){cb(null,d)})

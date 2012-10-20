@@ -469,9 +469,13 @@ N.restartall = function restarall(cb) {
  * @param {Function} cb with 2 args: err, result
  */
 N.reboot = function reboot(cb) {
-  cb = arguments[arguments.length - 1]
-  cb = _.isFunction(cb) ? cb : function(){}
   var self = this
+  var args = arguments
+  if (!this._dbLoaded)
+    return this.once('db::load',function(){N.stop.apply(self,args)})
+  cb = args[args.length - 1]
+  cb = _.isFunction(cb) ? cb : function(){}
+  
   self.ps(function(err,data){
     if (err) return cb(err)
     var result = []
