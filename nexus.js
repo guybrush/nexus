@@ -81,7 +81,7 @@ N.install = function install(opts, cb) {
   if (opts.type == 'git') {
     if (!opts.url && !_.isString(opts.url))
       return cb(new Error('invalid options, no git-url defined'))
-    var urlSplit = opts.url.split('#') 
+    var urlSplit = opts.url.split('#')
     var url = urlSplit[0]
     var ref = opts.ref || urlSplit[1] || 'master'
     var urlSplit = url.split('/')
@@ -89,7 +89,7 @@ N.install = function install(opts, cb) {
     var dir = path.join(self._config.apps, name)
     var cacheHash = crypto.createHash("sha1").update(url).digest("hex")
     var cachePath = path.join(self._config.cache, cacheHash)
-    
+
     async.series([checkDir, checkCache], function(err){
        if (err) return cb(err)
        var todo =
@@ -405,6 +405,8 @@ N.start = function start(opts, cb) {
 }
 
 /**
+ * Restart a running process.
+ *
  * @param {String} id of app
  * @param {Function} cb with 2 args: err, result
  */
@@ -446,6 +448,8 @@ N.restart = function restart(id, cb) {
 }
 
 /**
+ * Restart all currently running processes.
+ *
  * @param {Function} cb with 2 args: err, result
  */
 N.restartall = function restarall(cb) {
@@ -466,16 +470,18 @@ N.restartall = function restarall(cb) {
 }
 
 /**
+ * Restart every process with `status == 'ghost'`.
+ *
  * @param {Function} cb with 2 args: err, result
  */
 N.reboot = function reboot(cb) {
   var self = this
   var args = arguments
   if (!this._dbLoaded)
-    return this.once('db::load',function(){N.stop.apply(self,args)})
+    return this.once('db::load',function(){N.reboot.apply(self,args)})
   cb = args[args.length - 1]
   cb = _.isFunction(cb) ? cb : function(){}
-  
+
   self.ps(function(err,data){
     if (err) return cb(err)
     var result = []
@@ -495,6 +501,8 @@ N.reboot = function reboot(cb) {
 }
 
 /**
+ * Stop 1 process.
+ *
  * @param {String} id of app
  * @param {Function} cb with 2 args: err, result
  */
@@ -536,6 +544,8 @@ N.stop = function stop(id, cb) {
 }
 
 /**
+ * Stop all processes.
+ *
  * @param {Function} cb with 2 args: err, result
  */
 N.stopall = function stopall(cb) {
