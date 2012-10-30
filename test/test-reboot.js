@@ -30,16 +30,25 @@ ME['start 2 apps, process.kill all, reboot'] = function(done){
         // now fake a system-reboot: kill all processes
         process.kill(monPidA)
         process.kill(monPidB)
-        n.reboot(function(err,data){
+        debug('did kill processes')
+        n.ps(function(err,dataPs){
           assert.ok(!err)
-          debug('did reboot')
-          assert.equal(data.length,2)
-          var idsToRestart = [idA,idB]
-          data.forEach(function(x){
-            idsToRestart.splice(idsToRestart.indexOf(x.id),1)
+          assert.equal(dataPs.length,2)
+          assert.equal(dataPs[0].status,'ghost')
+          assert.equal(dataPs[1].status,'ghost')
+          n.reboot(function(err,dataReboot){
+            assert.ok(!err)
+            debug('did reboot')
+            assert.equal(dataReboot.length,2)
+            assert.equal(dataReboot[0].status,'alive')
+            assert.equal(dataReboot[1].status,'alive')
+            var idsToRestart = [idA,idB]
+            dataReboot.forEach(function(x){
+              idsToRestart.splice(idsToRestart.indexOf(x.id),1)
+            })
+            assert.ok(!idsToRestart.length)
+            n.stopall(done)
           })
-          assert.ok(!idsToRestart.length)
-          n.stopall(done)
         })
       })
     })
