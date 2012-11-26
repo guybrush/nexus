@@ -1,6 +1,7 @@
 var path = require('path')
 var rimraf = require('rimraf')
 var cp = require('child_process')
+var http = require('http')
 
 var configPath = path.join(__dirname,'config.js')
 var config = require(configPath)
@@ -16,6 +17,7 @@ module.exports =
 , config: config
 , tmpPath: tmpPath
 , appPath: appPath
+, sendRequest: sendRequest
 }
 
 function scenario() {}
@@ -40,5 +42,15 @@ function ee2log(name){
   return function(){
     debug((name || '☼')+':',this.event,'→',[].slice.call(arguments))
   }
+}
+
+function sendRequest(port,cb) {
+  http.get({host:'localhost',port:port,path:'/'},function(res){
+    if (res.statusCode != 200) return cb(res.statusCode)
+    res.setEncoding('utf8')
+    var data = ''
+    res.on('data',function(d){data+=d})
+    res.on('end',function(){cb(null,data)})
+  }).on('error', cb)
 }
 

@@ -41,7 +41,7 @@ ME['start error'] = function(done){
       assert.equal(data.name,name)
       var id = data.id
       ;(function checkRequest(){
-        sendRequest(function(err,d){
+        common.sendRequest(port,function(err,d){
           if (err) return setTimeout(checkRequest,200)
           assert.equal(d,id)
           var testHookPath = path.join(common.config.apps,name,'ERRORHOOK')
@@ -56,13 +56,6 @@ ME['start error'] = function(done){
           })()
         })
       })()
-      function sendRequest(cb) {
-        http.get({host:'localhost',port:port,path:'/'},function(res){
-          assert.equal(res.statusCode,200)
-          res.setEncoding('utf8')
-          res.on('data', function(d){cb(null,d)})
-        }).on('error', cb)
-      }
     })
   })
 }

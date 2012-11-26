@@ -39,22 +39,6 @@ var opti = require('optimist')
     , '    server     .. control nexus-servers'
     , '    help       .. try `nexus help <command>` for more info'
     ].join('\n')
-  
-var help = {}
-help.config     = ['nexus config'].join('\n')
-help.ls         = ['nexus ls [<filter>]'].join('\n')
-help.install    = ['nexus install <git-url>'].join('\n')
-help.uninstall  = ['nexus uninstall <app-name>'].join('\n')
-help.ps         = ['nexus ps [<filter>]'].join('\n')
-help.start      = ['nexus start <app-name> [-- <command>]'].join('\n')
-help.restart    = ['nexus restart <app-id>'].join('\n')
-help.restartall = ['nexus restartall'].join('\n')
-help.reboot     = ['nexus reboot'].join('\n')
-help.stop       = ['nexus stop <app-id> [<app-id> ..]'].join('\n')
-help.stopall    = ['nexus stopall'].join('\n')
-help.exec       = ['nexus exec [<app-name>] -- <command>'].join('\n')
-help.log        = ['nexus log <app-id> [<options>]'].join('\n')
-help.server     = ['nexus server [start]'].join('\n')
 
 // node@0.6.x compat
 fs.exists = fs.exists || path.exists
@@ -63,9 +47,8 @@ process.stdin.setRawMode = process.stdin.setRawMode || require('tty').setRawMode
     
 if (!argv._[0]) return exit(null, usage)
 else if (argv._[0] == 'help') {
-  if (!argv._[1] || !help[argv._[1]])
-    return exit(null, usage)
-  exit(null, help[argv._[1]])
+  if (!argv._[1]) return exit(null, usage)
+  help(argv._[1],exit)
 }
 else {
   var opts = {}
@@ -76,8 +59,12 @@ else {
   if (argv.cert) opts.cert = argv.cert
   if (argv.ca) opts.ca = argv.ca
   if (argv.r) opts.remote = argv.r
-  var N = nexus()
-  if (!opts.remote) return parseArgs('local')
+  if (argv.c)
+    var N = nexus(opts)
+  else
+    var N = nexus()
+  if (!opts.remote && !argv.p)
+    return parseArgs('local')
   var client = N.connect(opts,function(remote,conn){
     N = remote
     parseArgs('remote')
@@ -215,6 +202,15 @@ function parseArgs(type) {
       break
     default: exit('unknown command')
   }
+}
+
+function help(cmd,cb) {
+  var docDir = path.join(__dirname,'..','doc','cli')
+  var cmdFile = path.join(docDir,cmd+'.md')
+  fs.exists(cmdFile,function(e){
+    if (!e) return exit('invalid command "'+cmd+'"')
+    fs.readFile(cmdFile,'utf-8',cb)
+  })
 }
 
 function parseFilter(args) {
