@@ -9,7 +9,12 @@ test: test-prepare
 test-prepare:
 	rm -rf test/tmp/* ^.gitignore
 	cp -r test/fixtures/app test/tmp/app
-	cd test/tmp/app && git init . && git add . && git commit -am"foo"
+	cd test/tmp/app
+	git config user.email "foo@bar.com"
+	git config user.name "foo bar"
+	git init .
+	git add .
+	git commit -am"foo"
 	
 clean:
 	cd deps/mon && make clean
