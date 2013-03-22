@@ -1007,6 +1007,8 @@ function readTlsKeys(opts) {
       result.ca.push(fs.readFileSync(path.join(opts.ca,x)))
     })
   }
+  if (opts.rejectUnauthorized !== undefined)
+    result.rejectUnauthorized = opts.rejectUnauthorized
   return result
 }
 
