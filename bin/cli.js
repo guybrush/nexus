@@ -1,44 +1,45 @@
 #!/usr/bin/env node
 
 var opti = require('optimist')
-  , argv = opti.argv
-  , nexus = require('../')
-  , readline = require('readline')
-  , dnode = require('dnode')
-  , fs = require('fs')
-  , async = require('async')
-  , path = require('path')
-  , _ = require('underscore')
-  , cp = require('child_process')
-  , nodeMinorVersion = parseInt(process.versions.node.split('.')[1])
-  , _pkg = require('../package.json')
-  , debug = require('debug')('nexus:cli')
-  , usage =
-    [ ' ___  ___  _ _  _ _  ___'
-    , '|   || -_||_\'_|| | ||_ -|'
-    , '|_|_||___||_,_||___||___|v'+_pkg.version
-    , ''
-    , 'nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]'
-    , ''
-    , 'commands:'
-    , ''
-    , '    version    .. print version-number'
-    , '    config     .. print config'
-    , '    ls         .. list installed packages'
-    , '    install    .. install packages'
-    , '    uninstall  .. uninstall packages'
-    , '    ps         .. list of current running (and crashed) programs'
-    , '    start      .. start a program'
-    , '    restart    .. restart a running (or max crashed) program'
-    , '    restartall .. restart all running programs'
-    , '    reboot     .. reboot ghost-programs'
-    , '    stop       .. stop a running program'
-    , '    stopall    .. stop all running programs'
-    , '    exec       .. execute a command'
-    , '    log        .. access log-files'
-    , '    server     .. control nexus-servers'
-    , '    help       .. try `nexus help <command>` for more info'
-    ].join('\n')
+var argv = opti.argv
+var nexus = require('../')
+var readline = require('readline')
+var dnode = require('dnode')
+var fs = require('fs')
+var async = require('async')
+var path = require('path')
+var _ = require('underscore')
+var cp = require('child_process')
+var nodeMinorVersion = parseInt(process.versions.node.split('.')[1])
+var _pkg = require('../package.json')
+var debug = require('debug')('nexus:cli')
+var usage =
+  [ ' ___  ___  _ _  _ _  ___'
+  , '|   || -_||_\'_|| | ||_ -|'
+  , '|_|_||___||_,_||___||___|v'+_pkg.version
+  , ''
+  , 'nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]'
+  , ''
+  , 'commands:'
+  , ''
+  , '    version    .. print version-number'
+  , '    config     .. print config'
+  , '    ls         .. list installed packages'
+  , '    install    .. install packages'
+  , '    uninstall  .. uninstall packages'
+  , '    ps         .. list of current running (and crashed) programs'
+  , '    start      .. start a program'
+  , '    restart    .. restart a running (or max crashed) program'
+  , '    restartall .. restart all running programs'
+  , '    reboot     .. reboot ghost-programs'
+  , '    stop       .. stop a running program'
+  , '    stopall    .. stop all running programs'
+  , '    exec       .. execute a command'
+  , '    log        .. access log-files'
+  , '    server     .. control nexus-servers'
+  , '    help       .. try `nexus help <command>` for more info'
+  , ''
+  ].join('\n')
 
 // node@0.6.x compat
 fs.exists = fs.exists || path.exists

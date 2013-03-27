@@ -14,7 +14,8 @@
 
 * nexus provides a cli and a server with [dnode]-interface to install,
   uninstall, start, stop and observe local and remote programs.
-* right now only git-repos can be installed.
+* you can install a program with git (only) by using the `install` with a 
+  git-url.
 * running programs are monitored with [mon].
 * information about running programms is stored in a [dirty]-database.
 * all the config, logs and programs live in `~/.nexus` by default.
@@ -37,21 +38,22 @@
 install a program locally in `~/.nexus/apps`
 
     nexus install https://github.com/visionmedia/express
-   
-we need to do `npm install` since `nexus` does *not* do anything but cloning
-the repo. you can put a `nexus.json` into the root of your repo to tell `nexus`
-what you want it to do upon installation (see `nexus help install`):
+
+this will clone the repo into `~/.nexus/cache/<sha1(url)>` and checkout the
+current master into `~/.nexus/apps/express`. now we have to install the 
+dependencies since nexus doesnt do anything but git-clone/checkout if there 
+is no `nexus.json` in the root-directory of the repository.
     
     nexus exec express -- npm install
-    
-install another version of the program, the name is now express_2 to avoid 
-name-collision with the other program. now it will clone from a locally 
-mirrored cache of the repo:
+  
+install another version of the program, the name will be `express_1` to avoid 
+name-collision with the other program. now it will fetch/update the local
+cache of the repository and clone from that to save time:
    
     nexus install https://github.com/visionmedia/express#2.5.11
     nexus exec express_1 -- npm install
  
-start the resource-example with version 3.0.0rc3:
+start the resource-example with in the current master-branch of express:
 
     nexus start express -- node examples/resource/app
 
@@ -59,7 +61,7 @@ start another process with version 2.5.11:
     
     nexus start express_1 -- node -e "require('./examples/resource/app').listen(3001)"
 
-show all locally running processes:    
+show all locally running processes:
 
     nexus ps
     
@@ -71,36 +73,55 @@ start a nexus server:
 
     nexus server start -p 3840
     
-remotly install a program and start a process, stopall and uninstall:
+remotely install a program and start a process, stopall and uninstall:
 
-    nexus -h 127.0.0.1 -p 3840 install https://github.com/visionmedia/express foo
-    nexus -h 127.0.0.1 -p 3840 start foo -- node examples/blog/app
-    nexus -h 127.0.0.1 -p 3840 ps
-    nexus -h 127.0.0.1 -p 3840 stopall
-    nexus -h 127.0.0.1 -p 3840 rm foo
+    nexus -h 123.4.5.6 -p 3840 install https://github.com/visionmedia/express foo
+    nexus -h 123.4.5.6 -p 3840 start foo -- node examples/blog/app
+    nexus -h 123.4.5.6 -p 3840 ps
+    nexus -h 123.4.5.6 -p 3840 stopall
+    nexus -h 123.4.5.6 -p 3840 rm foo
 
+for further information please checkout the cli- and api-docs or take a look
+at the tests.
+    
 ## cli
 
     nexus [-r <remote>] [-c <path to configFile>] [<command> [<options>]]
 
 commands:
 
-* [version] - print version-number
-* [config] - print config
-* [ls] - list installed packages
-* [install] - install packages
-* [uninstall] - uninstall packages
-* [ps] - list of current running (and crashed) programs
-* [start] - start a program
-* [restart] - restart a running (or max crashed) program
-* [restartall] - restart all running programs
-* [reboot] - reboot ghost-programs
-* [stop] - stop a running program
-* [stopall] - stop all running programs
-* [exec] - execute a command
-* [log] - access log-files
-* [server] - control nexus-servers
-* [help] - try `nexus help <command>` for more info
+* [cli-version] - print version-number
+* [cli-config] - print config
+* [cli-ls] - list installed packages
+* [cli-install] - install packages
+* [cli-uninstall] - uninstall packages
+* [cli-ps] - list of current running (and crashed) programs
+* [cli-start] - start a program
+* [cli-restart] - restart a running (or max crashed) program
+* [cli-restartall] - restart all running programs
+* [cli-reboot] - reboot ghost-programs
+* [cli-stop] - stop a running program
+* [cli-stopall] - stop all running programs
+* [cli-exec] - execute a command
+* [cli-log] - access log-files
+* [cli-server] - control nexus-servers
+* [cli-help] - try `nexus help <command>` for more info
+
+[cli-version]: https://github.com/guybrush/nexus/blob/master/doc/cli/version.md
+[cli-config]: https://github.com/guybrush/nexus/blob/master/doc/cli/config.md
+[cli-ls]: https://github.com/guybrush/nexus/blob/master/doc/cli/ls.md
+[cli-uninstall]: https://github.com/guybrush/nexus/blob/master/doc/cli/uninstall.md
+[cli-ps]: https://github.com/guybrush/nexus/blob/master/doc/cli/ps.md
+[cli-start]: https://github.com/guybrush/nexus/blob/master/doc/cli/start.md
+[cli-restart]: https://github.com/guybrush/nexus/blob/master/doc/cli/restart.md
+[cli-restartall]: https://github.com/guybrush/nexus/blob/master/doc/cli/restartall.md
+[cli-reboot]: https://github.com/guybrush/nexus/blob/master/doc/cli/reboot.md
+[cli-stop]: https://github.com/guybrush/nexus/blob/master/doc/cli/stop.md
+[cli-stopall]: https://github.com/guybrush/nexus/blob/master/doc/cli/stopall.md
+[cli-exec]: https://github.com/guybrush/nexus/blob/master/doc/cli/exec.md
+[cli-log]: https://github.com/guybrush/nexus/blob/master/doc/cli/log.md
+[cli-server]: https://github.com/guybrush/nexus/blob/master/doc/cli/server.md
+[cli-help]: https://github.com/guybrush/nexus/blob/master/doc/cli/help.md
 
 ## api
 

@@ -9,11 +9,13 @@
 you can pass a string or an object to the nexus-constructor or use the (`-c`)
 option with the cli. if you pass a string it will will be `require(string)`'ed.
 
-* `var nexus = require('nexus')('/some/path/to/a/file.json/or/file.js')`
-* `var nexus = require('nexus')({prefix:__dirname})`
-* `nexus -c /some/path/to/../file.json/or/file.js`
+* cli
+    * `nexus -c /some/path/to/../file.json/or/file.js`
+* api
+    * `var nexus = require('nexus')('/some/path/to/a/file.json/or/file.js')`
+    * `var nexus = require('nexus')({prefix:__dirname})`
 
-if you dont pass any config-option the nexus-cli will create a
+if you dont pass any config-option the nexus will create a
 `~/.nexus`-directory if it doesnt exist and put all the configs and logs there.
 it will try to `require('~/.nexus/config.js')` per default.
 
@@ -70,3 +72,4 @@ or more simple - this will install all the things into `/var/nexus`:
 ```
 
 the nexus-server will then listen on port `0.0.0.0:12345`.
+
