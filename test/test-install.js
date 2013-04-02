@@ -9,6 +9,7 @@ ME.before = function(done){common.cleanup(done)}
 ME.git = function(done){
   var n = nexus(common.config)
   n.install({url:common.appPath,name:'fofoo'},function(err,data){
+    if (err) throw new Error(err)
     assert.ok(!err)
     assert.equal(data.name,'fofoo')
     var testHookPath = path.join(common.config.apps,'fofoo','INSTALLHOOK')

@@ -6,7 +6,8 @@ var port = !!~idx && process.argv[idx+1]
 
 http.createServer(function(req,res){
   res.end(process.env.NEXUS_ID)
-  if (req.url!='/favicon.ico') throw(new Error('i crashed hard'))
+  if (req.url == '/crash' && req.url != '/favicon.ico') 
+    throw(new Error('i crashed hard'))
 }).listen(port,function(){
   console.log(':'+port)
 })

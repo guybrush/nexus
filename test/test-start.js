@@ -41,7 +41,7 @@ ME['start error'] = function(done){
       assert.equal(data.name,name)
       var id = data.id
       ;(function checkRequest(){
-        common.sendRequest(port,function(err,d){
+        common.sendRequest(port,'/crash',function(err,d){
           if (err) return setTimeout(checkRequest,200)
           assert.equal(d,id)
           var testHookPath = path.join(common.config.apps,name,'ERRORHOOK')

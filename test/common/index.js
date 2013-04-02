@@ -5,8 +5,9 @@ var http = require('http')
 
 var configPath = path.join(__dirname,'config.js')
 var config = require(configPath)
+var fixturesPath = path.join(__dirname,'..','fixtures')
 var tmpPath = path.join(__dirname,'..','tmp')
-var appPath = path.join(__dirname,'..','tmp','app')
+var appPath = path.join(fixturesPath,'app')
 
 module.exports =
 { scenario: scenario
@@ -44,8 +45,9 @@ function ee2log(name){
   }
 }
 
-function sendRequest(port,cb) {
-  http.get({host:'localhost',port:port,path:'/'},function(res){
+function sendRequest(port,path,cb) {
+  path = path || '/'
+  http.get({host:'localhost',port:port,path:path},function(res){
     if (res.statusCode != 200) return cb(res.statusCode)
     res.setEncoding('utf8')
     var data = ''
