@@ -249,7 +249,7 @@ N.ls = function ls(filter, cb) {
         var filteredData = objFilter(filter, data)
         if (filteredData) result.push(filteredData)
       })
-      result.sort(function(x,y){return x.name>y.name})
+      result.sort(function(x,y){return x.name>y.name ? 1 : -1})
       cb(null, result)
     })
   })
@@ -310,7 +310,7 @@ N.ps = function ps(filter, cb) {
       next()
     })
   },function(){
-    result.sort(function(x,y){return x.name>y.name})
+    result.sort(function(x,y){return x.name>y.name ? 1 : -1})
     cb(null,result)
   })
 }
